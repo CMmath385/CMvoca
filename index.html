@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>최강수학메이드영어학원 - 영어 단어 학습 포털</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
         body { font-family: 'Pretendard', sans-serif; }
@@ -19,7 +19,7 @@
                 <h1 class="text-2xl font-bold tracking-tight">최강수학메이드영어학원</h1>
                 <p class="text-indigo-200 text-sm mt-0.5">스마트 영어 단어 & 스펠링 학습 시스템</p>
             </div>
-            <div id="status-badge" class="hidden md:block bg-indigo-800 text-indigo-100 text-xs px-3 py-1.5 rounded-full border border-indigo-600">
+            <div class="hidden md:block bg-indigo-800 text-indigo-100 text-xs px-3 py-1.5 rounded-full border border-indigo-600">
                 온라인 학습관 연결됨
             </div>
         </div>
@@ -32,7 +32,7 @@
         <section class="mb-8">
             <h2 class="text-xl font-bold text-slate-800 mb-4 border-l-4 border-indigo-600 pl-3">학년별 학습 과정 선택</h2>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <button onclick="filterGrade('all')" class="grade-btn bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-500 font-bold text-slate-700 hover:text-indigo-600 transition text-center active-grade" data-grade="all">
+                <button onclick="filterGrade('all')" class="grade-btn bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-500 font-bold text-slate-700 hover:text-indigo-600 transition text-center" data-grade="all">
                     전체 보기
                 </button>
                 <button onclick="filterGrade('m1')" class="grade-btn bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-500 font-bold text-slate-700 hover:text-indigo-600 transition text-center" data-grade="m1">
@@ -52,7 +52,7 @@
             <!-- Dynamic Content Load -->
         </section>
 
-        <!-- Quiz Container (Hidden initially) -->
+        <!-- Quiz Container -->
         <section id="quiz-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
             <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 relative">
                 <button onclick="closeQuiz()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
@@ -89,7 +89,6 @@
     </footer>
 
     <script>
-        // 학년별/단원별 Vocabulary Database
         const lessonsData = [
             {
                 id: 'm1-5',
@@ -223,9 +222,9 @@
 
         function filterGrade(grade) {
             document.querySelectorAll('.grade-btn').forEach(btn => {
-                btn.classList.remove('border-indigo-500', 'text-indigo-600');
+                btn.classList.remove('border-indigo-500', 'text-indigo-600', 'bg-indigo-50/50');
             });
-            event.target.classList.add('border-indigo-500', 'text-indigo-600');
+            event.target.classList.add('border-indigo-500', 'text-indigo-600', 'bg-indigo-50/50');
             renderGrid(grade);
         }
 
@@ -284,7 +283,6 @@
             document.getElementById('quiz-modal').classList.add('hidden');
         }
 
-        // Initialize Page
         renderGrid('all');
     </script>
 </body>
