@@ -8,9 +8,11 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
         body { font-family: 'Pretendard', sans-serif; }
+        .draggable-item { cursor: grab; }
+        .draggable-item:active { cursor: grabbing; }
         @media (max-width: 767px) {
             #sidebar-container { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
-            #sidebar-container button { flex: none; width: auto; white-space: nowrap; }
+            #sidebar-container div { flex: none; width: auto; white-space: nowrap; }
             #super-admin-tabs, #sub-admin-tabs { overflow-x: auto; }
             #super-admin-tabs button, #sub-admin-tabs button { flex: none !important; white-space: nowrap; }
             #content-container > div { flex-wrap: wrap; }
@@ -72,7 +74,7 @@
                     <nav id="top-nav-container" class="flex flex-wrap gap-2 text-sm font-bold items-center">
                         <!-- Dynamic Top Tabs -->
                     </nav>
-                    <button onclick="manageTopTabsPrompt()" id="btn-manage-tabs" class="hidden text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-2 rounded-xl transition" title="상단 메뉴 관리">⚙️ 메뉴설정</button>
+                    <button onclick="addTopTabPrompt()" id="btn-add-tab" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2.5 py-2 rounded-xl font-bold hover:bg-indigo-100 transition">+ 메뉴추가</button>
                 </div>
 
                 <div class="flex items-center gap-3">
@@ -90,10 +92,7 @@
             <aside class="w-full md:w-64 flex-shrink-0 flex flex-col gap-2">
                 <div class="flex justify-between items-center px-1 mb-1">
                     <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">학습 카테고리</span>
-                    <div class="flex items-center gap-1">
-                        <button onclick="manageSidebarCategoriesPrompt()" id="sidebar-manage-btn" class="hidden text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold hover:bg-slate-300">⚙️ 관리</button>
-                        <button onclick="addSidebarCategoryPrompt()" id="sidebar-add-btn" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-100">+ 추가</button>
-                    </div>
+                    <button onclick="addSidebarCategoryPrompt()" id="sidebar-add-btn" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-100">+ 추가</button>
                 </div>
                 <div id="sidebar-container" class="flex flex-col gap-1.5">
                     <!-- Dynamic Sidebar -->
@@ -124,14 +123,14 @@
                                 <h2 id="current-title" class="text-xl font-bold text-slate-800">폴더 및 학습 목록</h2>
                             </div>
                             
-                            <div class="flex items-center gap-2 w-full sm:w-auto" id="action-buttons-box">
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
                                 <button onclick="addFolderPrompt()" id="btn-add-folder" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">+ 새 폴더 추가</button>
                                 <button onclick="addLinkFilePrompt()" id="btn-add-link" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">🔗 웹/링크 등록</button>
                             </div>
                         </div>
 
                         <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원이 공유한 공통 자료는 보호되며, 우리 학원에서 추가한 자료만 자유롭게 수정·삭제할 수 있습니다.</span>
+                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 항목을 마우스로 드래그하여 순서를 바꿀 수 있으며, 우클릭하면 이름변경 및 삭제가 가능합니다.</span>
                         </div>
 
                         <div id="content-container" class="space-y-3"></div>
@@ -274,7 +273,7 @@
         }
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v25');
+            const saved = localStorage.getItem('multi_academy_portal_v26');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
@@ -293,7 +292,7 @@
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v25', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v26', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
@@ -349,27 +348,23 @@
                 document.getElementById('super-admin-tabs').classList.remove('hidden');
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
                 document.getElementById('sidebar-add-btn').classList.remove('hidden');
-                document.getElementById('sidebar-manage-btn').classList.remove('hidden');
-                document.getElementById('btn-manage-tabs').classList.remove('hidden');
+                document.getElementById('btn-add-tab').classList.remove('hidden');
             } else if (state.currentUser.role === 'sub') {
                 badge.innerText = `🏛️ ${state.currentUser.academyName} 원장님`;
                 nameEl.innerText = state.currentUser.academyName;
-                subEl.innerText = '지점 관리자 모드 (자체 자료 등록/수정 가능)';
+                subEl.innerText = '지점 관리자 모드';
                 document.getElementById('super-admin-tabs').classList.add('hidden');
                 document.getElementById('sub-admin-tabs').classList.remove('hidden');
                 document.getElementById('sidebar-add-btn').classList.add('hidden');
-                document.getElementById('sidebar-manage-btn').classList.add('hidden'); // 지점장은 카테고리 구조 수정 불가
-                document.getElementById('btn-manage-tabs').classList.add('hidden');
+                document.getElementById('btn-add-tab').classList.add('hidden');
             } else {
-                const b = state.branches.find(x => x.id === student.branchId);
                 badge.innerText = `👨‍🎓 ${state.currentUser.name} 학생`;
-                nameEl.innerText = b ? b.academyName : '학원';
+                nameEl.innerText = state.currentUser.academyName || '학원';
                 subEl.innerText = '학생 학습관';
                 document.getElementById('super-admin-tabs').classList.add('hidden');
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
                 document.getElementById('sidebar-add-btn').classList.add('hidden');
-                document.getElementById('sidebar-manage-btn').classList.add('hidden');
-                document.getElementById('btn-manage-tabs').classList.add('hidden');
+                document.getElementById('btn-add-tab').classList.add('hidden');
             }
 
             if (!state.topTabs.some(t => t.id === state.currentTopTab) && state.topTabs.length > 0) {
@@ -393,7 +388,7 @@
             const container = document.getElementById('top-nav-container');
             container.innerHTML = '';
 
-            state.topTabs.forEach(tab => {
+            state.topTabs.forEach((tab, index) => {
                 const isActive = state.currentTopTab === tab.id;
                 const btn = document.createElement('button');
                 btn.className = isActive
@@ -405,96 +400,104 @@
                     renderTopNav();
                     renderContent();
                 };
+
+                // 최고관리자인 경우 상단 탭 우클릭 시 이름변경/삭제 지원
+                if (state.currentUser && state.currentUser.role === 'super') {
+                    btn.oncontextmenu = (e) => {
+                        e.preventDefault();
+                        const cmd = prompt(`[${tab.name}] 메뉴 설정:\n1. 이름 변경\n2. 삭제`, '1');
+                        if (cmd === '1') {
+                            const newName = prompt('새 메뉴 이름:', tab.name);
+                            if (newName) { tab.name = newName.trim(); renderTopNav(); saveState(); }
+                        } else if (cmd === '2') {
+                            if (state.topTabs.length <= 1) return alert('최소 1개 메뉴는 필요합니다.');
+                            state.topTabs.splice(index, 1);
+                            if (state.currentTopTab === tab.id) state.currentTopTab = state.topTabs[0].id;
+                            renderTopNav(); renderContent(); saveState();
+                        }
+                    };
+                }
                 container.appendChild(btn);
             });
         }
 
-        function manageTopTabsPrompt() {
-            if (state.currentUser.role !== 'super') return alert('최고관리자만 메뉴를 설정할 수 있습니다.');
-            const action = prompt('상단 메뉴(탭) 관리 옵션을 선택하세요:\n1. 추가\n2. 이름 수정\n3. 삭제\n4. 순서 변경', '1');
-            if (!action) return;
-
-            if (action === '1') {
-                const name = prompt('새 메뉴 이름을 입력하세요:');
-                if (!name) return;
-                const id = 'tab_' + Date.now();
-                state.topTabs.push({ id, name: name.trim() });
-            } else if (action === '2' || action === '3' || action === '4') {
-                const listStr = state.topTabs.map((t, idx) => `${idx + 1}. ${t.name}`).join('\n');
-                const idxChoice = prompt(`대상 메뉴 번호를 입력하세요:\n\n${listStr}`);
-                if (!idxChoice) return;
-                const idx = parseInt(idxChoice) - 1;
-                if (isNaN(idx) || idx < 0 || idx >= state.topTabs.length) return alert('올바른 번호가 아닙니다.');
-
-                if (action === '2') {
-                    const newName = prompt('새 메뉴 이름을 입력하세요:', state.topTabs[idx].name);
-                    if (newName) state.topTabs[idx].name = newName.trim();
-                } else if (action === '3') {
-                    if (state.topTabs.length <= 1) return alert('최소 1개의 메뉴는 남아있어야 합니다.');
-                    const removedId = state.topTabs[idx].id;
-                    state.topTabs.splice(idx, 1);
-                    if (state.currentTopTab === removedId) state.currentTopTab = state.topTabs[0].id;
-                } else if (action === '4') {
-                    if (idx > 0) {
-                        const temp = state.topTabs[idx];
-                        state.topTabs[idx] = state.topTabs[idx - 1];
-                        state.topTabs[idx - 1] = temp;
-                    }
-                }
+        function addTopTabPrompt() {
+            if (state.currentUser.role !== 'super') return;
+            const name = prompt('새 상단 메뉴(탭) 이름을 입력하세요:');
+            if (name) {
+                state.topTabs.push({ id: 'tab_' + Date.now(), name: name.trim() });
+                renderTopNav();
+                saveState();
             }
-            renderTopNav();
-            renderContent();
-            saveState();
         }
 
         function renderSidebar() {
             const container = document.getElementById('sidebar-container');
             container.innerHTML = '';
 
-            state.sidebarCats.forEach(cat => {
+            state.sidebarCats.forEach((cat, index) => {
                 const isActive = state.currentSidebarCat === cat.id;
-                const btn = document.createElement('button');
-                btn.className = isActive
-                    ? 'w-full text-left bg-indigo-900 text-white font-bold p-3 rounded-xl shadow-sm text-sm flex justify-between items-center'
-                    : 'w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold p-3 rounded-xl text-sm flex justify-between items-center border border-slate-200 transition';
-                btn.innerHTML = `<span>${cat.name}</span> ${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
-                btn.onclick = () => {
+                const div = document.createElement('div');
+                div.className = isActive
+                    ? 'w-full text-left bg-indigo-900 text-white font-bold p-3 rounded-xl shadow-sm text-sm flex justify-between items-center draggable-item'
+                    : 'w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold p-3 rounded-xl text-sm flex justify-between items-center border border-slate-200 transition draggable-item';
+                div.innerHTML = `<span>${cat.name}</span> ${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
+                
+                div.onclick = () => {
                     state.currentSidebarCat = cat.id;
                     state.currentFolderId = null;
+                    renderSidebar();
                     renderContent();
                 };
-                container.appendChild(btn);
+
+                // 카테고리 우클릭 설정 (최고관리자만)
+                if (state.currentUser && state.currentUser.role === 'super') {
+                    div.oncontextmenu = (e) => {
+                        e.preventDefault();
+                        const cmd = prompt(`[${cat.name}] 카테고리 설정:\n1. 이름 변경\n2. 삭제`, '1');
+                        if (cmd === '1') {
+                            const newName = prompt('새 카테고리 이름:', cat.name);
+                            if (newName) { cat.name = newName.trim(); renderSidebar(); saveState(); }
+                        } else if (cmd === '2') {
+                            if (state.sidebarCats.length <= 1) return alert('최소 1개 카테고리는 필요합니다.');
+                            state.sidebarCats.splice(index, 1);
+                            delete state.masterDatabase[cat.id];
+                            if (state.currentSidebarCat === cat.id) state.currentSidebarCat = state.sidebarCats[0].id;
+                            renderSidebar(); renderContent(); saveState();
+                        }
+                    };
+                }
+
+                // 드래그 앤 드롭으로 카테고리 순서 변경
+                div.draggable = true;
+                div.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); };
+                div.ondragover = (e) => { e.preventDefault(); };
+                div.ondrop = (e) => {
+                    e.preventDefault();
+                    const srcIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                    const targetIdx = index;
+                    if (srcIdx !== targetIdx) {
+                        const moved = state.sidebarCats.splice(srcIdx, 1)[0];
+                        state.sidebarCats.splice(targetIdx, 0, moved);
+                        renderSidebar();
+                        saveState();
+                    }
+                };
+
+                container.appendChild(div);
             });
         }
 
-        function manageSidebarCategoriesPrompt() {
+        function addSidebarCategoryPrompt() {
             if (state.currentUser.role !== 'super') return;
-            const action = prompt('카테고리 관리 옵션:\n1. 이름 수정\n2. 삭제\n3. 순서 변경', '1');
-            if (!action) return;
-
-            const listStr = state.sidebarCats.map((c, idx) => `${idx + 1}. ${c.name}`).join('\n');
-            const idxChoice = prompt(`대상 카테고리 번호:\n\n${listStr}`);
-            if (!idxChoice) return;
-            const idx = parseInt(idxChoice) - 1;
-            if (isNaN(idx) || idx < 0 || idx >= state.sidebarCats.length) return;
-
-            if (action === '1') {
-                const newName = prompt('새 카테고리 이름:', state.sidebarCats[idx].name);
-                if (newName) state.sidebarCats[idx].name = newName.trim();
-            } else if (action === '2') {
-                if (state.sidebarCats.length <= 1) return alert('최소 1개 유지');
-                const catId = state.sidebarCats[idx].id;
-                state.sidebarCats.splice(idx, 1);
-                delete state.masterDatabase[catId];
-                if (state.currentSidebarCat === catId) state.currentSidebarCat = state.sidebarCats[0].id;
-            } else if (action === '3' && idx > 0) {
-                const temp = state.sidebarCats[idx];
-                state.sidebarCats[idx] = state.sidebarCats[idx - 1];
-                state.sidebarCats[idx - 1] = temp;
+            const name = prompt('새 카테고리 이름을 입력하세요:');
+            if (name) {
+                const id = 'cat_' + Date.now();
+                state.sidebarCats.push({ id, name: name.trim() });
+                state.masterDatabase[id] = [];
+                renderSidebar();
+                saveState();
             }
-            renderSidebar();
-            renderContent();
-            saveState();
         }
 
         function getBreadcrumbPath(folderId) {
@@ -552,9 +555,9 @@
                 return;
             }
 
-            currentChildren.forEach((item) => {
+            currentChildren.forEach((item, index) => {
                 const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center gap-3 font-bold text-slate-700 text-sm hover:border-slate-300 transition";
+                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center gap-3 font-bold text-slate-700 text-sm hover:border-slate-300 transition draggable-item";
                 
                 const leftDiv = document.createElement('div');
                 leftDiv.className = "flex items-center gap-2.5 cursor-pointer flex-grow";
@@ -577,48 +580,55 @@
 
                 row.appendChild(leftDiv);
 
-                const rightBox = document.createElement('div');
-                rightBox.className = 'flex items-center gap-1.5 flex-shrink-0';
-
+                // 마우스 우클릭 시 이름변경/삭제 메뉴 (권한에 맞게)
                 const isSuperUser = (state.currentUser && state.currentUser.role === 'super');
                 const isSubUser = (state.currentUser && state.currentUser.role === 'sub');
-
-                // 수정/삭제 권한 판별: 최고관리자는 전체 가능, 하위관리자는 자신이 만든 자료만 가능 (공유 자료 수정/삭제 불가)
                 const canModifyThisItem = isSuperUser || (isSubUser && !isSuperItem);
 
                 if (canModifyThisItem && state.currentUser && state.currentUser.role !== 'student') {
-                    const upBtn = document.createElement('button');
-                    upBtn.className = "bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2 py-1 rounded font-bold transition";
-                    upBtn.innerText = "▲";
-                    upBtn.onclick = (e) => { e.stopPropagation(); moveItemOrder(item.id, -1); };
-                    rightBox.appendChild(upBtn);
-
-                    const downBtn = document.createElement('button');
-                    downBtn.className = "bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2 py-1 rounded font-bold transition";
-                    downBtn.innerText = "▼";
-                    downBtn.onclick = (e) => { e.stopPropagation(); moveItemOrder(item.id, 1); };
-                    rightBox.appendChild(downBtn);
-
-                    if (item.type === 'file') {
-                        const moveTabBtn = document.createElement('button');
-                        moveTabBtn.className = "text-amber-600 hover:bg-amber-50 font-bold text-xs px-2 py-1.5 rounded-lg border border-amber-200 transition";
-                        moveTabBtn.innerText = "🔀 탭이동";
-                        moveTabBtn.onclick = (e) => { e.stopPropagation(); moveItemTabPrompt(item.id); };
-                        rightBox.appendChild(moveTabBtn);
-                    }
-
-                    const editBtn = document.createElement('button');
-                    editBtn.className = "text-indigo-600 hover:bg-indigo-50 font-bold text-xs px-2 py-1.5 rounded-lg border border-indigo-200 transition";
-                    editBtn.innerText = "✏️ 수정";
-                    editBtn.onclick = (e) => { e.stopPropagation(); editMasterItem(item.id); };
-                    rightBox.appendChild(editBtn);
-
-                    const delBtn = document.createElement('button');
-                    delBtn.className = "text-rose-500 hover:bg-rose-50 font-bold text-xs px-2 py-1.5 rounded-lg border border-rose-200 transition";
-                    delBtn.innerText = "🗑️ 삭제";
-                    delBtn.onclick = (e) => { e.stopPropagation(); deleteMasterItem(item.id); };
-                    rightBox.appendChild(delBtn);
+                    row.oncontextmenu = (e) => {
+                        e.preventDefault();
+                        const cmd = prompt(`[${item.name}] 항목 설정:\n1. 이름 변경\n2. 탭 이동(🔀)\n3. 삭제`, '1');
+                        if (cmd === '1') {
+                            const newName = prompt('새 이름:', item.name);
+                            if (newName) {
+                                item.name = newName.trim();
+                                if (item.linkUrl !== undefined) {
+                                    const newLink = prompt('웹/링크 주소:', item.linkUrl);
+                                    if (newLink !== null) item.linkUrl = newLink.trim();
+                                }
+                                renderContent(); saveState();
+                            }
+                        } else if (cmd === '2' && item.type === 'file') {
+                            moveItemTabPrompt(item.id);
+                        } else if (cmd === '3') {
+                            deleteMasterItem(item.id);
+                        }
+                    };
                 }
+
+                // 드래그 앤 드롭으로 항목 순서 변경
+                row.draggable = true;
+                row.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); };
+                row.ondragover = (e) => { e.preventDefault(); };
+                row.ondrop = (e) => {
+                    e.preventDefault();
+                    const srcIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                    const targetIdx = index;
+                    const fullArr = state.masterDatabase[state.currentSidebarCat];
+                    // 현재 폴더/탭 필터 내부에서의 순서를 전체 배열에 반영
+                    if (srcIdx !== targetIdx) {
+                        const moved = currentChildren.splice(srcIdx, 1)[0];
+                        currentChildren.splice(targetIdx, 0, moved);
+                        // 전체 masterDatabase 순서 재배치
+                        state.masterDatabase[state.currentSidebarCat] = fullArr.filter(x => !currentChildren.includes(x)).concat(currentChildren);
+                        renderContent();
+                        saveState();
+                    }
+                };
+
+                const rightBox = document.createElement('div');
+                rightBox.className = 'flex items-center gap-1.5 flex-shrink-0';
 
                 const isOpenLink = item.type !== 'folder' && item.linkUrl && !/youtube\.com|youtu\.be/.test(item.linkUrl);
                 const actionBtn = document.createElement(isOpenLink ? 'a' : 'button');
@@ -666,19 +676,6 @@
             document.getElementById('video-iframe').src = '';
         }
 
-        function moveItemOrder(itemId, dir) {
-            const arr = state.masterDatabase[state.currentSidebarCat];
-            const idx = arr.findIndex(i => i.id === itemId);
-            if (idx === -1) return;
-            const targetIdx = idx + dir;
-            if (targetIdx < 0 || targetIdx >= arr.length) return;
-            const temp = arr[idx];
-            arr[idx] = arr[targetIdx];
-            arr[targetIdx] = temp;
-            renderContent();
-            saveState();
-        }
-
         function moveItemTabPrompt(itemId) {
             const item = state.masterDatabase[state.currentSidebarCat].find(i => i.id === itemId);
             if (!item) return;
@@ -696,23 +693,6 @@
             renderContent();
             saveState();
             alert(`[${state.topTabs[idx].name}] 탭으로 이동되었습니다.`);
-        }
-
-        function editMasterItem(itemId) {
-            const item = state.masterDatabase[state.currentSidebarCat].find(i => i.id === itemId);
-            if (!item) return;
-            if (state.currentUser.role === 'sub' && item.authorRole === 'super') {
-                return alert('본원에서 공유해 준 자료는 수정할 수 없습니다.');
-            }
-            const newName = prompt('새 이름을 입력하세요:', item.name);
-            if (!newName) return;
-            item.name = newName.trim();
-            if (item.linkUrl !== undefined) {
-                const newLink = prompt('웹/링크 주소를 입력하세요:', item.linkUrl);
-                if (newLink !== null) item.linkUrl = newLink.trim();
-            }
-            renderContent();
-            saveState();
         }
 
         function deleteMasterItem(id) {
@@ -768,19 +748,6 @@
             renderContent();
             saveState();
             alert(`'${title}' 자료가 등록되었습니다.`);
-        }
-
-        function addSidebarCategoryPrompt() {
-            if (state.currentUser.role !== 'super') return;
-            const name = prompt('새 카테고리 이름을 입력하세요:');
-            if (name) {
-                const id = 'cat_' + Date.now();
-                state.sidebarCats.push({ id, name: name.trim() });
-                state.masterDatabase[id] = [];
-                renderSidebar();
-                renderContent();
-                saveState();
-            }
         }
 
         function switchAdminView(view) {
