@@ -9,6 +9,14 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
         body { font-family: 'Pretendard', sans-serif; }
+        @media (max-width: 767px) {
+            #sidebar-container { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+            #sidebar-container button { flex: none; width: auto; white-space: nowrap; }
+            #super-admin-tabs, #sub-admin-tabs { overflow-x: auto; }
+            #super-admin-tabs button, #sub-admin-tabs button { flex: none !important; white-space: nowrap; }
+            #content-container > div { flex-wrap: wrap; }
+            main { padding: 14px !important; }
+        }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col">
@@ -39,6 +47,11 @@
             </form>
 
             <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500 h-4"></div>
+            
+            <div class="mt-6 flex justify-between items-center text-xs px-2">
+                <button onclick="forceResetStorage()" class="text-slate-400 font-bold underline hover:text-slate-600">저장소 데이터 초기화</button>
+                <button onclick="exportData()" class="text-indigo-600 font-bold underline hover:text-indigo-800">📥 data.json 내보내기</button>
+            </div>
         </div>
     </div>
 
@@ -118,8 +131,9 @@
                             </div>
                         </div>
 
-                        <div id="sub-activity-bar" class="mb-6 p-3 bg-amber-50 rounded-2xl border border-amber-200/80 flex flex-wrap gap-2 items-center">
-                            <!-- Dynamic -->
+                        <!-- 탭 안내 배너 -->
+                        <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
+                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">🔤 현재 단어 학습 자료만 표시 중입니다.</span>
                         </div>
 
                         <div id="content-container" class="space-y-3">
@@ -324,12 +338,38 @@
             currentSubView: 'content',
             currentTopTab: 'voca',
             currentSidebarCat: 'middle_exam',
-            currentFolderId: null,
-            currentActivityMode: 'all'
+            currentFolderId: null
         };
 
+        function forceResetStorage() {
+            localStorage.clear();
+            localStorage.removeItem('cm_admin_pc');
+            alert('초기 설정으로 원상복구되었습니다.');
+            location.reload();
+        }
+
+        async function loadShared() {
+            loadState();
+            if (localStorage.getItem('cm_admin_pc')) return;
+            try {
+                const r = await fetch('data.json?v=' + Date.now(), { cache: 'no-store' });
+                if (r.ok) {
+                    const d = await r.json();
+                    ['branches','students','masterDatabase','wordDataMap','sidebarCats'].forEach(k => { if (d[k]) state[k] = d[k]; });
+                }
+            } catch (e) {}
+        }
+
+        function exportData() {
+            const data = { branches: state.branches, students: state.students, masterDatabase: state.masterDatabase, wordDataMap: state.wordDataMap, sidebarCats: state.sidebarCats };
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+            a.download = 'data.json';
+            a.click();
+        }
+
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v19');
+            const saved = localStorage.getItem('multi_academy_portal_v21');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
@@ -348,7 +388,7 @@
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v19', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v21', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
@@ -366,6 +406,7 @@
 
             if (id === 'admin' && pw === state.superAdminPw) {
                 state.currentUser = { role: 'super', username: 'admin' };
+                localStorage.setItem('cm_admin_pc', '1');
                 enterPortal();
                 return;
             }
@@ -464,52 +505,24 @@
                 const btn = document.createElement('button');
                 btn.className = isActive
                     ? 'bg-amber-500 text-slate-900 font-bold px-4 py-2 rounded-xl shadow-sm transition'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl transition';
+                    : 'bg-slate-100 text-slate-700 font-bold px-4 py-2 rounded-xl hover:bg-slate-200 transition';
                 btn.innerText = tab.name;
                 btn.onclick = () => {
                     state.currentTopTab = tab.id;
-                    state.currentActivityMode = 'all';
                     renderTopNav();
-                    renderActivitySubBar();
                     renderContent();
                 };
                 container.appendChild(btn);
             });
 
-            renderActivitySubBar();
-        }
-
-        function renderActivitySubBar() {
-            const container = document.getElementById('sub-activity-bar');
-            container.innerHTML = '';
-
+            const bannerText = document.getElementById('tab-info-text');
             if (state.currentTopTab === 'voca') {
-                container.innerHTML = `
-                    <span class="text-xs font-bold text-amber-800 mr-2">🔤 단어 학습 카테고리:</span>
-                    <button onclick="setActivityMode('all')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='all'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">전체 보기</button>
-                    <button onclick="setActivityMode('voca_kor_eng')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='voca_kor_eng'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">단어 한글+영어 학습</button>
-                    <button onclick="setActivityMode('voca_spelling')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='voca_spelling'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">스펠링 테스트</button>
-                `;
+                bannerText.innerHTML = '🔤 <strong>[단어 탭]</strong> 선택됨: 단어 한글+영어, 스펠링 테스트 자료만 표시됩니다.';
             } else if (state.currentTopTab === 'passage') {
-                container.innerHTML = `
-                    <span class="text-xs font-bold text-amber-800 mr-2">📖 본문 학습 카테고리:</span>
-                    <button onclick="setActivityMode('all')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='all'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">전체 보기</button>
-                    <button onclick="setActivityMode('passage_verb')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_verb'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">동사형 찾기</button>
-                    <button onclick="setActivityMode('passage_grammar')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_grammar'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">어법 선택</button>
-                    <button onclick="setActivityMode('passage_concept')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_concept'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">본문문법개념</button>
-                `;
-            } else if (state.currentTopTab === 'video') {
-                container.innerHTML = `
-                    <span class="text-xs font-bold text-amber-800 mr-2">🎬 영상 학습:</span>
-                    <span class="text-xs text-amber-900 font-medium">유튜브 동영상 링크 클릭 시 플레이어로 시청합니다.</span>
-                `;
+                bannerText.innerHTML = '📖 <strong>[본문 탭]</strong> 선택됨: 동사형 찾기, 어법 선택, 본문문법개념 설명 자료만 표시됩니다.';
+            } else {
+                bannerText.innerHTML = '🎬 <strong>[영상학습 탭]</strong> 선택됨: 동영상 학습 자료가 표시됩니다.';
             }
-        }
-
-        function setActivityMode(mode) {
-            state.currentActivityMode = mode;
-            renderActivitySubBar();
-            renderContent();
         }
 
         function renderSidebar() {
@@ -520,9 +533,9 @@
                 const isActive = state.currentSidebarCat === cat.id;
                 const btn = document.createElement('button');
                 btn.className = isActive
-                    ? 'w-full text-left bg-indigo-950 text-white font-bold p-3 rounded-xl shadow-sm transition text-sm flex justify-between items-center'
-                    : 'w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold p-3 rounded-xl transition text-sm flex justify-between items-center border border-slate-200/60';
-                btn.innerHTML = `<span>${cat.name}</span> ${isActive ? '<span class="text-xs bg-indigo-800 px-2 py-0.5 rounded-full">선택됨</span>' : ''}`;
+                    ? 'w-full text-left bg-indigo-900 text-white font-bold p-3 rounded-xl shadow-sm text-sm flex justify-between items-center'
+                    : 'w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold p-3 rounded-xl text-sm flex justify-between items-center border border-slate-200 transition';
+                btn.innerHTML = `<span>${cat.name}</span> ${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
                 btn.onclick = () => {
                     state.currentSidebarCat = cat.id;
                     state.currentFolderId = null;
@@ -557,9 +570,9 @@
             const catName = currentCatObj ? currentCatObj.name : '자료실';
 
             const path = getBreadcrumbPath(state.currentFolderId);
-            let trailHtml = `<span class="cursor-pointer hover:underline text-indigo-700 font-bold" onclick="state.currentFolderId=null; renderContent();">📁 ${catName}</span>`;
-            path.forEach((p, idx) => {
-                trailHtml += ` <span class="text-slate-400">＞</span> <span class="cursor-pointer hover:underline text-indigo-700 font-bold" onclick="state.currentFolderId='${p.id}'; renderContent();">${p.name}</span>`;
+            let trailHtml = `<span class="cursor-pointer text-indigo-600 font-bold hover:underline" onclick="state.currentFolderId=null; renderContent();">📁 ${catName}</span>`;
+            path.forEach((p) => {
+                trailHtml += ` <span class="text-slate-400">＞</span> <span class="cursor-pointer text-indigo-600 font-bold hover:underline" onclick="state.currentFolderId='${p.id}'; renderContent();">${p.name}</span>`;
             });
             breadcrumb.innerHTML = trailHtml;
 
@@ -570,21 +583,11 @@
                 if (item.type === 'folder') return true;
 
                 const name = item.name;
-                const isVocaType = name.includes('단어 한글+영어') || name.includes('스펠링');
-                const isPassageType = name.includes('동사형') || name.includes('어법') || name.includes('본문문법개념') || name.includes('한줄해석') || name.includes('빈칸');
+                const isVocaFile = name.includes('단어') || name.includes('스펠링');
+                const isPassageFile = name.includes('동사형') || name.includes('어법') || name.includes('본문문법개념') || name.includes('본문');
 
-                if (state.currentTopTab === 'voca') {
-                    if (!isVocaType) return false;
-                    if (state.currentActivityMode === 'voca_kor_eng' && !name.includes('단어 한글+영어')) return false;
-                    if (state.currentActivityMode === 'voca_spelling' && !name.includes('스펠링')) return false;
-                    return true;
-                } else if (state.currentTopTab === 'passage') {
-                    if (!isPassageType) return false;
-                    if (state.currentActivityMode === 'passage_verb' && !name.includes('동사형')) return false;
-                    if (state.currentActivityMode === 'passage_grammar' && !name.includes('어법')) return false;
-                    if (state.currentActivityMode === 'passage_concept' && !name.includes('본문문법개념')) return false;
-                    return true;
-                }
+                if (state.currentTopTab === 'voca') return isVocaFile;
+                if (state.currentTopTab === 'passage') return isPassageFile;
                 return true;
             });
 
@@ -593,79 +596,94 @@
             if (state.currentFolderId) {
                 const parentFolder = path[path.length - 2];
                 const backBtn = document.createElement('div');
-                backBtn.className = "p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer transition text-sm flex items-center gap-2 mb-2";
+                backBtn.className = "p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer text-sm flex items-center gap-2 border border-slate-200 transition mb-2";
                 backBtn.innerHTML = `<span>⬆️ 상위 폴더로 이동</span>`;
                 backBtn.onclick = () => { state.currentFolderId = parentFolder ? parentFolder.id : null; renderContent(); };
                 container.appendChild(backBtn);
             }
 
             if (currentChildren.length === 0) {
-                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">현재 탭/모드에 해당하는 학습 자료가 없습니다.</div>`;
+                const currentTabName = state.currentTopTab === 'voca' ? '단어' : (state.currentTopTab === 'passage' ? '본문' : '영상');
+                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">현재 폴더에 등록된 <strong>[${currentTabName}]</strong> 학습 자료가 없습니다.</div>`;
                 return;
             }
 
-            currentChildren.forEach((item, index) => {
+            currentChildren.forEach((item) => {
                 const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 font-bold text-slate-700 text-sm";
+                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center gap-3 font-bold text-slate-700 text-sm hover:border-slate-300 transition";
                 
                 const leftDiv = document.createElement('div');
-                leftDiv.className = "flex items-center gap-2.5 cursor-pointer";
+                leftDiv.className = "flex items-center gap-2.5 cursor-pointer flex-grow";
 
                 if (item.type === 'folder') {
-                    leftDiv.innerHTML = `<span class="text-xl text-amber-500">📂</span> <span class="hover:text-indigo-600 text-base">${item.name}</span>`;
+                    leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span>`;
                     leftDiv.onclick = () => { state.currentFolderId = item.id; renderContent(); };
                 } else if (item.linkUrl) {
-                    leftDiv.innerHTML = `<span class="text-xl text-sky-500">🔗</span> <span class="hover:text-sky-600 text-base">${item.name}</span>`;
-                    leftDiv.onclick = () => openLinkOrVideo(item);
+                    const isYt = /youtube\.com|youtu\.be/.test(item.linkUrl);
+                    if (isYt) {
+                        leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span>`;
+                        leftDiv.onclick = () => openLinkOrVideo(item);
+                    } else {
+                        leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span></a>`;
+                    }
                 } else {
-                    leftDiv.innerHTML = `<span class="text-xl text-indigo-500">📄</span> <span class="hover:text-indigo-600 text-base">${item.name}</span>`;
+                    leftDiv.innerHTML = `<span class="text-xl">📄</span> <span class="text-base">${item.name}</span>`;
                     leftDiv.onclick = () => openQuiz(item.wordDataKey || 'm1-5', item.name);
                 }
 
                 row.appendChild(leftDiv);
 
                 const rightBox = document.createElement('div');
-                rightBox.className = 'flex items-center gap-1.5 flex-wrap';
+                rightBox.className = 'flex items-center gap-1.5 flex-shrink-0';
 
                 if (state.currentUser && state.currentUser.role === 'super') {
                     const upBtn = document.createElement('button');
-                    upBtn.className = "bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2 py-1 rounded font-bold";
+                    upBtn.className = "bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2 py-1 rounded font-bold transition";
                     upBtn.innerText = "▲";
                     upBtn.onclick = (e) => { e.stopPropagation(); moveItemOrder(item.id, -1); };
                     rightBox.appendChild(upBtn);
 
                     const downBtn = document.createElement('button');
-                    downBtn.className = "bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2 py-1 rounded font-bold";
+                    downBtn.className = "bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2 py-1 rounded font-bold transition";
                     downBtn.innerText = "▼";
                     downBtn.onclick = (e) => { e.stopPropagation(); moveItemOrder(item.id, 1); };
                     rightBox.appendChild(downBtn);
 
                     const editBtn = document.createElement('button');
-                    editBtn.className = "text-indigo-600 hover:bg-indigo-50 font-bold text-xs p-1.5 rounded-lg border border-indigo-200";
+                    editBtn.className = "text-indigo-600 hover:bg-indigo-50 font-bold text-xs px-2 py-1.5 rounded-lg border border-indigo-200 transition";
                     editBtn.innerText = "✏️ 수정";
                     editBtn.onclick = (e) => { e.stopPropagation(); editMasterItem(item.id); };
                     rightBox.appendChild(editBtn);
 
                     const delBtn = document.createElement('button');
-                    delBtn.className = "text-rose-500 font-bold text-xs hover:bg-rose-100 p-1.5 rounded-lg border border-rose-200";
+                    delBtn.className = "text-rose-500 hover:bg-rose-50 font-bold text-xs px-2 py-1.5 rounded-lg border border-rose-200 transition";
                     delBtn.innerText = "🗑️ 삭제";
                     delBtn.onclick = (e) => { e.stopPropagation(); deleteMasterItem(item.id); };
                     rightBox.appendChild(delBtn);
                 }
 
-                const actionBtn = document.createElement('button');
-                actionBtn.className = "bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-lg shadow-sm transition font-bold ml-2";
+                const isOpenLink = item.type !== 'folder' && item.linkUrl && !/youtube\.com|youtu\.be/.test(item.linkUrl);
+                const actionBtn = document.createElement(isOpenLink ? 'a' : 'button');
+                if (isOpenLink) {
+                    actionBtn.href = item.linkUrl;
+                    actionBtn.target = '_blank';
+                    actionBtn.rel = 'noopener noreferrer';
+                }
+                actionBtn.className = "bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2 rounded-xl font-bold shadow-sm ml-2 transition inline-flex items-center justify-center";
                 actionBtn.innerText = item.type === 'folder' ? '열기 ➔' : '학습하기 ➔';
-                actionBtn.onclick = () => {
-                    if (item.type === 'folder') {
-                        state.currentFolderId = item.id;
-                        renderContent();
-                    } else if (item.linkUrl) {
-                        openLinkOrVideo(item);
-                    } else {
-                        openQuiz(item.wordDataKey || 'm1-5', item.name);
-                    }
-                };
+                
+                if (!isOpenLink) {
+                    actionBtn.onclick = () => {
+                        if (item.type === 'folder') {
+                            state.currentFolderId = item.id;
+                            renderContent();
+                        } else if (item.linkUrl) {
+                            openLinkOrVideo(item);
+                        } else {
+                            openQuiz(item.wordDataKey || 'm1-5', item.name);
+                        }
+                    };
+                }
                 rightBox.appendChild(actionBtn);
 
                 row.appendChild(rightBox);
@@ -674,18 +692,19 @@
         }
 
         function openLinkOrVideo(item) {
-            if (item.linkUrl.includes('youtube.com') || item.linkUrl.includes('youtu.be')) {
-                let embedUrl = item.linkUrl;
-                if (item.linkUrl.includes('watch?v=')) {
-                    embedUrl = item.linkUrl.replace('watch?v=', 'embed/');
-                } else if (item.linkUrl.includes('youtu.be/')) {
-                    embedUrl = item.linkUrl.replace('youtu.be/', 'youtube.com/embed/');
+            const url = item.linkUrl;
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                let embedUrl = url;
+                if (url.includes('watch?v=')) {
+                    embedUrl = url.replace('watch?v=', 'embed/');
+                } else if (url.includes('youtu.be/')) {
+                    embedUrl = url.replace('youtu.be/', 'youtube.com/embed/');
                 }
                 document.getElementById('video-title').innerText = item.name;
                 document.getElementById('video-iframe').src = embedUrl;
                 document.getElementById('video-modal').classList.remove('hidden');
             } else {
-                window.open(item.linkUrl, '_blank');
+                window.open(url, '_blank');
             }
         }
 
@@ -853,7 +872,7 @@
 
             document.getElementById('quiz-body').classList.remove('hidden');
             document.getElementById('quiz-result').classList.add('hidden');
-            document.getElementById('quiz-title').innerText = `${title} [${state.currentActivityMode}]`;
+            document.getElementById('quiz-title').innerText = title;
             document.getElementById('quiz-modal').classList.remove('hidden');
             loadQuizQuestion();
         }
@@ -908,7 +927,7 @@
                 id: 'h_' + Date.now(),
                 branchId: state.currentUser.branchId,
                 studentName: state.currentUser.name,
-                title: `${currentQuizTitle} (${state.currentActivityMode})`,
+                title: currentQuizTitle,
                 score: score,
                 correct: quizCorrect,
                 total: activeWords.length,
@@ -926,56 +945,37 @@
 
         function switchAdminView(view) {
             state.currentSuperView = view;
-            document.getElementById('view-content').classList.add('hidden');
-            document.getElementById('view-branches').classList.add('hidden');
-            document.getElementById('view-share').classList.add('hidden');
+            document.getElementById('view-content').classList.toggle('hidden', view !== 'content');
+            document.getElementById('view-branches').classList.toggle('hidden', view !== 'branches');
+            document.getElementById('view-share').classList.toggle('hidden', view !== 'share');
 
-            document.getElementById('sup-v-content').className = "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
-            document.getElementById('sup-v-branches').className = "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
-            document.getElementById('sup-v-share').className = "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
+            document.getElementById('sup-v-content').className = view === 'content' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
+            document.getElementById('sup-v-branches').className = view === 'branches' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
+            document.getElementById('sup-v-share').className = view === 'share' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
 
-            if (view === 'content') {
-                document.getElementById('view-content').classList.remove('hidden');
-                document.getElementById('sup-v-content').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm";
-            } else if (view === 'branches') {
-                document.getElementById('view-branches').classList.remove('hidden');
-                document.getElementById('sup-v-branches').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm";
-                renderBranches();
-            } else if (view === 'share') {
-                document.getElementById('view-share').classList.remove('hidden');
-                document.getElementById('sup-v-share').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm";
-                renderShareManager();
-            }
+            if (view === 'content') renderContent();
+            else if (view === 'branches') renderBranches();
+            else if (view === 'share') renderShareManager();
         }
 
         function switchSubView(view) {
             state.currentSubView = view;
-            document.getElementById('view-content').classList.add('hidden');
-            document.getElementById('view-sub-students').classList.add('hidden');
-            document.getElementById('view-sub-history').classList.add('hidden');
-            document.getElementById('view-sub-settings').classList.add('hidden');
+            document.getElementById('view-content').classList.toggle('hidden', view !== 'content');
+            document.getElementById('view-sub-students').classList.toggle('hidden', view !== 'students');
+            document.getElementById('view-sub-history').classList.toggle('hidden', view !== 'history');
+            document.getElementById('view-sub-settings').classList.toggle('hidden', view !== 'settings');
 
-            document.getElementById('sub-v-content').className = "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
-            document.getElementById('sub-v-students').className = "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
-            document.getElementById('sub-v-history').className = "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
-            document.getElementById('sub-v-settings').className = "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
+            document.getElementById('sub-v-content').className = view === 'content' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
+            document.getElementById('sub-v-students').className = view === 'students' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
+            document.getElementById('sub-v-history').className = view === 'history' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
+            document.getElementById('sub-v-settings').className = view === 'settings' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
 
-            if (view === 'content') {
-                document.getElementById('view-content').classList.remove('hidden');
-                document.getElementById('sub-v-content').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm";
-            } else if (view === 'students') {
-                document.getElementById('view-sub-students').classList.remove('hidden');
-                document.getElementById('sub-v-students').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm";
-                renderSubStudents();
-            } else if (view === 'history') {
-                document.getElementById('view-sub-history').classList.remove('hidden');
-                document.getElementById('sub-v-history').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm";
-                renderSubHistory();
-            } else if (view === 'settings') {
-                document.getElementById('view-sub-settings').classList.remove('hidden');
-                document.getElementById('sub-v-settings').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm";
+            if (view === 'content') renderContent();
+            else if (view === 'students') renderSubStudents();
+            else if (view === 'history') renderSubHistory();
+            else if (view === 'settings') {
                 if (state.currentUser) {
-                    document.getElementById('setting-academy-name').value = state.currentUser.academyName;
+                    document.getElementById('setting-academy-name').value = state.currentUser.academyName || '';
                 }
             }
         }
@@ -992,14 +992,14 @@
                         <div class="flex justify-between items-start mb-2">
                             <span class="font-bold text-slate-800 text-lg">${b.academyName}</span>
                         </div>
-                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-100">
+                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-200">
                             <div>🆔 지점 아이디: <strong class="text-indigo-600">${b.username}</strong></div>
                             <div>🔑 비밀번호: <strong class="text-slate-800">${b.password}</strong></div>
                         </div>
                     </div>
                     <div class="flex gap-2">
                         <button onclick="editBranch('${b.id}')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs py-2 rounded-xl font-bold transition">수정</button>
-                        <button onclick="removeBranch('${b.id}')" class="flex-1 text-rose-600 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200 transition">삭제</button>
+                        <button onclick="removeBranch('${b.id}')" class="flex-1 text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200 transition">삭제</button>
                     </div>
                 `;
                 container.appendChild(card);
@@ -1054,7 +1054,7 @@
 
         function renderShareManager() {
             const container = document.getElementById('share-list-container');
-            container.innerHTML = `<div class="p-4 bg-emerald-50 text-emerald-800 font-bold rounded-xl text-sm">💡 모든 하위 지점과 학생들에게 학습 자료가 자동으로 전체 공유됩니다.</div>`;
+            container.innerHTML = `<div class="p-4 bg-amber-50 text-amber-800 font-bold rounded-xl text-sm border border-amber-200">💡 모든 하위 지점과 학생들에게 학습 자료가 자동으로 전체 공유됩니다.</div>`;
         }
 
         function renderSubStudents() {
@@ -1074,14 +1074,14 @@
                     <div>
                         <div class="flex justify-between items-start mb-2">
                             <span class="font-bold text-slate-800 text-lg">${s.name}</span>
-                            <span class="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-bold">${s.grade}</span>
+                            <span class="text-xs bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-full font-bold border border-slate-200">${s.grade}</span>
                         </div>
-                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-100">
+                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-200">
                             <div>🆔 아이디: <strong class="text-indigo-600">${s.username}</strong></div>
                             <div>🔑 비밀번호: <strong class="text-slate-800">${s.password}</strong></div>
                         </div>
                     </div>
-                    <button onclick="removeStudent('${s.id}')" class="text-rose-600 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200 transition">학생 삭제</button>
+                    <button onclick="removeStudent('${s.id}')" class="text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200 transition">학생 삭제</button>
                 `;
                 container.appendChild(card);
             });
@@ -1133,7 +1133,7 @@
                     <div>
                         <div class="flex items-center gap-2 mb-1">
                             <span class="font-bold text-slate-800 text-base">${h.studentName}</span>
-                            <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">${h.score}점</span>
+                            <span class="text-xs bg-slate-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold border border-slate-200">${h.score}점</span>
                         </div>
                         <div class="text-sm text-slate-600 font-medium">${h.title} (${h.correct} / ${h.total} 정답)</div>
                         <div class="text-xs text-slate-400 mt-1">완료 일시: ${h.date}</div>
@@ -1186,7 +1186,7 @@
             }
         }
 
-        loadState();
+        loadShared();
     </script>
 </body>
 </html>
