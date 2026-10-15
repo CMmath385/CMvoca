@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -355,24 +356,26 @@
         };
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v17');
+            const saved = localStorage.getItem('multi_academy_portal_v18');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
-                    state.branches = p.branches || state.branches;
-                    state.students = p.students || state.students;
-                    state.historyRecords = p.historyRecords || state.historyRecords;
-                    state.masterDatabase = p.masterDatabase || state.masterDatabase;
-                    state.wordDataMap = p.wordDataMap || state.wordDataMap;
-                    state.sidebarCats = p.sidebarCats || state.sidebarCats;
-                } catch(e){}
+                    state.branches = p.branches && p.branches.length > 0 ? p.branches : state.branches;
+                    state.students = p.students && p.students.length > 0 ? p.students : state.students;
+                    state.historyRecords = p.historyRecords || [];
+                    state.masterDatabase = p.masterDatabase && Object.keys(p.masterDatabase).length > 0 ? p.masterDatabase : JSON.parse(JSON.stringify(initialMasterDatabase));
+                    state.wordDataMap = p.wordDataMap || {};
+                    state.sidebarCats = p.sidebarCats && p.sidebarCats.length > 0 ? p.sidebarCats : state.sidebarCats;
+                } catch(e){
+                    state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
+                }
             } else {
                 state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
             }
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v17', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v18', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
@@ -651,7 +654,7 @@
                 const rightBox = document.createElement('div');
                 rightBox.className = 'flex items-center gap-1.5 flex-wrap';
 
-                if (state.currentUser.role === 'super') {
+                if (state.currentUser && state.currentUser.role === 'super') {
                     const upBtn = document.createElement('button');
                     upBtn.className = "bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2 py-1 rounded font-bold";
                     upBtn.innerText = "▲";
@@ -775,11 +778,11 @@
 
         function renderAll() {
             renderSidebar();
-            if (state.currentUser.role === 'super') {
+            if (state.currentUser && state.currentUser.role === 'super') {
                 if (state.currentSuperView === 'content') renderContent();
                 else if (state.currentSuperView === 'branches') renderBranches();
                 else if (state.currentSuperView === 'share') renderShareManager();
-            } else if (state.currentUser.role === 'sub') {
+            } else if (state.currentUser && state.currentUser.role === 'sub') {
                 if (state.currentSubView === 'content') renderContent();
                 else if (state.currentSubView === 'students') renderSubStudents();
                 else if (state.currentSubView === 'history') renderSubHistory();
@@ -920,7 +923,7 @@
         }
 
         function autoSubmitScoreRecord() {
-            if (state.currentUser.role !== 'student') {
+            if (!state.currentUser || state.currentUser.role !== 'student') {
                 closeQuiz();
                 return;
             }
@@ -998,7 +1001,9 @@
             } else if (view === 'settings') {
                 document.getElementById('view-sub-settings').classList.remove('hidden');
                 document.getElementById('sub-v-settings').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm";
-                document.getElementById('setting-academy-name').value = state.currentUser.academyName;
+                if (state.currentUser) {
+                    document.getElementById('setting-academy-name').value = state.currentUser.academyName;
+                }
             }
         }
 
@@ -1083,7 +1088,7 @@
             const container = document.getElementById('sub-student-list');
             container.innerHTML = '';
 
-            const myStudents = state.students.filter(s => s.branchId === state.currentUser.branchId);
+            const myStudents = state.students.filter(s => s.branchId === (state.currentUser ? state.currentUser.branchId : ''));
             if (myStudents.length === 0) {
                 container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 font-medium text-sm">등록된 소속 학생이 없습니다.</div>`;
                 return;
@@ -1142,7 +1147,7 @@
             const container = document.getElementById('sub-history-container');
             container.innerHTML = '';
 
-            const myRecords = state.historyRecords.filter(h => h.branchId === state.currentUser.branchId);
+            const myRecords = state.historyRecords.filter(h => h.branchId === (state.currentUser ? state.currentUser.branchId : ''));
             if (myRecords.length === 0) {
                 container.innerHTML = `<div class="text-center py-12 text-slate-400 font-medium text-sm">학습 이력이 없습니다.</div>`;
                 return;
@@ -1170,7 +1175,7 @@
             if (!name) return alert('학원명을 입력하세요.');
 
             const fileInput = document.getElementById('setting-academy-logo-file');
-            const branch = state.branches.find(b => b.id === state.currentUser.branchId);
+            const branch = state.branches.find(b => b.id === (state.currentUser ? state.currentUser.branchId : ''));
 
             if (!branch) return;
 
