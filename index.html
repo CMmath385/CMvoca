@@ -37,7 +37,7 @@
             <form onsubmit="handleLogin(event)" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1.5">아이디</label>
-                    <input type="text" id="login-id" required placeholder="아이디 입력" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
+                    <input type="text" id="login-id" oninput="checkLoginIdType(this.value)" required placeholder="아이디 입력" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1.5">비밀번호</label>
@@ -50,7 +50,8 @@
 
             <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500 h-4"></div>
             
-            <div class="mt-6 flex justify-between items-center text-xs px-2 border-t border-slate-100 pt-4">
+            <!-- 최고관리자(admin) 아이디를 입력할 때만 나타나는 백업/초기화 영역 -->
+            <div id="admin-tools-box" class="hidden mt-6 flex justify-between items-center text-xs px-2 border-t border-slate-100 pt-4">
                 <button onclick="forceResetStorage()" class="text-slate-400 font-bold underline hover:text-slate-600">저장소 초기화</button>
                 <button onclick="exportData()" class="text-indigo-600 font-bold underline hover:text-indigo-800 text-sm">📥 백업 내보내기</button>
             </div>
@@ -247,6 +248,15 @@
             currentFolderId: null
         };
 
+        function checkLoginIdType(val) {
+            const box = document.getElementById('admin-tools-box');
+            if (val.trim().toLowerCase() === 'admin') {
+                box.classList.remove('hidden');
+            } else {
+                box.classList.add('hidden');
+            }
+        }
+
         function forceResetStorage() {
             localStorage.clear();
             localStorage.removeItem('cm_admin_pc');
@@ -266,7 +276,7 @@
                     if (d.sidebarCats) state.sidebarCats = d.sidebarCats;
                 }
             } catch (e) {}
-            loadState(); // 로컬 스토리지에 저장된 추가 지점 데이터 병합
+            loadState();
         }
 
         function exportData() {
@@ -278,7 +288,7 @@
         }
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v27');
+            const saved = localStorage.getItem('multi_academy_portal_v28');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
@@ -288,7 +298,6 @@
                     if (p.topTabs) state.topTabs = p.topTabs;
                     if (p.sidebarCats) state.sidebarCats = p.sidebarCats;
                     
-                    // masterDatabase는 최고관리자가 등록한 공유 항목(super)과 각 지점이 추가한 항목을 병합
                     if (p.masterDatabase) {
                         Object.keys(p.masterDatabase).forEach(cat => {
                             if (!state.masterDatabase[cat]) state.masterDatabase[cat] = [];
@@ -305,7 +314,7 @@
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v27', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v28', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
@@ -395,6 +404,7 @@
             document.getElementById('app-portal').classList.add('hidden');
             document.getElementById('login-id').value = '';
             document.getElementById('login-pw').value = '';
+            document.getElementById('admin-tools-box').classList.add('hidden');
         }
 
         function renderTopNav() {
