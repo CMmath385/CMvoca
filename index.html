@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -109,6 +110,11 @@
             </form>
 
             <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500" style="height:1rem;"></div>
+            
+            <!-- 모바일용 강제 초기화 버튼 -->
+            <div class="mt-6 text-center">
+                <button onclick="forceResetMobileStorage()" class="text-xs text-slate-400 font-bold underline">스마트폰 연결 오류 시 데이터 초기화</button>
+            </div>
         </div>
     </div>
 
@@ -379,34 +385,43 @@
             currentActivityMode: 'all'
         };
 
+        function forceResetMobileStorage() {
+            localStorage.clear();
+            alert('스마트폰 데이터가 깨끗하게 초기화되었습니다. 새로고침합니다.');
+            location.reload();
+        }
+
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v21');
-            if (saved) {
-                try {
+            try {
+                const saved = localStorage.getItem('multi_academy_portal_v25');
+                if (saved) {
                     const p = JSON.parse(saved);
-                    state.branches = p.branches && p.branches.length > 0 ? p.branches : state.branches;
-                    state.students = p.students && p.students.length > 0 ? p.students : state.students;
+                    state.branches = (p.branches && p.branches.length > 0) ? p.branches : state.branches;
+                    state.students = (p.students && p.students.length > 0) ? p.students : state.students;
                     state.historyRecords = p.historyRecords || [];
-                    state.masterDatabase = p.masterDatabase && Object.keys(p.masterDatabase).length > 0 ? p.masterDatabase : JSON.parse(JSON.stringify(initialMasterDatabase));
+                    state.masterDatabase = (p.masterDatabase && Object.keys(p.masterDatabase).length > 0) ? p.masterDatabase : JSON.parse(JSON.stringify(initialMasterDatabase));
                     state.wordDataMap = p.wordDataMap || {};
-                    state.sidebarCats = p.sidebarCats && p.sidebarCats.length > 0 ? p.sidebarCats : state.sidebarCats;
-                } catch(e){
+                    state.sidebarCats = (p.sidebarCats && p.sidebarCats.length > 0) ? p.sidebarCats : state.sidebarCats;
+                } else {
                     state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
                 }
-            } else {
+            } catch(e) {
+                localStorage.clear();
                 state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
             }
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v21', JSON.stringify({
-                branches: state.branches,
-                students: state.students,
-                historyRecords: state.historyRecords,
-                masterDatabase: state.masterDatabase,
-                wordDataMap: state.wordDataMap,
-                sidebarCats: state.sidebarCats
-            }));
+            try {
+                localStorage.setItem('multi_academy_portal_v25', JSON.stringify({
+                    branches: state.branches,
+                    students: state.students,
+                    historyRecords: state.historyRecords,
+                    masterDatabase: state.masterDatabase,
+                    wordDataMap: state.wordDataMap,
+                    sidebarCats: state.sidebarCats
+                }));
+            } catch(e) {}
         }
 
         function handleLogin(e) {
