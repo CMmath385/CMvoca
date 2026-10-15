@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>스마트 종합 학습 플랫폼 - 멀티 아카데미</title>
-    <!-- 모바일/PC 호환성 안정을 위한 표준 스타일 적용 -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
@@ -39,7 +38,6 @@
         .bg-slate-100 { background-color: #f1f5f9; }
         .bg-slate-900 { background-color: #0f172a; }
         .bg-indigo-600 { background-color: #4f46e5; }
-        .bg-indigo-700 { background-color: #4338ca; }
         .bg-amber-500 { background-color: #f59e0b; }
         .bg-amber-50 { background-color: #fffbeb; }
         .text-white { color: #ffffff; }
@@ -116,7 +114,6 @@
 
     <!-- 2. MAIN APP PORTAL -->
     <div id="app-portal" class="hidden flex-grow flex flex-col">
-        <!-- Top Header & Nav -->
         <header class="bg-white border-b shadow-sm sticky z-30">
             <div class="max-w-[1600px] px-4 py-3 flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-3 cursor-pointer" onclick="resetToHome()">
@@ -134,7 +131,7 @@
                 </nav>
 
                 <div class="flex items-center gap-3">
-                    <span id="user-badge" class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-2 rounded-xl border">
+                    <span id="user-badge" class="text-xs bg-slate-100 text-indigo-600 font-bold px-3 py-2 rounded-xl border">
                         사용자 모드
                     </span>
                     <button onclick="logout()" class="text-xs text-slate-500 font-bold border px-3 py-2 rounded-xl">
@@ -144,7 +141,6 @@
             </div>
         </header>
 
-        <!-- Main Workspace -->
         <div class="max-w-[1600px] w-full flex-grow flex flex-col md:flex-row p-4 gap-4">
             <aside class="w-full md:w-64 flex-shrink-0 flex flex-col gap-2">
                 <div class="flex justify-between items-center px-1 mb-1">
@@ -158,14 +154,12 @@
 
             <main class="flex-grow bg-white rounded-2xl shadow-sm border p-6 flex flex-col justify-between">
                 <div>
-                    <!-- Super Admin View Tabs -->
                     <div id="super-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border">
                         <button onclick="switchAdminView('content')" id="sup-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">👑 본원 콘텐츠 마스터</button>
                         <button onclick="switchAdminView('branches')" id="sup-v-branches" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600">🏛️ 하위 관리자 등록</button>
                         <button onclick="switchAdminView('share')" id="sup-v-share" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600">🔗 지점별 공유 설정</button>
                     </div>
 
-                    <!-- Sub Admin View Tabs -->
                     <div id="sub-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border">
                         <button onclick="switchSubView('content')" id="sub-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">📂 공유된 학습 자료실</button>
                         <button onclick="switchSubView('students')" id="sub-v-students" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600">👨‍🎓 내 학원 학생 관리</button>
@@ -173,7 +167,6 @@
                         <button onclick="switchSubView('settings')" id="sub-v-settings" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600">⚙️ 학원 설정</button>
                     </div>
 
-                    <!-- VIEW 1: CONTENT -->
                     <div id="view-content">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b">
                             <div>
@@ -182,12 +175,12 @@
                             </div>
                             <div class="flex items-center gap-2 flex-wrap">
                                 <button onclick="addFolderPrompt()" id="btn-add-folder" class="hidden bg-indigo-600 text-white text-xs px-3 py-2 rounded-xl font-bold">+ 폴더 추가</button>
-                                <button onclick="addLinkFilePrompt()" id="btn-add-link" class="hidden bg-sky-600 text-white text-xs px-3 py-2 rounded-xl font-bold">🔗 링크 등록</button>
-                                <button onclick="addCustomWordSetPrompt()" id="btn-add-file" class="hidden bg-emerald-600 text-white text-xs px-3 py-2 rounded-xl font-bold">+ 단어장 생성</button>
+                                <button onclick="addLinkFilePrompt()" id="btn-add-link" class="hidden bg-indigo-600 text-white text-xs px-3 py-2 rounded-xl font-bold">🔗 링크 등록</button>
+                                <button onclick="addCustomWordSetPrompt()" id="btn-add-file" class="hidden bg-indigo-600 text-white text-xs px-3 py-2 rounded-xl font-bold">+ 단어장 생성</button>
                             </div>
                         </div>
 
-                        <div id="sub-activity-bar" class="mb-6 p-3 bg-amber-50 rounded-2xl border border-amber-200 flex flex-wrap gap-2 items-center">
+                        <div id="sub-activity-bar" class="mb-6 p-3 bg-amber-50 rounded-2xl border flex flex-wrap gap-2 items-center">
                             <!-- Dynamic -->
                         </div>
 
@@ -196,19 +189,17 @@
                         </div>
                     </div>
 
-                    <!-- VIEW 2: BRANCHES -->
                     <div id="view-branches" class="hidden">
                         <div class="flex justify-between items-center mb-6 pb-4 border-b">
                             <div>
                                 <span class="text-xs font-bold text-indigo-600">프랜차이즈 관리</span>
-                                <h2 class="text-xl font-bold text-slate-800">하위 관리자(지점장) 계정 관리</h2>
+                                <h2 class="text-xl font-bold text-slate-800">하위 관리자 계정 관리</h2>
                             </div>
                             <button onclick="addBranchPrompt()" class="bg-indigo-600 text-white text-xs px-4 py-2.5 rounded-xl font-bold">+ 신규 지점 등록</button>
                         </div>
                         <div id="branch-list-container" class="grid md:grid-cols-3 gap-4"></div>
                     </div>
 
-                    <!-- VIEW 3: SHARE -->
                     <div id="view-share" class="hidden">
                         <div class="mb-6 pb-4 border-b">
                             <span class="text-xs font-bold text-indigo-600">콘텐츠 배포</span>
@@ -217,7 +208,6 @@
                         <div id="share-list-container" class="space-y-4"></div>
                     </div>
 
-                    <!-- VIEW 4: STUDENTS -->
                     <div id="view-sub-students" class="hidden">
                         <div class="flex justify-between items-center mb-6 pb-4 border-b">
                             <div>
@@ -229,7 +219,6 @@
                         <div id="sub-student-list" class="grid md:grid-cols-3 gap-4"></div>
                     </div>
 
-                    <!-- VIEW 5: HISTORY -->
                     <div id="view-sub-history" class="hidden">
                         <div class="mb-6 pb-4 border-b">
                             <span class="text-xs font-bold text-indigo-600">학습 리포트</span>
@@ -238,7 +227,6 @@
                         <div id="sub-history-container" class="space-y-3"></div>
                     </div>
 
-                    <!-- VIEW 6: SETTINGS -->
                     <div id="view-sub-settings" class="hidden">
                         <div class="mb-6 pb-4 border-b">
                             <span class="text-xs font-bold text-indigo-600">학원 설정</span>
@@ -392,7 +380,7 @@
         };
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v20');
+            const saved = localStorage.getItem('multi_academy_portal_v21');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
@@ -411,7 +399,7 @@
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v20', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v21', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
@@ -1012,15 +1000,17 @@
             document.getElementById('view-sub-settings').style.display = view === 'settings' ? 'block' : 'none';
 
             document.getElementById('sub-v-content').className = view === 'content' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
-            document.getElementById('sub-v-students').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
-            document.getElementById('sub-v-history').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
-            document.getElementById('sub-v-settings').className = "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
+            document.getElementById('sub-v-students').className = view === 'students' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
+            document.getElementById('sub-v-history').className = view === 'history' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
+            document.getElementById('sub-v-settings').className = view === 'settings' ? "flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm" : "flex-1 py-2 rounded-lg text-xs font-bold text-slate-600";
 
             if (view === 'content') renderContent();
             else if (view === 'students') renderSubStudents();
             else if (view === 'history') renderSubHistory();
             else if (view === 'settings') {
-                document.getElementById('setting-academy-name').value = state.currentUser.academyName;
+                if (state.currentUser) {
+                    document.getElementById('setting-academy-name').value = state.currentUser.academyName || '';
+                }
             }
         }
 
@@ -1098,7 +1088,7 @@
 
         function renderShareManager() {
             const container = document.getElementById('share-list-container');
-            container.innerHTML = `<div class="p-4 bg-amber-50 text-amber-800 font-bold rounded-xl text-sm border border-amber-200">💡 모든 하위 지점과 학생들에게 학습 자료가 자동으로 전체 공유됩니다.</div>`;
+            container.innerHTML = `<div class="p-4 bg-amber-50 text-amber-800 font-bold rounded-xl text-sm border">💡 모든 하위 지점과 학생들에게 학습 자료가 자동으로 전체 공유됩니다.</div>`;
         }
 
         function renderSubStudents() {
@@ -1118,7 +1108,7 @@
                     <div>
                         <div class="flex justify-between items-start mb-2">
                             <span class="font-bold text-slate-800 text-lg">${s.name}</span>
-                            <span class="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full font-bold">${s.grade}</span>
+                            <span class="text-xs bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-full font-bold">${s.grade}</span>
                         </div>
                         <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border">
                             <div>🆔 아이디: <strong class="text-indigo-600">${s.username}</strong></div>
@@ -1177,7 +1167,7 @@
                     <div>
                         <div class="flex items-center gap-2 mb-1">
                             <span class="font-bold text-slate-800 text-base">${h.studentName}</span>
-                            <span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold">${h.score}점</span>
+                            <span class="text-xs bg-slate-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold">${h.score}점</span>
                         </div>
                         <div class="text-sm text-slate-600 font-medium">${h.title} (${h.correct} / ${h.total} 정답)</div>
                         <div class="text-xs text-slate-400 mt-1">완료 일시: ${h.date}</div>
