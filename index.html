@@ -40,6 +40,7 @@
         .bg-slate-900 { background-color: #0f172a; }
         .bg-indigo-600 { background-color: #4f46e5; }
         .bg-amber-500 { background-color: #f59e0b; }
+        .bg-amber-50 { background-color: #fffbeb; }
         .text-white { color: #ffffff; }
         .text-slate-400 { color: #94a3b8; }
         .text-slate-600 { color: #475569; }
@@ -182,6 +183,11 @@
                                 <button onclick="addLinkFilePrompt()" id="btn-add-link" class="hidden bg-indigo-600 text-white text-xs px-3 py-2 rounded-xl font-bold">🔗 링크 등록</button>
                                 <button onclick="addCustomWordSetPrompt()" id="btn-add-file" class="hidden bg-indigo-600 text-white text-xs px-3 py-2 rounded-xl font-bold">+ 단어장 생성</button>
                             </div>
+                        </div>
+
+                        <!-- 학습 세부 서브 필터바 -->
+                        <div id="sub-activity-bar" class="mb-6 p-3 bg-amber-50 rounded-2xl border flex flex-wrap gap-2 items-center">
+                            <!-- Dynamic -->
                         </div>
 
                         <div id="content-container" class="space-y-3">
@@ -375,18 +381,19 @@
             currentSubView: 'content',
             currentTopTab: 'voca',
             currentSidebarCat: 'middle_exam',
-            currentFolderId: null
+            currentFolderId: null,
+            currentActivityMode: 'all'
         };
 
         function forceResetStorage() {
             localStorage.clear();
-            alert('초기 설정으로 원상복구되었습니다. 새로고침합니다.');
+            alert('중1/2 동사형·어법 구성 상태로 강제 초기화되었습니다.');
             location.reload();
         }
 
         function loadState() {
             try {
-                const saved = localStorage.getItem('multi_academy_portal_v100');
+                const saved = localStorage.getItem('multi_academy_portal_v200');
                 if (saved) {
                     const p = JSON.parse(saved);
                     state.branches = (p.branches && p.branches.length > 0) ? p.branches : state.branches;
@@ -406,7 +413,7 @@
 
         function saveState() {
             try {
-                localStorage.setItem('multi_academy_portal_v100', JSON.stringify({
+                localStorage.setItem('multi_academy_portal_v200', JSON.stringify({
                     branches: state.branches,
                     students: state.students,
                     historyRecords: state.historyRecords,
@@ -527,11 +534,48 @@
                 btn.innerText = tab.name;
                 btn.onclick = () => {
                     state.currentTopTab = tab.id;
+                    state.currentActivityMode = 'all';
                     renderTopNav();
+                    renderActivitySubBar();
                     renderContent();
                 };
                 container.appendChild(btn);
             });
+
+            renderActivitySubBar();
+        }
+
+        function renderActivitySubBar() {
+            const container = document.getElementById('sub-activity-bar');
+            container.innerHTML = '';
+
+            if (state.currentTopTab === 'voca') {
+                container.innerHTML = `
+                    <span class="text-xs font-bold text-amber-800 mr-2">🔤 단어 학습 카테고리:</span>
+                    <button onclick="setActivityMode('all')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='all'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">전체 보기</button>
+                    <button onclick="setActivityMode('voca_kor_eng')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='voca_kor_eng'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">단어 한글+영어 학습</button>
+                    <button onclick="setActivityMode('voca_spelling')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='voca_spelling'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">스펠링 테스트</button>
+                `;
+            } else if (state.currentTopTab === 'passage') {
+                container.innerHTML = `
+                    <span class="text-xs font-bold text-amber-800 mr-2">📖 본문 학습 카테고리:</span>
+                    <button onclick="setActivityMode('all')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='all'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">전체 보기</button>
+                    <button onclick="setActivityMode('passage_verb')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_verb'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">동사형 찾기</button>
+                    <button onclick="setActivityMode('passage_grammar')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_grammar'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">어법 선택</button>
+                    <button onclick="setActivityMode('passage_concept')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_concept'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">본문문법개념</button>
+                `;
+            } else if (state.currentTopTab === 'video') {
+                container.innerHTML = `
+                    <span class="text-xs font-bold text-amber-800 mr-2">🎬 영상 학습:</span>
+                    <span class="text-xs text-amber-900 font-medium">유튜브 동영상 링크 클릭 시 플레이어로 시청합니다.</span>
+                `;
+            }
+        }
+
+        function setActivityMode(mode) {
+            state.currentActivityMode = mode;
+            renderActivitySubBar();
+            renderContent();
         }
 
         function renderSidebar() {
@@ -590,6 +634,28 @@
             let items = state.masterDatabase[state.currentSidebarCat] || [];
             let currentChildren = items.filter(item => item.parentId === state.currentFolderId);
 
+            currentChildren = currentChildren.filter(item => {
+                if (item.type === 'folder') return true;
+
+                const name = item.name;
+                const isVocaType = name.includes('단어 한글+영어') || name.includes('스펠링');
+                const isPassageType = name.includes('동사형') || name.includes('어법') || name.includes('본문문법개념') || name.includes('한줄해석') || name.includes('빈칸');
+
+                if (state.currentTopTab === 'voca') {
+                    if (!isVocaType) return false;
+                    if (state.currentActivityMode === 'voca_kor_eng' && !name.includes('단어 한글+영어')) return false;
+                    if (state.currentActivityMode === 'voca_spelling' && !name.includes('스펠링')) return false;
+                    return true;
+                } else if (state.currentTopTab === 'passage') {
+                    if (!isPassageType) return false;
+                    if (state.currentActivityMode === 'passage_verb' && !name.includes('동사형')) return false;
+                    if (state.currentActivityMode === 'passage_grammar' && !name.includes('어법')) return false;
+                    if (state.currentActivityMode === 'passage_concept' && !name.includes('본문문법개념')) return false;
+                    return true;
+                }
+                return true;
+            });
+
             title.innerText = state.currentFolderId ? (path[path.length - 1]?.name || '폴더') : catName;
 
             if (state.currentFolderId) {
@@ -602,7 +668,7 @@
             }
 
             if (currentChildren.length === 0) {
-                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">등록된 학습 자료가 없습니다.</div>`;
+                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">현재 선택한 카테고리에 해당하는 학습 자료가 없습니다.</div>`;
                 return;
             }
 
