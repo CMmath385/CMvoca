@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -130,7 +131,7 @@
                         </div>
 
                         <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 항목을 마우스로 드래그하여 순서를 바꿀 수 있으며, 우클릭하면 이름변경 및 삭제가 가능합니다.</span>
+                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원이 등록한 공통 자료는 모든 하위 지점과 학생들에게 즉시 공유됩니다.</span>
                         </div>
 
                         <div id="content-container" class="space-y-3"></div>
@@ -254,14 +255,18 @@
         }
 
         async function loadShared() {
-            loadState();
             try {
                 const r = await fetch('data.json?v=' + Date.now(), { cache: 'no-store' });
                 if (r.ok) {
                     const d = await r.json();
-                    ['branches','students','masterDatabase','topTabs','sidebarCats'].forEach(k => { if (d[k]) state[k] = d[k]; });
+                    if (d.masterDatabase) state.masterDatabase = d.masterDatabase;
+                    if (d.branches) state.branches = d.branches;
+                    if (d.students) state.students = d.students;
+                    if (d.topTabs) state.topTabs = d.topTabs;
+                    if (d.sidebarCats) state.sidebarCats = d.sidebarCats;
                 }
             } catch (e) {}
+            loadState(); // 로컬 스토리지에 저장된 추가 지점 데이터 병합
         }
 
         function exportData() {
@@ -273,26 +278,34 @@
         }
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v26');
+            const saved = localStorage.getItem('multi_academy_portal_v27');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
-                    state.branches = p.branches && p.branches.length > 0 ? p.branches : state.branches;
-                    state.students = p.students && p.students.length > 0 ? p.students : state.students;
-                    state.historyRecords = p.historyRecords || [];
-                    state.masterDatabase = p.masterDatabase && Object.keys(p.masterDatabase).length > 0 ? p.masterDatabase : JSON.parse(JSON.stringify(initialMasterDatabase));
-                    state.topTabs = p.topTabs && p.topTabs.length > 0 ? p.topTabs : state.topTabs;
-                    state.sidebarCats = p.sidebarCats && p.sidebarCats.length > 0 ? p.sidebarCats : state.sidebarCats;
-                } catch(e){
-                    state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
-                }
-            } else {
-                state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
+                    if (p.branches) state.branches = p.branches;
+                    if (p.students) state.students = p.students;
+                    if (p.historyRecords) state.historyRecords = p.historyRecords;
+                    if (p.topTabs) state.topTabs = p.topTabs;
+                    if (p.sidebarCats) state.sidebarCats = p.sidebarCats;
+                    
+                    // masterDatabase는 최고관리자가 등록한 공유 항목(super)과 각 지점이 추가한 항목을 병합
+                    if (p.masterDatabase) {
+                        Object.keys(p.masterDatabase).forEach(cat => {
+                            if (!state.masterDatabase[cat]) state.masterDatabase[cat] = [];
+                            p.masterDatabase[cat].forEach(localItem => {
+                                const exists = state.masterDatabase[cat].some(existing => existing.id === localItem.id);
+                                if (!exists) {
+                                    state.masterDatabase[cat].push(localItem);
+                                }
+                            });
+                        });
+                    }
+                } catch(e){}
             }
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v26', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v27', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
@@ -401,7 +414,6 @@
                     renderContent();
                 };
 
-                // 최고관리자인 경우 상단 탭 우클릭 시 이름변경/삭제 지원
                 if (state.currentUser && state.currentUser.role === 'super') {
                     btn.oncontextmenu = (e) => {
                         e.preventDefault();
@@ -450,7 +462,6 @@
                     renderContent();
                 };
 
-                // 카테고리 우클릭 설정 (최고관리자만)
                 if (state.currentUser && state.currentUser.role === 'super') {
                     div.oncontextmenu = (e) => {
                         e.preventDefault();
@@ -468,7 +479,6 @@
                     };
                 }
 
-                // 드래그 앤 드롭으로 카테고리 순서 변경
                 div.draggable = true;
                 div.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); };
                 div.ondragover = (e) => { e.preventDefault(); };
@@ -580,7 +590,6 @@
 
                 row.appendChild(leftDiv);
 
-                // 마우스 우클릭 시 이름변경/삭제 메뉴 (권한에 맞게)
                 const isSuperUser = (state.currentUser && state.currentUser.role === 'super');
                 const isSubUser = (state.currentUser && state.currentUser.role === 'sub');
                 const canModifyThisItem = isSuperUser || (isSubUser && !isSuperItem);
@@ -607,7 +616,6 @@
                     };
                 }
 
-                // 드래그 앤 드롭으로 항목 순서 변경
                 row.draggable = true;
                 row.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); };
                 row.ondragover = (e) => { e.preventDefault(); };
@@ -616,11 +624,9 @@
                     const srcIdx = parseInt(e.dataTransfer.getData('text/plain'));
                     const targetIdx = index;
                     const fullArr = state.masterDatabase[state.currentSidebarCat];
-                    // 현재 폴더/탭 필터 내부에서의 순서를 전체 배열에 반영
                     if (srcIdx !== targetIdx) {
                         const moved = currentChildren.splice(srcIdx, 1)[0];
                         currentChildren.splice(targetIdx, 0, moved);
-                        // 전체 masterDatabase 순서 재배치
                         state.masterDatabase[state.currentSidebarCat] = fullArr.filter(x => !currentChildren.includes(x)).concat(currentChildren);
                         renderContent();
                         saveState();
