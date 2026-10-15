@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -287,7 +286,7 @@
                 { id: 'file_m1_7_1', type: 'file', name: 'Lesson 7 단어 한글+영어 학습', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1' },
                 { id: 'file_m1_7_2', type: 'file', name: 'Lesson 7 단어 스펠링 테스트', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd' },
                 { id: 'file_m1_7_3', type: 'file', name: 'Lesson 7 본문 동사형 찾기', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/ea014e0adb32?skid=f472cd07-cf96-407a-ad3a-7e209dada6b6' },
-                { id: 'file_m1_7_4', type: 'file', name: 'Lesson 7 본문 어법 선택', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0206674fda6a?social_preview=false&skid=24c491df-8acb-41df-a6a7-82e677f638e8' },
+                { id: 'file_m1_7_4', type: 'file', name: 'Lesson 7 본문 어법 선택', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0206674fda6a?skid=24c491df-8acb-41df-a6a7-82e677f638e8' },
 
                 { id: 'file_m1_8_1', type: 'file', name: 'Lesson 8 단어 한글+영어 학습', parentId: 'f_l8', linkUrl: 'https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb' },
                 { id: 'file_m1_8_2', type: 'file', name: 'Lesson 8 단어 스펠링 테스트', parentId: 'f_l8', linkUrl: 'https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168' },
@@ -345,9 +344,6 @@
             ],
 
             masterDatabase: JSON.parse(JSON.stringify(initialMasterDatabase)),
-
-            sharedFiles: {},
-
             wordDataMap: {},
 
             currentSuperView: 'content',
@@ -359,7 +355,7 @@
         };
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v16');
+            const saved = localStorage.getItem('multi_academy_portal_v17');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
@@ -367,7 +363,6 @@
                     state.students = p.students || state.students;
                     state.historyRecords = p.historyRecords || state.historyRecords;
                     state.masterDatabase = p.masterDatabase || state.masterDatabase;
-                    state.sharedFiles = p.sharedFiles || {};
                     state.wordDataMap = p.wordDataMap || state.wordDataMap;
                     state.sidebarCats = p.sidebarCats || state.sidebarCats;
                 } catch(e){}
@@ -377,12 +372,11 @@
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v16', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v17', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
                 masterDatabase: state.masterDatabase,
-                sharedFiles: state.sharedFiles,
                 wordDataMap: state.wordDataMap,
                 sidebarCats: state.sidebarCats
             }));
@@ -594,17 +588,6 @@
             breadcrumb.innerHTML = trailHtml;
 
             let items = state.masterDatabase[state.currentSidebarCat] || [];
-
-            // If non-super user and custom share rules exist, apply them.
-            // Otherwise, default to sharing ALL files across all devices!
-            if (state.currentUser && state.currentUser.role !== 'super') {
-                const bId = state.currentUser.branchId;
-                const allowedIds = state.sharedFiles[bId];
-                if (allowedIds && Array.isArray(allowedIds) && allowedIds.length > 0) {
-                    items = items.filter(item => item.type === 'folder' || allowedIds.includes(item.id));
-                }
-            }
-
             let currentChildren = items.filter(item => item.parentId === state.currentFolderId);
 
             currentChildren = currentChildren.filter(item => {
@@ -1093,62 +1076,7 @@
 
         function renderShareManager() {
             const container = document.getElementById('share-list-container');
-            container.innerHTML = '';
-
-            let allFiles = [];
-            Object.keys(state.masterDatabase).forEach(cat => {
-                state.masterDatabase[cat].forEach(item => {
-                    if (item.type === 'file') allFiles.push(item);
-                });
-            });
-
-            if (allFiles.length === 0) {
-                container.innerHTML = `<div class="text-center py-12 text-slate-400">등록된 파일이 없습니다.</div>`;
-                return;
-            }
-
-            state.branches.forEach(b => {
-                const branchCard = document.createElement('div');
-                branchCard.className = "p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3";
-                
-                let fileCheckboxes = '';
-                allFiles.forEach(f => {
-                    const isShared = !state.sharedFiles[b.id] || state.sharedFiles[b.id].includes(f.id);
-                    fileCheckboxes += `
-                        <label class="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white p-2 rounded-lg border border-slate-200 cursor-pointer">
-                            <input type="checkbox" ${isShared ? 'checked' : ''} onchange="toggleShare('${b.id}', '${f.id}')" class="w-4 h-4 text-indigo-600 rounded">
-                            <span>${f.name}</span>
-                        </label>
-                    `;
-                });
-
-                branchCard.innerHTML = `
-                    <div class="font-bold text-slate-800 text-base border-b pb-2">🏛️ ${b.academyName} 지점 공유 파일 선택</div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">${fileCheckboxes}</div>
-                `;
-                container.appendChild(branchCard);
-            });
-        }
-
-        function toggleShare(branchId, fileId) {
-            let allFiles = [];
-            Object.keys(state.masterDatabase).forEach(cat => {
-                state.masterDatabase[cat].forEach(item => {
-                    if (item.type === 'file') allFiles.push(item.id);
-                });
-            });
-
-            if (!state.sharedFiles[branchId]) {
-                state.sharedFiles[branchId] = [...allFiles];
-            }
-
-            const idx = state.sharedFiles[branchId].indexOf(fileId);
-            if (idx > -1) {
-                state.sharedFiles[branchId].splice(idx, 1);
-            } else {
-                state.sharedFiles[branchId].push(fileId);
-            }
-            saveState();
+            container.innerHTML = `<div class="p-4 bg-emerald-50 text-emerald-800 font-bold rounded-xl text-sm">💡 모든 하위 지점과 학생들에게 학습 자료가 자동으로 전체 공유됩니다.</div>`;
         }
 
         function renderSubStudents() {
