@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -110,7 +111,7 @@
             <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500" style="height:1rem;"></div>
             
             <div class="mt-6 text-center">
-                <button onclick="forceResetMobileStorage()" class="text-xs text-slate-400 font-bold underline">스마트폰/PC 접속 오류 시 초기화</button>
+                <button onclick="forceResetStorage()" class="text-xs text-slate-400 font-bold underline">저장소 데이터 초기화</button>
             </div>
         </div>
     </div>
@@ -252,19 +253,6 @@
         </div>
     </div>
 
-    <!-- Gemini & External Link Bridge Modal (스마트폰 제미나이 차단 구원 안내 모달) -->
-    <div id="link-modal" class="fixed inset-0 hidden flex items-center justify-center p-4 z-50" style="background:rgba(15,23,42,0.75);">
-        <div class="bg-white rounded-3xl max-w-md w-full p-6 text-center relative shadow-2xl border">
-            <button onclick="closeLinkModal()" style="position:absolute; top:1rem; right:1rem; font-size:1.25rem; font-weight:700;">✕</button>
-            <div style="font-size:2.5rem; margin-bottom:0.5rem;">🤖</div>
-            <h3 id="link-modal-title" class="text-lg font-bold text-slate-800 mb-2">학습 페이지 이동</h3>
-            <p class="text-xs text-slate-500 mb-6">모바일 보안 정책으로 인해 아래 링크 버튼을 누르시면 구글 제미나이 학습창이 바로 열립니다.</p>
-            <a id="link-modal-btn" href="#" target="_blank" rel="noopener noreferrer" class="block w-full bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-md text-sm">
-                🔗 제미나이 학습창 열기 (클릭)
-            </a>
-        </div>
-    </div>
-
     <!-- Video Modal -->
     <div id="video-modal" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center p-4 z-50" style="background:rgba(15,23,42,0.8);">
         <div class="bg-white rounded-2xl max-w-3xl w-full p-6 relative">
@@ -390,15 +378,15 @@
             currentFolderId: null
         };
 
-        function forceResetMobileStorage() {
+        function forceResetStorage() {
             localStorage.clear();
-            alert('초기화가 완료되었습니다. 새로고침합니다.');
+            alert('초기 설정으로 원상복구되었습니다. 새로고침합니다.');
             location.reload();
         }
 
         function loadState() {
             try {
-                const saved = localStorage.getItem('multi_academy_portal_v50');
+                const saved = localStorage.getItem('multi_academy_portal_v100');
                 if (saved) {
                     const p = JSON.parse(saved);
                     state.branches = (p.branches && p.branches.length > 0) ? p.branches : state.branches;
@@ -418,7 +406,7 @@
 
         function saveState() {
             try {
-                localStorage.setItem('multi_academy_portal_v50', JSON.stringify({
+                localStorage.setItem('multi_academy_portal_v100', JSON.stringify({
                     branches: state.branches,
                     students: state.students,
                     historyRecords: state.historyRecords,
@@ -620,10 +608,10 @@
 
             currentChildren.forEach((item) => {
                 const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 font-bold text-slate-700 text-sm";
+                row.className = "p-4 bg-slate-50 border rounded-xl flex justify-between items-center gap-3 font-bold text-slate-700 text-sm";
                 
                 const leftDiv = document.createElement('div');
-                leftDiv.className = "flex items-center gap-2.5 cursor-pointer w-full sm:w-auto";
+                leftDiv.className = "flex items-center gap-2.5 cursor-pointer";
 
                 if (item.type === 'folder') {
                     leftDiv.innerHTML = `<span style="font-size:1.25rem;">📂</span> <span class="text-base">${item.name}</span>`;
@@ -639,7 +627,7 @@
                 row.appendChild(leftDiv);
 
                 const rightBox = document.createElement('div');
-                rightBox.className = 'flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end';
+                rightBox.className = 'flex items-center gap-1.5';
 
                 if (state.currentUser && state.currentUser.role === 'super') {
                     const upBtn = document.createElement('button');
@@ -668,7 +656,7 @@
                 }
 
                 const actionBtn = document.createElement('button');
-                actionBtn.className = "bg-indigo-600 text-white text-xs px-4 py-2.5 rounded-xl font-bold w-full sm:w-auto mt-2 sm:mt-0 shadow-sm";
+                actionBtn.className = "bg-indigo-600 text-white text-xs px-4 py-2 rounded-xl font-bold shadow-sm ml-2";
                 actionBtn.innerText = item.type === 'folder' ? '열기 ➔' : '학습하기 ➔';
                 actionBtn.onclick = () => {
                     if (item.type === 'folder') {
@@ -687,7 +675,6 @@
             });
         }
 
-        // 제미나이 및 스마트폰 모바일 링크 보완
         function openLinkOrVideo(item) {
             const url = item.linkUrl;
             if (url.includes('youtube.com') || url.includes('youtu.be')) {
@@ -701,21 +688,8 @@
                 document.getElementById('video-iframe').src = embedUrl;
                 document.getElementById('video-modal').style.display = 'flex';
             } else {
-                // 모바일 차단 완벽 대응: 스마트폰 브라우저에서는 안전 브릿지 모달 호출
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                if (isMobile) {
-                    document.getElementById('link-modal-title').innerText = item.name;
-                    const btn = document.getElementById('link-modal-btn');
-                    btn.href = url;
-                    document.getElementById('link-modal').classList.remove('hidden');
-                } else {
-                    window.open(url, '_blank', 'noopener,noreferrer');
-                }
+                window.open(url, '_blank');
             }
-        }
-
-        function closeLinkModal() {
-            document.getElementById('link-modal').classList.add('hidden');
         }
 
         function closeVideo() {
