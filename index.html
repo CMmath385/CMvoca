@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -111,7 +110,6 @@
 
             <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500" style="height:1rem;"></div>
             
-            <!-- 모바일용 강제 초기화 버튼 -->
             <div class="mt-6 text-center">
                 <button onclick="forceResetMobileStorage()" class="text-xs text-slate-400 font-bold underline">스마트폰 연결 오류 시 데이터 초기화</button>
             </div>
@@ -259,6 +257,19 @@
         </div>
     </div>
 
+    <!-- Direct Gemini Link Modal -->
+    <div id="link-modal" class="fixed inset-0 hidden flex items-center justify-center p-4 z-50" style="background:rgba(15,23,42,0.7);">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 text-center relative shadow-2xl border">
+            <button onclick="closeLinkModal()" style="position:absolute; top:1rem; right:1rem; font-size:1.25rem; font-weight:700;">✕</button>
+            <div style="font-size:2.5rem; margin-bottom:0.5rem;">🤖</div>
+            <h3 id="link-modal-title" class="text-lg font-bold text-slate-800 mb-2">학습 페이지로 이동</h3>
+            <p class="text-xs text-slate-500 mb-6">스마트폰 브라우저 보호 정책으로 인해 아래 버튼을 터치하시면 제미나이 학습창이 바로 열립니다.</p>
+            <a id="link-modal-btn" href="#" target="_blank" rel="noopener noreferrer" class="block w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-md text-sm">
+                🔗 학습 창으로 이동하기 (클릭)
+            </a>
+        </div>
+    </div>
+
     <!-- Video Modal -->
     <div id="video-modal" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center p-4 z-50" style="background:rgba(15,23,42,0.8);">
         <div class="bg-white rounded-2xl max-w-3xl w-full p-6 relative">
@@ -381,19 +392,18 @@
             currentSubView: 'content',
             currentTopTab: 'voca',
             currentSidebarCat: 'middle_exam',
-            currentFolderId: null,
-            currentActivityMode: 'all'
+            currentFolderId: null
         };
 
         function forceResetMobileStorage() {
             localStorage.clear();
-            alert('스마트폰 데이터가 깨끗하게 초기화되었습니다. 새로고침합니다.');
+            alert('데이터가 초기화되었습니다. 새로고침합니다.');
             location.reload();
         }
 
         function loadState() {
             try {
-                const saved = localStorage.getItem('multi_academy_portal_v25');
+                const saved = localStorage.getItem('multi_academy_portal_v31');
                 if (saved) {
                     const p = JSON.parse(saved);
                     state.branches = (p.branches && p.branches.length > 0) ? p.branches : state.branches;
@@ -413,7 +423,7 @@
 
         function saveState() {
             try {
-                localStorage.setItem('multi_academy_portal_v25', JSON.stringify({
+                localStorage.setItem('multi_academy_portal_v31', JSON.stringify({
                     branches: state.branches,
                     students: state.students,
                     historyRecords: state.historyRecords,
@@ -534,48 +544,11 @@
                 btn.innerText = tab.name;
                 btn.onclick = () => {
                     state.currentTopTab = tab.id;
-                    state.currentActivityMode = 'all';
                     renderTopNav();
-                    renderActivitySubBar();
                     renderContent();
                 };
                 container.appendChild(btn);
             });
-
-            renderActivitySubBar();
-        }
-
-        function renderActivitySubBar() {
-            const container = document.getElementById('sub-activity-bar');
-            container.innerHTML = '';
-
-            if (state.currentTopTab === 'voca') {
-                container.innerHTML = `
-                    <span class="text-xs font-bold text-amber-800 mr-2">🔤 단어 학습 카테고리:</span>
-                    <button onclick="setActivityMode('all')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='all'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">전체 보기</button>
-                    <button onclick="setActivityMode('voca_kor_eng')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='voca_kor_eng'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">단어 한글+영어 학습</button>
-                    <button onclick="setActivityMode('voca_spelling')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='voca_spelling'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">스펠링 테스트</button>
-                `;
-            } else if (state.currentTopTab === 'passage') {
-                container.innerHTML = `
-                    <span class="text-xs font-bold text-amber-800 mr-2">📖 본문 학습 카테고리:</span>
-                    <button onclick="setActivityMode('all')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='all'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">전체 보기</button>
-                    <button onclick="setActivityMode('passage_verb')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_verb'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">동사형 찾기</button>
-                    <button onclick="setActivityMode('passage_grammar')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_grammar'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">어법 선택</button>
-                    <button onclick="setActivityMode('passage_concept')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_concept'?'bg-amber-500 text-slate-900 border-amber-500':'bg-white text-slate-700'}">본문문법개념</button>
-                `;
-            } else if (state.currentTopTab === 'video') {
-                container.innerHTML = `
-                    <span class="text-xs font-bold text-amber-800 mr-2">🎬 영상 학습:</span>
-                    <span class="text-xs text-amber-900 font-medium">유튜브 동영상 링크 클릭 시 플레이어로 시청합니다.</span>
-                `;
-            }
-        }
-
-        function setActivityMode(mode) {
-            state.currentActivityMode = mode;
-            renderActivitySubBar();
-            renderContent();
         }
 
         function renderSidebar() {
@@ -634,28 +607,6 @@
             let items = state.masterDatabase[state.currentSidebarCat] || [];
             let currentChildren = items.filter(item => item.parentId === state.currentFolderId);
 
-            currentChildren = currentChildren.filter(item => {
-                if (item.type === 'folder') return true;
-
-                const name = item.name;
-                const isVocaType = name.includes('단어 한글+영어') || name.includes('스펠링');
-                const isPassageType = name.includes('동사형') || name.includes('어법') || name.includes('본문문법개념') || name.includes('한줄해석') || name.includes('빈칸');
-
-                if (state.currentTopTab === 'voca') {
-                    if (!isVocaType) return false;
-                    if (state.currentActivityMode === 'voca_kor_eng' && !name.includes('단어 한글+영어')) return false;
-                    if (state.currentActivityMode === 'voca_spelling' && !name.includes('스펠링')) return false;
-                    return true;
-                } else if (state.currentTopTab === 'passage') {
-                    if (!isPassageType) return false;
-                    if (state.currentActivityMode === 'passage_verb' && !name.includes('동사형')) return false;
-                    if (state.currentActivityMode === 'passage_grammar' && !name.includes('어법')) return false;
-                    if (state.currentActivityMode === 'passage_concept' && !name.includes('본문문법개념')) return false;
-                    return true;
-                }
-                return true;
-            });
-
             title.innerText = state.currentFolderId ? (path[path.length - 1]?.name || '폴더') : catName;
 
             if (state.currentFolderId) {
@@ -668,7 +619,7 @@
             }
 
             if (currentChildren.length === 0) {
-                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">현재 탭/모드에 해당하는 학습 자료가 없습니다.</div>`;
+                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">등록된 학습 자료가 없습니다.</div>`;
                 return;
             }
 
@@ -677,7 +628,7 @@
                 row.className = "p-4 bg-slate-50 border rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 font-bold text-slate-700 text-sm";
                 
                 const leftDiv = document.createElement('div');
-                leftDiv.className = "flex items-center gap-2.5 cursor-pointer";
+                leftDiv.className = "flex items-center gap-2.5 cursor-pointer w-full sm:w-auto";
 
                 if (item.type === 'folder') {
                     leftDiv.innerHTML = `<span style="font-size:1.25rem;">📂</span> <span class="text-base">${item.name}</span>`;
@@ -693,7 +644,7 @@
                 row.appendChild(leftDiv);
 
                 const rightBox = document.createElement('div');
-                rightBox.className = 'flex items-center gap-1.5 flex-wrap';
+                rightBox.className = 'flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end';
 
                 if (state.currentUser && state.currentUser.role === 'super') {
                     const upBtn = document.createElement('button');
@@ -722,7 +673,7 @@
                 }
 
                 const actionBtn = document.createElement('button');
-                actionBtn.className = "bg-indigo-600 text-white text-xs px-3.5 py-2 rounded-lg font-bold ml-2";
+                actionBtn.className = "bg-indigo-600 text-white text-xs px-4 py-2.5 rounded-xl font-bold w-full sm:w-auto mt-2 sm:mt-0 shadow-sm";
                 actionBtn.innerText = item.type === 'folder' ? '열기 ➔' : '학습하기 ➔';
                 actionBtn.onclick = () => {
                     if (item.type === 'folder') {
@@ -742,19 +693,30 @@
         }
 
         function openLinkOrVideo(item) {
-            if (item.linkUrl.includes('youtube.com') || item.linkUrl.includes('youtu.be')) {
-                let embedUrl = item.linkUrl;
-                if (item.linkUrl.includes('watch?v=')) {
-                    embedUrl = item.linkUrl.replace('watch?v=', 'embed/');
-                } else if (item.linkUrl.includes('youtu.be/')) {
-                    embedUrl = item.linkUrl.replace('youtu.be/', 'youtube.com/embed/');
+            const url = item.linkUrl;
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                let embedUrl = url;
+                if (url.includes('watch?v=')) {
+                    embedUrl = url.replace('watch?v=', 'embed/');
+                } else if (url.includes('youtu.be/')) {
+                    embedUrl = url.replace('youtu.be/', 'youtube.com/embed/');
                 }
                 document.getElementById('video-title').innerText = item.name;
                 document.getElementById('video-iframe').src = embedUrl;
                 document.getElementById('video-modal').style.display = 'flex';
             } else {
-                window.open(item.linkUrl, '_blank');
+                const win = window.open(url, '_blank', 'noopener,noreferrer');
+                if (!win || win.closed || typeof win.closed === 'undefined') {
+                    document.getElementById('link-modal-title').innerText = item.name;
+                    const btn = document.getElementById('link-modal-btn');
+                    btn.href = url;
+                    document.getElementById('link-modal').classList.remove('hidden');
+                }
             }
+        }
+
+        function closeLinkModal() {
+            document.getElementById('link-modal').classList.add('hidden');
         }
 
         function closeVideo() {
@@ -921,7 +883,7 @@
 
             document.getElementById('quiz-body').style.display = 'block';
             document.getElementById('quiz-result').style.display = 'none';
-            document.getElementById('quiz-title').innerText = `${title} [${state.currentActivityMode}]`;
+            document.getElementById('quiz-title').innerText = title;
             document.getElementById('quiz-modal').style.display = 'flex';
             loadQuizQuestion();
         }
@@ -976,7 +938,7 @@
                 id: 'h_' + Date.now(),
                 branchId: state.currentUser.branchId,
                 studentName: state.currentUser.name,
-                title: `${currentQuizTitle} (${state.currentActivityMode})`,
+                title: currentQuizTitle,
                 score: score,
                 correct: quizCorrect,
                 total: activeWords.length,
