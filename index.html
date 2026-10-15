@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -69,9 +68,12 @@
                     </div>
                 </div>
 
-                <nav id="top-nav-container" class="flex flex-wrap gap-2 text-sm font-bold">
-                    <!-- Dynamic -->
-                </nav>
+                <div class="flex items-center gap-2">
+                    <nav id="top-nav-container" class="flex flex-wrap gap-2 text-sm font-bold items-center">
+                        <!-- Dynamic Top Tabs -->
+                    </nav>
+                    <button onclick="manageTopTabsPrompt()" id="btn-manage-tabs" class="hidden text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-2 rounded-xl transition" title="상단 메뉴 관리">⚙️ 메뉴설정</button>
+                </div>
 
                 <div class="flex items-center gap-3">
                     <span id="user-badge" class="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1.5 rounded-xl border border-indigo-100">
@@ -88,10 +90,13 @@
             <aside class="w-full md:w-64 flex-shrink-0 flex flex-col gap-2">
                 <div class="flex justify-between items-center px-1 mb-1">
                     <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">학습 카테고리</span>
-                    <button onclick="addSidebarCategoryPrompt()" id="sidebar-add-btn" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-100">+ 추가</button>
+                    <div class="flex items-center gap-1">
+                        <button onclick="manageSidebarCategoriesPrompt()" id="sidebar-manage-btn" class="hidden text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold hover:bg-slate-300">⚙️ 관리</button>
+                        <button onclick="addSidebarCategoryPrompt()" id="sidebar-add-btn" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-100">+ 추가</button>
+                    </div>
                 </div>
                 <div id="sidebar-container" class="flex flex-col gap-1.5">
-                    <!-- Dynamic -->
+                    <!-- Dynamic Sidebar -->
                 </div>
             </aside>
 
@@ -103,7 +108,7 @@
                     </div>
 
                     <div id="sub-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200">
-                        <button onclick="switchSubView('content')" id="sub-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">📂 학원 학습 자료실 (등록/수정)</button>
+                        <button onclick="switchSubView('content')" id="sub-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">📂 학원 학습 자료실</button>
                         <button onclick="switchSubView('students')" id="sub-v-students" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">👨‍🎓 학생 관리</button>
                         <button onclick="switchSubView('history')" id="sub-v-history" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">📊 학습 이력</button>
                         <button onclick="switchSubView('settings')" id="sub-v-settings" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">⚙️ 학원 설정</button>
@@ -119,14 +124,14 @@
                                 <h2 id="current-title" class="text-xl font-bold text-slate-800">폴더 및 학습 목록</h2>
                             </div>
                             
-                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <div class="flex items-center gap-2 w-full sm:w-auto" id="action-buttons-box">
                                 <button onclick="addFolderPrompt()" id="btn-add-folder" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">+ 새 폴더 추가</button>
-                                <button onclick="addLinkFilePrompt()" id="btn-add-link" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">🔗 웹/HTML 링크 등록</button>
+                                <button onclick="addLinkFilePrompt()" id="btn-add-link" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">🔗 웹/링크 등록</button>
                             </div>
                         </div>
 
                         <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">✨ 폴더 및 자료의 이동(▲▼), 수정, 삭제가 자유롭게 가능합니다.</span>
+                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원이 공유한 공통 자료는 보호되며, 우리 학원에서 추가한 자료만 자유롭게 수정·삭제할 수 있습니다.</span>
                         </div>
 
                         <div id="content-container" class="space-y-3"></div>
@@ -206,9 +211,9 @@
     <script>
         const initialMasterDatabase = {
             'middle_exam': [
-                { id: 'f_onam_high', type: 'folder', name: '오남고 공통영어2', parentId: null },
-                { id: 'f_onam_l3', type: 'folder', name: 'Lesson 3', parentId: 'f_onam_high' },
-                { id: 'f_onam_l4', type: 'folder', name: 'Lesson 4', parentId: 'f_onam_high' }
+                { id: 'f_onam_high', type: 'folder', name: '오남고 공통영어2', parentId: null, tabId: 'video', authorRole: 'super' },
+                { id: 'f_onam_l3', type: 'folder', name: 'Lesson 3', parentId: 'f_onam_high', tabId: 'video', authorRole: 'super' },
+                { id: 'f_onam_l4', type: 'folder', name: 'Lesson 4', parentId: 'f_onam_high', tabId: 'video', authorRole: 'super' }
             ],
             'high_exam': [],
             'grammar': []
@@ -225,7 +230,9 @@
             ],
             historyRecords: [],
             topTabs: [
-                { id: 'voca', name: '단어/본문 학습' }
+                { id: 'video', name: '영상학습훈련' },
+                { id: 'voca', name: '단어' },
+                { id: 'passage', name: '본문' }
             ],
             sidebarCats: [
                 { id: 'middle_exam', name: '내신문제' },
@@ -235,7 +242,7 @@
             masterDatabase: JSON.parse(JSON.stringify(initialMasterDatabase)),
             currentSuperView: 'content',
             currentSubView: 'content',
-            currentTopTab: 'voca',
+            currentTopTab: 'video',
             currentSidebarCat: 'middle_exam',
             currentFolderId: null
         };
@@ -253,13 +260,13 @@
                 const r = await fetch('data.json?v=' + Date.now(), { cache: 'no-store' });
                 if (r.ok) {
                     const d = await r.json();
-                    ['branches','students','masterDatabase','sidebarCats'].forEach(k => { if (d[k]) state[k] = d[k]; });
+                    ['branches','students','masterDatabase','topTabs','sidebarCats'].forEach(k => { if (d[k]) state[k] = d[k]; });
                 }
             } catch (e) {}
         }
 
         function exportData() {
-            const data = { branches: state.branches, students: state.students, masterDatabase: state.masterDatabase, sidebarCats: state.sidebarCats };
+            const data = { branches: state.branches, students: state.students, masterDatabase: state.masterDatabase, topTabs: state.topTabs, sidebarCats: state.sidebarCats };
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
             a.download = 'data.json';
@@ -267,7 +274,7 @@
         }
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v23');
+            const saved = localStorage.getItem('multi_academy_portal_v25');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
@@ -275,6 +282,7 @@
                     state.students = p.students && p.students.length > 0 ? p.students : state.students;
                     state.historyRecords = p.historyRecords || [];
                     state.masterDatabase = p.masterDatabase && Object.keys(p.masterDatabase).length > 0 ? p.masterDatabase : JSON.parse(JSON.stringify(initialMasterDatabase));
+                    state.topTabs = p.topTabs && p.topTabs.length > 0 ? p.topTabs : state.topTabs;
                     state.sidebarCats = p.sidebarCats && p.sidebarCats.length > 0 ? p.sidebarCats : state.sidebarCats;
                 } catch(e){
                     state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
@@ -285,11 +293,12 @@
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v23', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v25', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
                 masterDatabase: state.masterDatabase,
+                topTabs: state.topTabs,
                 sidebarCats: state.sidebarCats
             }));
         }
@@ -340,23 +349,34 @@
                 document.getElementById('super-admin-tabs').classList.remove('hidden');
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
                 document.getElementById('sidebar-add-btn').classList.remove('hidden');
+                document.getElementById('sidebar-manage-btn').classList.remove('hidden');
+                document.getElementById('btn-manage-tabs').classList.remove('hidden');
             } else if (state.currentUser.role === 'sub') {
                 badge.innerText = `🏛️ ${state.currentUser.academyName} 원장님`;
                 nameEl.innerText = state.currentUser.academyName;
-                subEl.innerText = '지점 관리자 모드 (자료 등록/수정 가능)';
+                subEl.innerText = '지점 관리자 모드 (자체 자료 등록/수정 가능)';
                 document.getElementById('super-admin-tabs').classList.add('hidden');
                 document.getElementById('sub-admin-tabs').classList.remove('hidden');
                 document.getElementById('sidebar-add-btn').classList.add('hidden');
+                document.getElementById('sidebar-manage-btn').classList.add('hidden'); // 지점장은 카테고리 구조 수정 불가
+                document.getElementById('btn-manage-tabs').classList.add('hidden');
             } else {
-                const b = state.branches.find(x => x.id === state.currentUser.branchId);
+                const b = state.branches.find(x => x.id === student.branchId);
                 badge.innerText = `👨‍🎓 ${state.currentUser.name} 학생`;
                 nameEl.innerText = b ? b.academyName : '학원';
                 subEl.innerText = '학생 학습관';
                 document.getElementById('super-admin-tabs').classList.add('hidden');
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
                 document.getElementById('sidebar-add-btn').classList.add('hidden');
+                document.getElementById('sidebar-manage-btn').classList.add('hidden');
+                document.getElementById('btn-manage-tabs').classList.add('hidden');
             }
 
+            if (!state.topTabs.some(t => t.id === state.currentTopTab) && state.topTabs.length > 0) {
+                state.currentTopTab = state.topTabs[0].id;
+            }
+
+            renderTopNav();
             renderSidebar();
             renderContent();
         }
@@ -367,6 +387,64 @@
             document.getElementById('app-portal').classList.add('hidden');
             document.getElementById('login-id').value = '';
             document.getElementById('login-pw').value = '';
+        }
+
+        function renderTopNav() {
+            const container = document.getElementById('top-nav-container');
+            container.innerHTML = '';
+
+            state.topTabs.forEach(tab => {
+                const isActive = state.currentTopTab === tab.id;
+                const btn = document.createElement('button');
+                btn.className = isActive
+                    ? 'bg-amber-500 text-slate-900 font-bold px-4 py-2 rounded-xl shadow-sm transition'
+                    : 'bg-slate-100 text-slate-700 font-bold px-4 py-2 rounded-xl hover:bg-slate-200 transition';
+                btn.innerText = tab.name;
+                btn.onclick = () => {
+                    state.currentTopTab = tab.id;
+                    renderTopNav();
+                    renderContent();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function manageTopTabsPrompt() {
+            if (state.currentUser.role !== 'super') return alert('최고관리자만 메뉴를 설정할 수 있습니다.');
+            const action = prompt('상단 메뉴(탭) 관리 옵션을 선택하세요:\n1. 추가\n2. 이름 수정\n3. 삭제\n4. 순서 변경', '1');
+            if (!action) return;
+
+            if (action === '1') {
+                const name = prompt('새 메뉴 이름을 입력하세요:');
+                if (!name) return;
+                const id = 'tab_' + Date.now();
+                state.topTabs.push({ id, name: name.trim() });
+            } else if (action === '2' || action === '3' || action === '4') {
+                const listStr = state.topTabs.map((t, idx) => `${idx + 1}. ${t.name}`).join('\n');
+                const idxChoice = prompt(`대상 메뉴 번호를 입력하세요:\n\n${listStr}`);
+                if (!idxChoice) return;
+                const idx = parseInt(idxChoice) - 1;
+                if (isNaN(idx) || idx < 0 || idx >= state.topTabs.length) return alert('올바른 번호가 아닙니다.');
+
+                if (action === '2') {
+                    const newName = prompt('새 메뉴 이름을 입력하세요:', state.topTabs[idx].name);
+                    if (newName) state.topTabs[idx].name = newName.trim();
+                } else if (action === '3') {
+                    if (state.topTabs.length <= 1) return alert('최소 1개의 메뉴는 남아있어야 합니다.');
+                    const removedId = state.topTabs[idx].id;
+                    state.topTabs.splice(idx, 1);
+                    if (state.currentTopTab === removedId) state.currentTopTab = state.topTabs[0].id;
+                } else if (action === '4') {
+                    if (idx > 0) {
+                        const temp = state.topTabs[idx];
+                        state.topTabs[idx] = state.topTabs[idx - 1];
+                        state.topTabs[idx - 1] = temp;
+                    }
+                }
+            }
+            renderTopNav();
+            renderContent();
+            saveState();
         }
 
         function renderSidebar() {
@@ -387,6 +465,36 @@
                 };
                 container.appendChild(btn);
             });
+        }
+
+        function manageSidebarCategoriesPrompt() {
+            if (state.currentUser.role !== 'super') return;
+            const action = prompt('카테고리 관리 옵션:\n1. 이름 수정\n2. 삭제\n3. 순서 변경', '1');
+            if (!action) return;
+
+            const listStr = state.sidebarCats.map((c, idx) => `${idx + 1}. ${c.name}`).join('\n');
+            const idxChoice = prompt(`대상 카테고리 번호:\n\n${listStr}`);
+            if (!idxChoice) return;
+            const idx = parseInt(idxChoice) - 1;
+            if (isNaN(idx) || idx < 0 || idx >= state.sidebarCats.length) return;
+
+            if (action === '1') {
+                const newName = prompt('새 카테고리 이름:', state.sidebarCats[idx].name);
+                if (newName) state.sidebarCats[idx].name = newName.trim();
+            } else if (action === '2') {
+                if (state.sidebarCats.length <= 1) return alert('최소 1개 유지');
+                const catId = state.sidebarCats[idx].id;
+                state.sidebarCats.splice(idx, 1);
+                delete state.masterDatabase[catId];
+                if (state.currentSidebarCat === catId) state.currentSidebarCat = state.sidebarCats[0].id;
+            } else if (action === '3' && idx > 0) {
+                const temp = state.sidebarCats[idx];
+                state.sidebarCats[idx] = state.sidebarCats[idx - 1];
+                state.sidebarCats[idx - 1] = temp;
+            }
+            renderSidebar();
+            renderContent();
+            saveState();
         }
 
         function getBreadcrumbPath(folderId) {
@@ -421,7 +529,12 @@
             breadcrumb.innerHTML = trailHtml;
 
             let items = state.masterDatabase[state.currentSidebarCat] || [];
-            let currentChildren = items.filter(item => item.parentId === state.currentFolderId);
+            let currentChildren = items.filter(item => {
+                const matchesParent = item.parentId === state.currentFolderId;
+                if (!matchesParent) return false;
+                if (item.type === 'folder') return true;
+                return (item.tabId || 'video') === state.currentTopTab;
+            });
 
             title.innerText = state.currentFolderId ? (path[path.length - 1]?.name || '폴더') : catName;
 
@@ -435,11 +548,9 @@
             }
 
             if (currentChildren.length === 0) {
-                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">등록된 학습 자료가 없습니다. 상단 버튼을 눌러 추가해 주세요.</div>`;
+                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">등록된 학습 자료가 없습니다.</div>`;
                 return;
             }
-
-            const canManage = state.currentUser && (state.currentUser.role === 'super' || state.currentUser.role === 'sub');
 
             currentChildren.forEach((item) => {
                 const row = document.createElement('div');
@@ -448,16 +559,19 @@
                 const leftDiv = document.createElement('div');
                 leftDiv.className = "flex items-center gap-2.5 cursor-pointer flex-grow";
 
+                const isSuperItem = (item.authorRole === 'super');
+                const badgeHtml = isSuperItem ? `<span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">공유됨</span>` : `<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">우리학원</span>`;
+
                 if (item.type === 'folder') {
-                    leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span>`;
+                    leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
                     leftDiv.onclick = () => { state.currentFolderId = item.id; renderContent(); };
                 } else {
                     const isYt = /youtube\.com|youtu\.be/.test(item.linkUrl);
                     if (isYt) {
-                        leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span>`;
+                        leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
                         leftDiv.onclick = () => openLinkOrVideo(item);
                     } else {
-                        leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span></a>`;
+                        leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span> ${badgeHtml}</a>`;
                     }
                 }
 
@@ -466,8 +580,13 @@
                 const rightBox = document.createElement('div');
                 rightBox.className = 'flex items-center gap-1.5 flex-shrink-0';
 
-                // 관리자(최고관리자 및 하위 지점장) 권한인 경우 순서 이동, 수정, 삭제 제공
-                if (canManage) {
+                const isSuperUser = (state.currentUser && state.currentUser.role === 'super');
+                const isSubUser = (state.currentUser && state.currentUser.role === 'sub');
+
+                // 수정/삭제 권한 판별: 최고관리자는 전체 가능, 하위관리자는 자신이 만든 자료만 가능 (공유 자료 수정/삭제 불가)
+                const canModifyThisItem = isSuperUser || (isSubUser && !isSuperItem);
+
+                if (canModifyThisItem && state.currentUser && state.currentUser.role !== 'student') {
                     const upBtn = document.createElement('button');
                     upBtn.className = "bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2 py-1 rounded font-bold transition";
                     upBtn.innerText = "▲";
@@ -479,6 +598,14 @@
                     downBtn.innerText = "▼";
                     downBtn.onclick = (e) => { e.stopPropagation(); moveItemOrder(item.id, 1); };
                     rightBox.appendChild(downBtn);
+
+                    if (item.type === 'file') {
+                        const moveTabBtn = document.createElement('button');
+                        moveTabBtn.className = "text-amber-600 hover:bg-amber-50 font-bold text-xs px-2 py-1.5 rounded-lg border border-amber-200 transition";
+                        moveTabBtn.innerText = "🔀 탭이동";
+                        moveTabBtn.onclick = (e) => { e.stopPropagation(); moveItemTabPrompt(item.id); };
+                        rightBox.appendChild(moveTabBtn);
+                    }
 
                     const editBtn = document.createElement('button');
                     editBtn.className = "text-indigo-600 hover:bg-indigo-50 font-bold text-xs px-2 py-1.5 rounded-lg border border-indigo-200 transition";
@@ -552,14 +679,36 @@
             saveState();
         }
 
+        function moveItemTabPrompt(itemId) {
+            const item = state.masterDatabase[state.currentSidebarCat].find(i => i.id === itemId);
+            if (!item) return;
+            if (state.currentUser.role === 'sub' && item.authorRole === 'super') {
+                return alert('본원에서 공유해 준 자료는 탭을 이동할 수 없습니다.');
+            }
+
+            const tabListStr = state.topTabs.map((t, idx) => `${idx + 1}. ${t.name}`).join('\n');
+            const choice = prompt(`이동할 상단 메뉴(탭) 번호:\n\n${tabListStr}`);
+            if (!choice) return;
+            const idx = parseInt(choice) - 1;
+            if (isNaN(idx) || idx < 0 || idx >= state.topTabs.length) return;
+
+            item.tabId = state.topTabs[idx].id;
+            renderContent();
+            saveState();
+            alert(`[${state.topTabs[idx].name}] 탭으로 이동되었습니다.`);
+        }
+
         function editMasterItem(itemId) {
             const item = state.masterDatabase[state.currentSidebarCat].find(i => i.id === itemId);
             if (!item) return;
+            if (state.currentUser.role === 'sub' && item.authorRole === 'super') {
+                return alert('본원에서 공유해 준 자료는 수정할 수 없습니다.');
+            }
             const newName = prompt('새 이름을 입력하세요:', item.name);
             if (!newName) return;
             item.name = newName.trim();
             if (item.linkUrl !== undefined) {
-                const newLink = prompt('웹/HTML 링크 주소를 입력하세요:', item.linkUrl);
+                const newLink = prompt('웹/링크 주소를 입력하세요:', item.linkUrl);
                 if (newLink !== null) item.linkUrl = newLink.trim();
             }
             renderContent();
@@ -567,6 +716,10 @@
         }
 
         function deleteMasterItem(id) {
+            const item = state.masterDatabase[state.currentSidebarCat].find(i => i.id === id);
+            if (item && state.currentUser.role === 'sub' && item.authorRole === 'super') {
+                return alert('본원에서 공유해 준 자료는 삭제할 수 없습니다.');
+            }
             if (confirm('해당 폴더/자료를 삭제하시겠습니까?')) {
                 state.masterDatabase[state.currentSidebarCat] = state.masterDatabase[state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
                 renderContent();
@@ -578,11 +731,14 @@
             const name = prompt('새 폴더 이름을 입력하세요 (예: Lesson 5):');
             if (name) {
                 if (!state.masterDatabase[state.currentSidebarCat]) state.masterDatabase[state.currentSidebarCat] = [];
+                const role = (state.currentUser && state.currentUser.role === 'super') ? 'super' : 'sub';
                 state.masterDatabase[state.currentSidebarCat].push({
                     id: 'f_' + Date.now(),
                     type: 'folder',
                     name: name.trim(),
-                    parentId: state.currentFolderId
+                    parentId: state.currentFolderId,
+                    tabId: state.currentTopTab,
+                    authorRole: role
                 });
                 renderContent();
                 saveState();
@@ -598,17 +754,33 @@
             const fileId = 'link_' + Date.now();
             if (!state.masterDatabase[state.currentSidebarCat]) state.masterDatabase[state.currentSidebarCat] = [];
 
+            const role = (state.currentUser && state.currentUser.role === 'super') ? 'super' : 'sub';
             state.masterDatabase[state.currentSidebarCat].push({
                 id: fileId,
                 type: 'file',
                 name: title.trim(),
                 parentId: state.currentFolderId,
-                linkUrl: url.trim()
+                linkUrl: url.trim(),
+                tabId: state.currentTopTab,
+                authorRole: role
             });
 
             renderContent();
             saveState();
-            alert(`'${title}' 자료가 성공적으로 등록되었습니다.`);
+            alert(`'${title}' 자료가 등록되었습니다.`);
+        }
+
+        function addSidebarCategoryPrompt() {
+            if (state.currentUser.role !== 'super') return;
+            const name = prompt('새 카테고리 이름을 입력하세요:');
+            if (name) {
+                const id = 'cat_' + Date.now();
+                state.sidebarCats.push({ id, name: name.trim() });
+                state.masterDatabase[id] = [];
+                renderSidebar();
+                renderContent();
+                saveState();
+            }
         }
 
         function switchAdminView(view) {
