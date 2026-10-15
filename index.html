@@ -284,7 +284,7 @@
                 { id: 'grammar', name: '문법' }
             ],
 
-            // Updated Full Database Structure
+            // Master Database with Middle 1 & Middle 2 Grade/Publisher Folders
             masterDatabase: {
                 'middle_exam': [
                     // Level 1: Grade Folders
@@ -331,7 +331,10 @@
                     { id: 'file_m1_8_2', type: 'file', name: 'Lesson 8 단어 스펠링 테스트', parentId: 'f_l8', linkUrl: 'https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168' },
 
                     // Level 2: Publishers under 중2 (개정)
+                    { id: 'f_m2_mirae', type: 'folder', name: '중2 미래엔 문영인', parentId: 'f_g2' },
+                    { id: 'f_m2_visang', type: 'folder', name: '중2 비상 황종배', parentId: 'f_g2' },
                     { id: 'f_m2_chun_so', type: 'folder', name: '중2 천재 소영순', parentId: 'f_g2' },
+                    { id: 'f_m2_chun_lee', type: 'folder', name: '중2 천재 이상기', parentId: 'f_g2' },
 
                     // Level 3: Lessons under 중2 천재 소영순
                     { id: 'f_m2_so_l7', type: 'folder', name: '07과', parentId: 'f_m2_chun_so' },
@@ -376,11 +379,11 @@
             currentTopTab: 'voca',
             currentSidebarCat: 'middle_exam',
             currentFolderId: null,
-            currentActivityMode: 'memo'
+            currentActivityMode: 'all'
         };
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v11');
+            const saved = localStorage.getItem('multi_academy_portal_v12');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
@@ -396,7 +399,7 @@
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v11', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v12', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
@@ -517,8 +520,10 @@
                 btn.innerText = tab.name;
                 btn.onclick = () => {
                     state.currentTopTab = tab.id;
+                    state.currentActivityMode = 'all';
                     renderTopNav();
                     renderActivitySubBar();
+                    renderContent();
                 };
                 container.appendChild(btn);
             });
@@ -532,23 +537,23 @@
 
             if (state.currentTopTab === 'voca') {
                 container.innerHTML = `
-                    <span class="text-xs font-bold text-amber-800 mr-2">🔤 단어 학습 모드:</span>
-                    <button onclick="setActivityMode('memo')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='memo'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">1. 암기 카드</button>
-                    <button onclick="setActivityMode('quiz4')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='quiz4'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">2. 한글+영어 뜻 찾기</button>
-                    <button onclick="setActivityMode('spelling')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='spelling'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">3. 스펠링 테스트</button>
+                    <span class="text-xs font-bold text-amber-800 mr-2">🔤 단어 학습 카테고리:</span>
+                    <button onclick="setActivityMode('all')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='all'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">전체 보기</button>
+                    <button onclick="setActivityMode('voca_kor_eng')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='voca_kor_eng'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">단어 한글+영어 학습</button>
+                    <button onclick="setActivityMode('voca_spelling')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='voca_spelling'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">스펠링 테스트</button>
                 `;
             } else if (state.currentTopTab === 'passage') {
                 container.innerHTML = `
-                    <span class="text-xs font-bold text-amber-800 mr-2">📖 본문 학습 모드:</span>
-                    <button onclick="setActivityMode('passage_read')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_read'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">1. 한줄해석/문법개념</button>
-                    <button onclick="setActivityMode('passage_blank')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_blank'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">2. 빈칸 한글+영어</button>
-                    <button onclick="setActivityMode('passage_verb')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_verb'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">3. 동사형 찾기</button>
-                    <button onclick="setActivityMode('passage_grammar')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_grammar'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">4. 어법 선택</button>
+                    <span class="text-xs font-bold text-amber-800 mr-2">📖 본문 학습 카테고리:</span>
+                    <button onclick="setActivityMode('all')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='all'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">전체 보기</button>
+                    <button onclick="setActivityMode('passage_verb')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_verb'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">동사형 찾기</button>
+                    <button onclick="setActivityMode('passage_grammar')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_grammar'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">어법 선택</button>
+                    <button onclick="setActivityMode('passage_concept')" class="text-xs font-bold px-3 py-1.5 rounded-lg border ${state.currentActivityMode==='passage_concept'?'bg-amber-600 text-white border-amber-600':'bg-white text-slate-700 border-amber-200'}">본문문법개념</button>
                 `;
             } else if (state.currentTopTab === 'video') {
                 container.innerHTML = `
                     <span class="text-xs font-bold text-amber-800 mr-2">🎬 영상 학습:</span>
-                    <span class="text-xs text-amber-900 font-medium">유튜브 동영상 링크 클릭 시 모달 플레이어로 시청합니다.</span>
+                    <span class="text-xs text-amber-900 font-medium">유튜브 동영상 링크 클릭 시 플레이어로 시청합니다.</span>
                 `;
             }
         }
@@ -556,6 +561,7 @@
         function setActivityMode(mode) {
             state.currentActivityMode = mode;
             renderActivitySubBar();
+            renderContent();
         }
 
         function renderSidebar() {
@@ -617,7 +623,30 @@
                 items = items.filter(item => item.type === 'folder' || allowedIds.includes(item.id));
             }
 
-            const currentChildren = items.filter(item => item.parentId === state.currentFolderId);
+            let currentChildren = items.filter(item => item.parentId === state.currentFolderId);
+
+            // Strict Filtering Based on Top Nav (Voca vs Passage)
+            currentChildren = currentChildren.filter(item => {
+                if (item.type === 'folder') return true;
+
+                const name = item.name;
+                const isVocaType = name.includes('단어 한글+영어') || name.includes('스펠링');
+                const isPassageType = name.includes('동사형') || name.includes('어법') || name.includes('본문문법개념') || name.includes('한줄해석') || name.includes('빈칸');
+
+                if (state.currentTopTab === 'voca') {
+                    if (!isVocaType) return false;
+                    if (state.currentActivityMode === 'voca_kor_eng' && !name.includes('단어 한글+영어')) return false;
+                    if (state.currentActivityMode === 'voca_spelling' && !name.includes('스펠링')) return false;
+                    return true;
+                } else if (state.currentTopTab === 'passage') {
+                    if (!isPassageType) return false;
+                    if (state.currentActivityMode === 'passage_verb' && !name.includes('동사형')) return false;
+                    if (state.currentActivityMode === 'passage_grammar' && !name.includes('어법')) return false;
+                    if (state.currentActivityMode === 'passage_concept' && !name.includes('본문문법개념')) return false;
+                    return true;
+                }
+                return true;
+            });
 
             title.innerText = state.currentFolderId ? (path[path.length - 1]?.name || '폴더') : catName;
 
@@ -631,7 +660,7 @@
             }
 
             if (currentChildren.length === 0) {
-                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">등록되었거나 공유된 학습 폴더/자료가 없습니다.</div>`;
+                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">해당 모드(탭)에 해당하는 학습 자료가 없습니다.</div>`;
                 return;
             }
 
