@@ -26,7 +26,7 @@
             <form onsubmit="handleLogin(event)" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1.5">아이디</label>
-                    <input type="text" id="login-id" required placeholder="아이디 입력" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
+                    <input type="text" id="login-id" required placeholder="아이디 입력" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1.5">비밀번호</label>
@@ -286,7 +286,7 @@
                 { id: 'file_m1_7_1', type: 'file', name: 'Lesson 7 단어 한글+영어 학습', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1' },
                 { id: 'file_m1_7_2', type: 'file', name: 'Lesson 7 단어 스펠링 테스트', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd' },
                 { id: 'file_m1_7_3', type: 'file', name: 'Lesson 7 본문 동사형 찾기', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/ea014e0adb32?skid=f472cd07-cf96-407a-ad3a-7e209dada6b6' },
-                { id: 'file_m1_7_4', type: 'file', name: 'Lesson 7 본문 어법 선택', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0206674fda6a?skid=24c491df-8acb-41df-a6a7-82e677f638e8' },
+                { id: 'file_m1_7_4', type: 'file', name: 'Lesson 7 본문 어법 선택', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0206674fda6a?social_preview=false&skid=24c491df-8acb-41df-a6a7-82e677f638e8' },
 
                 { id: 'file_m1_8_1', type: 'file', name: 'Lesson 8 단어 한글+영어 학습', parentId: 'f_l8', linkUrl: 'https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb' },
                 { id: 'file_m1_8_2', type: 'file', name: 'Lesson 8 단어 스펠링 테스트', parentId: 'f_l8', linkUrl: 'https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168' },
@@ -345,17 +345,7 @@
 
             masterDatabase: JSON.parse(JSON.stringify(initialMasterDatabase)),
 
-            sharedFiles: {
-                'branch_1': [
-                    'file_m1_5_1', 'file_m1_5_2', 'file_m1_5_3', 'file_m1_5_4',
-                    'file_m1_6_1', 'file_m1_6_2', 'file_m1_6_3', 'file_m1_6_4',
-                    'file_m1_7_1', 'file_m1_7_2', 'file_m1_7_3', 'file_m1_7_4',
-                    'file_m1_8_1', 'file_m1_8_2',
-                    'file_m2_7_1', 'file_m2_7_2', 'file_m2_7_3', 'file_m2_7_4',
-                    'file_m2_7_g1', 'file_m2_7_g2', 'file_m2_7_g3', 'file_m2_7_g4', 'file_m2_7_g5',
-                    'file_m2_8_1', 'file_m2_8_2', 'file_m2_8_3'
-                ]
-            },
+            sharedFiles: {},
 
             wordDataMap: {},
 
@@ -368,7 +358,7 @@
         };
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v14');
+            const saved = localStorage.getItem('multi_academy_portal_v16');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
@@ -376,7 +366,7 @@
                     state.students = p.students || state.students;
                     state.historyRecords = p.historyRecords || state.historyRecords;
                     state.masterDatabase = p.masterDatabase || state.masterDatabase;
-                    state.sharedFiles = p.sharedFiles || state.sharedFiles;
+                    state.sharedFiles = p.sharedFiles || {};
                     state.wordDataMap = p.wordDataMap || state.wordDataMap;
                     state.sidebarCats = p.sidebarCats || state.sidebarCats;
                 } catch(e){}
@@ -386,7 +376,7 @@
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v14', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v16', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
@@ -399,7 +389,7 @@
 
         function handleLogin(e) {
             e.preventDefault();
-            const id = document.getElementById('login-id').value.trim();
+            const id = document.getElementById('login-id').value.trim().toLowerCase();
             const pw = document.getElementById('login-pw').value.trim();
             const err = document.getElementById('login-error');
 
@@ -409,14 +399,14 @@
                 return;
             }
 
-            const branch = state.branches.find(b => b.username === id && b.password === pw);
+            const branch = state.branches.find(b => b.username.toLowerCase() === id && b.password === pw);
             if (branch) {
                 state.currentUser = { role: 'sub', branchId: branch.id, academyName: branch.academyName, logoImage: branch.logoImage };
                 enterPortal();
                 return;
             }
 
-            const student = state.students.find(s => s.username === id && s.password === pw);
+            const student = state.students.find(s => s.username.toLowerCase() === id && s.password === pw);
             if (student) {
                 const b = state.branches.find(x => x.id === student.branchId);
                 state.currentUser = { role: 'student', branchId: student.branchId, name: student.name, academyName: b ? b.academyName : '학원', logoImage: b ? b.logoImage : '' };
@@ -472,7 +462,7 @@
             } else {
                 const b = state.branches.find(x => x.id === state.currentUser.branchId);
                 badge.innerText = `👨‍🎓 ${state.currentUser.name} 학생`;
-                applyLogoAndName(b.academyName, b.logoImage);
+                applyLogoAndName(b ? b.academyName : '학원', b ? b.logoImage : '');
                 subEl.innerText = '학생 학습관';
                 document.getElementById('super-admin-tabs').classList.add('hidden');
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
@@ -604,10 +594,14 @@
 
             let items = state.masterDatabase[state.currentSidebarCat] || [];
 
-            if (state.currentUser.role !== 'super') {
+            // If non-super user and custom share rules exist, apply them.
+            // Otherwise, default to sharing ALL files across all devices!
+            if (state.currentUser && state.currentUser.role !== 'super') {
                 const bId = state.currentUser.branchId;
-                const allowedIds = state.sharedFiles[bId] || [];
-                items = items.filter(item => item.type === 'folder' || allowedIds.includes(item.id));
+                const allowedIds = state.sharedFiles[bId];
+                if (allowedIds && Array.isArray(allowedIds) && allowedIds.length > 0) {
+                    items = items.filter(item => item.type === 'folder' || allowedIds.includes(item.id));
+                }
             }
 
             let currentChildren = items.filter(item => item.parentId === state.currentFolderId);
@@ -790,11 +784,6 @@
                 linkUrl: url.trim()
             });
 
-            state.branches.forEach(b => {
-                if (!state.sharedFiles[b.id]) state.sharedFiles[b.id] = [];
-                state.sharedFiles[b.id].push(fileId);
-            });
-
             renderContent();
             saveState();
             alert(`'${title}' 링크가 성공적으로 등록되었습니다.`);
@@ -858,14 +847,9 @@
                 wordDataKey: key
             });
 
-            state.branches.forEach(b => {
-                if (!state.sharedFiles[b.id]) state.sharedFiles[b.id] = [];
-                state.sharedFiles[b.id].push(fileId);
-            });
-
             renderContent();
             saveState();
-            alert(`'${title}' 단어장이 생성되고 공유되었습니다.`);
+            alert(`'${title}' 단어장이 생성되었습니다.`);
         }
 
         function deleteMasterItem(id) {
@@ -1128,7 +1112,7 @@
                 
                 let fileCheckboxes = '';
                 allFiles.forEach(f => {
-                    const isShared = (state.sharedFiles[b.id] || []).includes(f.id);
+                    const isShared = !state.sharedFiles[b.id] || state.sharedFiles[b.id].includes(f.id);
                     fileCheckboxes += `
                         <label class="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white p-2 rounded-lg border border-slate-200 cursor-pointer">
                             <input type="checkbox" ${isShared ? 'checked' : ''} onchange="toggleShare('${b.id}', '${f.id}')" class="w-4 h-4 text-indigo-600 rounded">
@@ -1146,7 +1130,17 @@
         }
 
         function toggleShare(branchId, fileId) {
-            if (!state.sharedFiles[branchId]) state.sharedFiles[branchId] = [];
+            let allFiles = [];
+            Object.keys(state.masterDatabase).forEach(cat => {
+                state.masterDatabase[cat].forEach(item => {
+                    if (item.type === 'file') allFiles.push(item.id);
+                });
+            });
+
+            if (!state.sharedFiles[branchId]) {
+                state.sharedFiles[branchId] = [...allFiles];
+            }
+
             const idx = state.sharedFiles[branchId].indexOf(fileId);
             if (idx > -1) {
                 state.sharedFiles[branchId].splice(idx, 1);
