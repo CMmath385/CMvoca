@@ -258,6 +258,82 @@
     </div>
 
     <script>
+        // System Initial Master Database (V13)
+        const initialMasterDatabase = {
+            'middle_exam': [
+                // Level 1: Grade Folders
+                { id: 'f_g1', type: 'folder', name: '중1 (개정)', parentId: null },
+                { id: 'f_g2', type: 'folder', name: '중2 (개정)', parentId: null },
+                { id: 'f_g3', type: 'folder', name: '중3', parentId: null },
+
+                // Level 2: Publishers under 중1 (개정)
+                { id: 'f_mirae', type: 'folder', name: '중1 미래엔 문영인', parentId: 'f_g1' },
+                { id: 'f_visang', type: 'folder', name: '중1 비상 황종배', parentId: 'f_g1' },
+                { id: 'f_chun_so', type: 'folder', name: '중1 천재 소영순', parentId: 'f_g1' },
+                { id: 'f_chun_lee', type: 'folder', name: '중1 천재 이상기', parentId: 'f_g1' },
+
+                // Level 3: Lessons under 중1 천재 이상기
+                { id: 'f_l1', type: 'folder', name: '01과', parentId: 'f_chun_lee' },
+                { id: 'f_l2', type: 'folder', name: '02과', parentId: 'f_chun_lee' },
+                { id: 'f_l3', type: 'folder', name: '03과', parentId: 'f_chun_lee' },
+                { id: 'f_l4', type: 'folder', name: '04과', parentId: 'f_chun_lee' },
+                { id: 'f_l5', type: 'folder', name: '05과', parentId: 'f_chun_lee' },
+                { id: 'f_l6', type: 'folder', name: '06과', parentId: 'f_chun_lee' },
+                { id: 'f_l7', type: 'folder', name: '07과', parentId: 'f_chun_lee' },
+                { id: 'f_l8', type: 'folder', name: '08과', parentId: 'f_chun_lee' },
+
+                // Files under 중1 천재 이상기 05과
+                { id: 'file_m1_5_1', type: 'file', name: 'Lesson 5 단어 한글+영어 학습', parentId: 'f_l5', linkUrl: 'https://gemini.google.com/share/bbe4cd395f01?social_preview=false&skid=8f8896bd-2837-4f29-9c27-f5a857e7e46f' },
+                { id: 'file_m1_5_2', type: 'file', name: 'Lesson 5 단어 스펠링 테스트', parentId: 'f_l5', linkUrl: 'https://gemini.google.com/share/a2fb6f3527e0?social_preview=false&skid=f041a675-4c9f-4bda-985a-0ccbef4251cf' },
+                { id: 'file_m1_5_3', type: 'file', name: 'Lesson 5 본문 동사형 찾기', parentId: 'f_l5', linkUrl: 'https://gemini.google.com/share/81ee631ddfe4?skid=c0478af9-a1bb-4d50-bd65-2fd8e81d16b2' },
+                { id: 'file_m1_5_4', type: 'file', name: 'Lesson 5 본문 어법 선택', parentId: 'f_l5', linkUrl: 'https://gemini.google.com/share/b0c48cfcd008?skid=1b3a3121-1285-4e38-8002-4db10efb2be5' },
+
+                // Files under 중1 천재 이상기 06과
+                { id: 'file_m1_6_1', type: 'file', name: 'Lesson 6 단어 한글+영어 학습', parentId: 'f_l6', linkUrl: 'https://gemini.google.com/share/07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac' },
+                { id: 'file_m1_6_2', type: 'file', name: 'Lesson 6 단어 스펠링 테스트', parentId: 'f_l6', linkUrl: 'https://gemini.google.com/share/8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc' },
+                { id: 'file_m1_6_3', type: 'file', name: 'Lesson 6 본문 동사형 찾기', parentId: 'f_l6', linkUrl: 'https://gemini.google.com/share/0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2' },
+                { id: 'file_m1_6_4', type: 'file', name: 'Lesson 6 본문 어법 선택', parentId: 'f_l6', linkUrl: 'https://gemini.google.com/share/012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032' },
+
+                // Files under 중1 천재 이상기 07과
+                { id: 'file_m1_7_1', type: 'file', name: 'Lesson 7 단어 한글+영어 학습', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1' },
+                { id: 'file_m1_7_2', type: 'file', name: 'Lesson 7 단어 스펠링 테스트', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd' },
+                { id: 'file_m1_7_3', type: 'file', name: 'Lesson 7 본문 동사형 찾기', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/ea014e0adb32?social_preview=false&skid=f472cd07-cf96-407a-ad3a-7e209dada6b6' },
+                { id: 'file_m1_7_4', type: 'file', name: 'Lesson 7 본문 어법 선택', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0206674fda6a?social_preview=false&skid=24c491df-8acb-41df-a6a7-82e677f638e8' },
+
+                // Files under 중1 천재 이상기 08과
+                { id: 'file_m1_8_1', type: 'file', name: 'Lesson 8 단어 한글+영어 학습', parentId: 'f_l8', linkUrl: 'https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb' },
+                { id: 'file_m1_8_2', type: 'file', name: 'Lesson 8 단어 스펠링 테스트', parentId: 'f_l8', linkUrl: 'https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168' },
+
+                // Level 2: Publishers under 중2 (개정) - Strictly Matched to Your Image
+                { id: 'f_m2_mirae', type: 'folder', name: '중2 미래엔 문영인', parentId: 'f_g2' },
+                { id: 'f_m2_visang', type: 'folder', name: '중2 비상 황종배', parentId: 'f_g2' },
+                { id: 'f_m2_chun_so', type: 'folder', name: '중2 천재 소영순', parentId: 'f_g2' },
+                { id: 'f_m2_chun_lee', type: 'folder', name: '중2 천재 이상기', parentId: 'f_g2' },
+
+                // Level 3: Lessons under 중2 천재 소영순
+                { id: 'f_m2_so_l7', type: 'folder', name: '07과', parentId: 'f_m2_chun_so' },
+                { id: 'f_m2_so_l8', type: 'folder', name: '08과', parentId: 'f_m2_chun_so' },
+
+                // Files under 중2 천재 소영순 07과
+                { id: 'file_m2_7_1', type: 'file', name: 'Lesson 7 단어 한글+영어 학습', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0' },
+                { id: 'file_m2_7_2', type: 'file', name: 'Lesson 7 단어 스펠링 테스트', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b' },
+                { id: 'file_m2_7_3', type: 'file', name: 'Lesson 7 본문 동사형 찾기', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/f155aa1e557a?skid=f44d0553-2d09-468a-94a2-0cfa0b14e51b' },
+                { id: 'file_m2_7_4', type: 'file', name: 'Lesson 7 본문 어법 선택', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/dc505389312e?skid=a9720e9c-2b6b-44d5-821b-cfa5c8d79a5b' },
+                { id: 'file_m2_7_g1', type: 'file', name: 'Lesson 7 본문문법개념 1', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7' },
+                { id: 'file_m2_7_g2', type: 'file', name: 'Lesson 7 본문문법개념 2', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e' },
+                { id: 'file_m2_7_g3', type: 'file', name: 'Lesson 7 본문문법개념 3', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37' },
+                { id: 'file_m2_7_g4', type: 'file', name: 'Lesson 7 본문문법개념 4', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d' },
+                { id: 'file_m2_7_g5', type: 'file', name: 'Lesson 7 본문문법개념 5', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/4ee754fa6845?skid=d02946a5-b269-4ab7-9fac-a97e97ff09da' },
+
+                // Files under 중2 천재 소영순 08과
+                { id: 'file_m2_8_1', type: 'file', name: 'Lesson 8 단어 한글+영어 학습', parentId: 'f_m2_so_l8', linkUrl: 'https://gemini.google.com/share/26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f' },
+                { id: 'file_m2_8_2', type: 'file', name: 'Lesson 8 본문 동사형 찾기', parentId: 'f_m2_so_l8', linkUrl: 'https://gemini.google.com/share/b73c89f87c48?social_preview=false&skid=e8ec5f44-0739-42d4-bc7e-0fcadbb9e8bd' },
+                { id: 'file_m2_8_3', type: 'file', name: 'Lesson 8 본문 어법 선택', parentId: 'f_m2_so_l8', linkUrl: 'https://gemini.google.com/share/2416be03d7e6?social_preview=false&skid=b72e8674-405f-4e88-a2a6-dd6d998bb1b3' }
+            ],
+            'high_exam': [],
+            'grammar': []
+        };
+
         let state = {
             currentUser: null,
             superAdminPw: '1234',
@@ -284,81 +360,7 @@
                 { id: 'grammar', name: '문법' }
             ],
 
-            // Master Database with Middle 1 & Middle 2 Grade/Publisher Folders
-            masterDatabase: {
-                'middle_exam': [
-                    // Level 1: Grade Folders
-                    { id: 'f_g1', type: 'folder', name: '중1 (개정)', parentId: null },
-                    { id: 'f_g2', type: 'folder', name: '중2 (개정)', parentId: null },
-                    { id: 'f_g3', type: 'folder', name: '중3', parentId: null },
-
-                    // Level 2: Publishers under 중1 (개정)
-                    { id: 'f_mirae', type: 'folder', name: '중1 미래엔 문영인', parentId: 'f_g1' },
-                    { id: 'f_visang', type: 'folder', name: '중1 비상 황종배', parentId: 'f_g1' },
-                    { id: 'f_chun_so', type: 'folder', name: '중1 천재 소영순', parentId: 'f_g1' },
-                    { id: 'f_chun_lee', type: 'folder', name: '중1 천재 이상기', parentId: 'f_g1' },
-
-                    // Level 3: Lessons under 중1 천재 이상기
-                    { id: 'f_l1', type: 'folder', name: '01과', parentId: 'f_chun_lee' },
-                    { id: 'f_l2', type: 'folder', name: '02과', parentId: 'f_chun_lee' },
-                    { id: 'f_l3', type: 'folder', name: '03과', parentId: 'f_chun_lee' },
-                    { id: 'f_l4', type: 'folder', name: '04과', parentId: 'f_chun_lee' },
-                    { id: 'f_l5', type: 'folder', name: '05과', parentId: 'f_chun_lee' },
-                    { id: 'f_l6', type: 'folder', name: '06과', parentId: 'f_chun_lee' },
-                    { id: 'f_l7', type: 'folder', name: '07과', parentId: 'f_chun_lee' },
-                    { id: 'f_l8', type: 'folder', name: '08과', parentId: 'f_chun_lee' },
-
-                    // Files under 중1 천재 이상기 05과
-                    { id: 'file_m1_5_1', type: 'file', name: 'Lesson 5 단어 한글+영어 학습', parentId: 'f_l5', linkUrl: 'https://gemini.google.com/share/bbe4cd395f01?social_preview=false&skid=8f8896bd-2837-4f29-9c27-f5a857e7e46f' },
-                    { id: 'file_m1_5_2', type: 'file', name: 'Lesson 5 단어 스펠링 테스트', parentId: 'f_l5', linkUrl: 'https://gemini.google.com/share/a2fb6f3527e0?social_preview=false&skid=f041a675-4c9f-4bda-985a-0ccbef4251cf' },
-                    { id: 'file_m1_5_3', type: 'file', name: 'Lesson 5 본문 동사형 찾기', parentId: 'f_l5', linkUrl: 'https://gemini.google.com/share/81ee631ddfe4?skid=c0478af9-a1bb-4d50-bd65-2fd8e81d16b2' },
-                    { id: 'file_m1_5_4', type: 'file', name: 'Lesson 5 본문 어법 선택', parentId: 'f_l5', linkUrl: 'https://gemini.google.com/share/b0c48cfcd008?skid=1b3a3121-1285-4e38-8002-4db10efb2be5' },
-
-                    // Files under 중1 천재 이상기 06과
-                    { id: 'file_m1_6_1', type: 'file', name: 'Lesson 6 단어 한글+영어 학습', parentId: 'f_l6', linkUrl: 'https://gemini.google.com/share/07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac' },
-                    { id: 'file_m1_6_2', type: 'file', name: 'Lesson 6 단어 스펠링 테스트', parentId: 'f_l6', linkUrl: 'https://gemini.google.com/share/8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc' },
-                    { id: 'file_m1_6_3', type: 'file', name: 'Lesson 6 본문 동사형 찾기', parentId: 'f_l6', linkUrl: 'https://gemini.google.com/share/0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2' },
-                    { id: 'file_m1_6_4', type: 'file', name: 'Lesson 6 본문 어법 선택', parentId: 'f_l6', linkUrl: 'https://gemini.google.com/share/012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032' },
-
-                    // Files under 중1 천재 이상기 07과
-                    { id: 'file_m1_7_1', type: 'file', name: 'Lesson 7 단어 한글+영어 학습', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1' },
-                    { id: 'file_m1_7_2', type: 'file', name: 'Lesson 7 단어 스펠링 테스트', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd' },
-                    { id: 'file_m1_7_3', type: 'file', name: 'Lesson 7 본문 동사형 찾기', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/ea014e0adb32?social_preview=false&skid=f472cd07-cf96-407a-ad3a-7e209dada6b6' },
-                    { id: 'file_m1_7_4', type: 'file', name: 'Lesson 7 본문 어법 선택', parentId: 'f_l7', linkUrl: 'https://gemini.google.com/share/0206674fda6a?social_preview=false&skid=24c491df-8acb-41df-a6a7-82e677f638e8' },
-
-                    // Files under 중1 천재 이상기 08과
-                    { id: 'file_m1_8_1', type: 'file', name: 'Lesson 8 단어 한글+영어 학습', parentId: 'f_l8', linkUrl: 'https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb' },
-                    { id: 'file_m1_8_2', type: 'file', name: 'Lesson 8 단어 스펠링 테스트', parentId: 'f_l8', linkUrl: 'https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168' },
-
-                    // Level 2: Publishers under 중2 (개정)
-                    { id: 'f_m2_mirae', type: 'folder', name: '중2 미래엔 문영인', parentId: 'f_g2' },
-                    { id: 'f_m2_visang', type: 'folder', name: '중2 비상 황종배', parentId: 'f_g2' },
-                    { id: 'f_m2_chun_so', type: 'folder', name: '중2 천재 소영순', parentId: 'f_g2' },
-                    { id: 'f_m2_chun_lee', type: 'folder', name: '중2 천재 이상기', parentId: 'f_g2' },
-
-                    // Level 3: Lessons under 중2 천재 소영순
-                    { id: 'f_m2_so_l7', type: 'folder', name: '07과', parentId: 'f_m2_chun_so' },
-                    { id: 'f_m2_so_l8', type: 'folder', name: '08과', parentId: 'f_m2_chun_so' },
-
-                    // Files under 중2 천재 소영순 07과
-                    { id: 'file_m2_7_1', type: 'file', name: 'Lesson 7 단어 한글+영어 학습', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0' },
-                    { id: 'file_m2_7_2', type: 'file', name: 'Lesson 7 단어 스펠링 테스트', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b' },
-                    { id: 'file_m2_7_3', type: 'file', name: 'Lesson 7 본문 동사형 찾기', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/f155aa1e557a?skid=f44d0553-2d09-468a-94a2-0cfa0b14e51b' },
-                    { id: 'file_m2_7_4', type: 'file', name: 'Lesson 7 본문 어법 선택', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/dc505389312e?skid=a9720e9c-2b6b-44d5-821b-cfa5c8d79a5b' },
-                    { id: 'file_m2_7_g1', type: 'file', name: 'Lesson 7 본문문법개념 1', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7' },
-                    { id: 'file_m2_7_g2', type: 'file', name: 'Lesson 7 본문문법개념 2', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e' },
-                    { id: 'file_m2_7_g3', type: 'file', name: 'Lesson 7 본문문법개념 3', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37' },
-                    { id: 'file_m2_7_g4', type: 'file', name: 'Lesson 7 본문문법개념 4', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d' },
-                    { id: 'file_m2_7_g5', type: 'file', name: 'Lesson 7 본문문법개념 5', parentId: 'f_m2_so_l7', linkUrl: 'https://gemini.google.com/share/4ee754fa6845?skid=d02946a5-b269-4ab7-9fac-a97e97ff09da' },
-
-                    // Files under 중2 천재 소영순 08과
-                    { id: 'file_m2_8_1', type: 'file', name: 'Lesson 8 단어 한글+영어 학습', parentId: 'f_m2_so_l8', linkUrl: 'https://gemini.google.com/share/26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f' },
-                    { id: 'file_m2_8_2', type: 'file', name: 'Lesson 8 본문 동사형 찾기', parentId: 'f_m2_so_l8', linkUrl: 'https://gemini.google.com/share/b73c89f87c48?social_preview=false&skid=e8ec5f44-0739-42d4-bc7e-0fcadbb9e8bd' },
-                    { id: 'file_m2_8_3', type: 'file', name: 'Lesson 8 본문 어법 선택', parentId: 'f_m2_so_l8', linkUrl: 'https://gemini.google.com/share/2416be03d7e6?social_preview=false&skid=b72e8674-405f-4e88-a2a6-dd6d998bb1b3' }
-                ],
-                'high_exam': [],
-                'grammar': []
-            },
+            masterDatabase: JSON.parse(JSON.stringify(initialMasterDatabase)),
 
             sharedFiles: {
                 'branch_1': [
@@ -383,7 +385,7 @@
         };
 
         function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v12');
+            const saved = localStorage.getItem('multi_academy_portal_v13');
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
@@ -395,11 +397,13 @@
                     state.wordDataMap = p.wordDataMap || state.wordDataMap;
                     state.sidebarCats = p.sidebarCats || state.sidebarCats;
                 } catch(e){}
+            } else {
+                state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
             }
         }
 
         function saveState() {
-            localStorage.setItem('multi_academy_portal_v12', JSON.stringify({
+            localStorage.setItem('multi_academy_portal_v13', JSON.stringify({
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
@@ -625,7 +629,7 @@
 
             let currentChildren = items.filter(item => item.parentId === state.currentFolderId);
 
-            // Strict Filtering Based on Top Nav (Voca vs Passage)
+            // Strict Filtering Logic: Only filter 'file' items based on Top Nav tab!
             currentChildren = currentChildren.filter(item => {
                 if (item.type === 'folder') return true;
 
@@ -660,7 +664,7 @@
             }
 
             if (currentChildren.length === 0) {
-                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">해당 모드(탭)에 해당하는 학습 자료가 없습니다.</div>`;
+                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">현재 탭/모드에 해당하는 학습 자료가 없습니다.</div>`;
                 return;
             }
 
