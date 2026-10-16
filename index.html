@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스마트 종합 학습 플랫폼 - 멀티 아카데미 (하위 지점 독립 관리 지원)</title>
+    <title>스마트 종합 학습 플랫폼 - 멀티 아카데미 (실시간 클라우드 연동)</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
@@ -211,14 +212,28 @@
         const CLOUD_BIN_ID = '6ad195baffd5d160536f9a3a'; 
         const CLOUD_API_KEY = '$2a$10$xfybF8YznlSFs90Jp2N2EeJt/RMxJZSYc2FJpPM080Dh1/quk0XLa';
 
-        const initialMasterDatabase = {
+        const fallbackMasterDatabase = {
             'middle_exam': [
-                { id: 'f_onam_high', type: 'folder', name: '오남고 공통영어2', parentId: null, tabId: 'video', authorRole: 'super' },
-                { id: 'f_onam_l3', type: 'folder', name: 'Lesson 3', parentId: 'f_onam_high', tabId: 'video', authorRole: 'super' },
-                { id: 'f_onam_l4', type: 'folder', name: 'Lesson 4', parentId: 'f_onam_high', tabId: 'video', authorRole: 'super' }
+                {id: 'f_g1', type: 'folder', name: '중1 (개정)', parentId: null},
+                {id: 'f_g2', type: 'folder', name: '중2 (개정)', parentId: null},
+                {id: 'f_g3', type: 'folder', name: '중3', parentId: null},
+                {id: 'f_mirae', type: 'folder', name: '중1 미래엔 문영인', parentId: 'f_g1'},
+                {id: 'f_visang', type: 'folder', name: '중1 비상 황종배', parentId: 'f_g1'},
+                {id: 'f_chun_so', type: 'folder', name: '중1 천재 소영순', parentId: 'f_g1'},
+                {id: 'f_chun_lee', type: 'folder', name: '중1 천재 이상기', parentId: 'f_g1'},
+                {id: 'f_l1', type: 'folder', name: '01과', parentId: 'f_chun_lee'},
+                {id: 'f_l2', type: 'folder', name: '02과', parentId: 'f_chun_lee'},
+                {id: 'f_l3', type: 'folder', name: '03과', parentId: 'f_chun_lee'},
+                {id: 'f_l4', type: 'folder', name: '04과', parentId: 'f_chun_lee'},
+                {id: 'f_l5', type: 'folder', name: '05과', parentId: 'f_chun_lee'},
+                {id: 'f_l6', type: 'folder', name: '06과', parentId: 'f_chun_lee'},
+                {id: 'f_l7', type: 'folder', name: '07과', parentId: 'f_chun_lee'},
+                {id: 'f_l8', type: 'folder', name: '08과', parentId: 'f_chun_lee'}
             ],
             'high_exam': [],
-            'grammar': []
+            'grammar': [],
+            'cat_1792074925468': [],
+            'cat_1792074950120': []
         };
 
         let state = {
@@ -228,7 +243,7 @@
                 { id: 'branch_1', username: 'onam', password: '123', academyName: '최강수학메이드영어학원', logoImage: '' }
             ],
             students: [
-                { id: 's1', branchId: 'branch_1', username: 'student1', password: '123', name: '김철수', grade: '고1' }
+                { id: 's1', branchId: 'branch_1', username: 'student1', password: '123', name: '김철수', grade: '중1' }
             ],
             historyRecords: [],
             topTabs: [
@@ -237,11 +252,13 @@
                 { id: 'passage', name: '본문' }
             ],
             sidebarCats: [
-                { id: 'middle_exam', name: '내신문제' },
-                { id: 'high_exam', name: '고등부 심화' },
-                { id: 'grammar', name: '문법' }
+                { id: 'middle_exam', name: '중등부 내신문제' },
+                { id: 'high_exam', name: '고등부 내신문제' },
+                { id: 'cat_1792074925468', name: '고등모의고사' },
+                { id: 'grammar', name: '문법' },
+                { id: 'cat_1792074950120', name: '단어' }
             ],
-            masterDatabase: JSON.parse(JSON.stringify(initialMasterDatabase)),
+            masterDatabase: JSON.parse(JSON.stringify(fallbackMasterDatabase)),
             branchDatabases: {},
             currentSuperView: 'content',
             currentSubView: 'content',
@@ -453,7 +470,7 @@
                 div.className = isActive
                     ? 'w-full text-left bg-indigo-900 text-white font-bold p-3 rounded-xl shadow-sm text-sm flex justify-between items-center draggable-item'
                     : 'w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold p-3 rounded-xl text-sm flex justify-between items-center border border-slate-200 transition draggable-item';
-                div.innerHTML = `<span>${cat.name}</span> ${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
+                div.innerHTML = `<span>${cat.name}</span>${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
                 
                 div.onclick = () => {
                     state.currentSidebarCat = cat.id;
@@ -577,15 +594,15 @@
                 const badgeHtml = isSuperItem ? `<span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">본원공유</span>` : `<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">우리학원</span>`;
 
                 if (item.type === 'folder') {
-                    leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
+                    leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span>${badgeHtml}`;
                     leftDiv.onclick = () => { state.currentFolderId = item.id; renderContent(); };
                 } else {
                     const isYt = /youtube\.com|youtu\.be/.test(item.linkUrl);
                     if (isYt) {
-                        leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
+                        leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span>${badgeHtml}`;
                         leftDiv.onclick = () => openLinkOrVideo(item);
                     } else {
-                        leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span> ${badgeHtml}</a>`;
+                        leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span>${badgeHtml}</a>`;
                     }
                 }
 
@@ -817,86 +834,3 @@
                 card.innerHTML = `
                     <div>
                         <div class="flex justify-between items-start mb-2">
-                            <span class="font-bold text-slate-800 text-lg">${s.name}</span>
-                            <span class="text-xs bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-full font-bold border border-slate-200">${s.grade}</span>
-                        </div>
-                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-200">
-                            <div>🆔 아이디: <strong class="text-indigo-600">${s.username}</strong></div>
-                            <div>🔑 비밀번호: <strong class="text-slate-800">${s.password}</strong></div>
-                        </div>
-                    </div>
-                    <button onclick="removeStudent('${s.id}')" class="text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200 transition">학생 삭제</button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function addSubStudentPrompt() {
-            const name = prompt('학생 이름:');
-            if (!name) return;
-            const username = prompt('학생 아이디:');
-            if (!username) return;
-            const password = prompt('학생 비밀번호:');
-            if (!password) return;
-            const grade = prompt('학년 (예: 고1):', '고1');
-
-            state.students.push({ id: 's_' + Date.now(), branchId: state.currentUser.branchId, username: username.trim(), password: password.trim(), name: name.trim(), grade: grade ? grade.trim() : '고1' });
-            renderSubStudents();
-            saveState();
-        }
-
-        function removeStudent(id) {
-            if (confirm('삭제하시겠습니까?')) {
-                state.students = state.students.filter(s => s.id !== id);
-                renderSubStudents();
-                saveState();
-            }
-        }
-
-        function renderSubHistory() {
-            const container = document.getElementById('sub-history-container');
-            container.innerHTML = '';
-            const myRecords = state.historyRecords.filter(h => h.branchId === (state.currentUser ? state.currentUser.branchId : ''));
-            if (myRecords.length === 0) {
-                container.innerHTML = `<div class="text-center py-12 text-slate-400 font-medium text-sm">학습 이력이 없습니다.</div>`;
-                return;
-            }
-            myRecords.slice().reverse().forEach(h => {
-                const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center";
-                row.innerHTML = `
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="font-bold text-slate-800 text-base">${h.studentName}</span>
-                            <span class="text-xs bg-slate-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold border border-slate-200">${h.score}점</span>
-                        </div>
-                        <div class="text-sm text-slate-600 font-medium">${h.title} (${h.correct} / ${h.total} 정답)</div>
-                        <div class="text-xs text-slate-400 mt-1">완료 일시: ${h.date}</div>
-                    </div>
-                `;
-                container.appendChild(row);
-            });
-        }
-
-        function saveAcademySettings() {
-            const name = document.getElementById('setting-academy-name').value.trim();
-            if (!name) return alert('학원명을 입력하세요.');
-            const branch = state.branches.find(b => b.id === (state.currentUser ? state.currentUser.branchId : ''));
-            if (!branch) return;
-
-            branch.academyName = name;
-            state.currentUser.academyName = name;
-            document.getElementById('header-academy-name').innerText = name;
-            saveState();
-            alert('학원 설정이 저장되었습니다!');
-        }
-
-        function resetToHome() {
-            state.currentFolderId = null;
-            renderContent();
-        }
-
-        loadShared();
-    </script>
-</body>
-</html>
