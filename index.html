@@ -262,7 +262,6 @@
             currentFolderId: null
         };
 
-        // 데이터 로드는 백그라운드로 안전하게 처리하여 로그인을 절대 방해하지 않음
         async function loadShared() {
             try {
                 const r = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`, {
@@ -280,7 +279,12 @@
                     if (d.historyRecords) state.historyRecords = d.historyRecords;
                 }
             } catch (e) {
-                console.warn('클라우드 로드 실패, 기본 데이터 유지', e);
+                console.warn('클라우드 로드 실패', e);
+            }
+            if (state.currentUser) {
+                renderTopNav();
+                renderSidebar();
+                renderContent();
             }
         }
 
@@ -305,11 +309,10 @@
                     body: JSON.stringify(payload)
                 });
             } catch (e) {
-                console.error('클라우드 저장 실패', e);
+                console.error('클라우드 실시간 동기화 실패', e);
             }
         }
 
-        // 로그인 검증을 완벽하게 동기식으로 처리하여 즉시 로그인 보장
         function handleLogin(e) {
             e.preventDefault();
             const id = document.getElementById('login-id').value.trim().toLowerCase();
@@ -847,3 +850,62 @@
             const grade = prompt('학년 (예: 중1):', '중1');
 
             state.students.push({ id: 's_' + Date.now(), branchId: state.currentUser.branchId, username: username.trim(), password: password.trim(), name: name.trim(), grade: grade ? grade.trim() : '중1' });
+            renderSubStudents();
+            saveState();
+        }
+
+        function removeStudent(id) {
+            if (confirm('삭제하시겠습니까?')) {
+                state.students = state.students.filter(s => s.id !== id);
+                renderSubStudents();
+                saveState();
+            }
+        }
+
+        function renderSubHistory() {
+            const container = document.getElementById('sub-history-container');
+            container.innerHTML = '';
+            const myRecords = state.historyRecords.filter(h => h.branchId === (state.currentUser ? state.currentUser.branchId : ''));
+            if (myRecords.length === 0) {
+                container.innerHTML = `<div class="text-center py-12 text-slate-400 font-medium text-sm">학습 이력이 없습니다.</div>`;
+                return;
+            }
+            myRecords.slice().reverse().forEach(h => {
+                const row = document.createElement('div');
+                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center";
+                row.innerHTML = `
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-bold text-slate-800 text-base">${h.studentName}</span>
+                            <span class="text-xs bg-slate-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold border border-slate-200">${h.score}점</span>
+                        </div>
+                        <div class="text-sm text-slate-600 font-medium">${h.title} (${h.correct} / ${h.total} 정답)</div>
+                        <div class="text-xs text-slate-400 mt-1">완료 일시: ${h.date}</div>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function saveAcademySettings() {
+            const name = document.getElementById('setting-academy-name').value.trim();
+            if (!name) return alert('학원명을 입력하세요.');
+            const branch = state.branches.find(b => b.id === (state.currentUser ? state.currentUser.branchId : ''));
+            if (!branch) return;
+
+            branch.academyName = name;
+            state.currentUser.academyName = name;
+            document.getElementById('header-academy-name').innerText = name;
+            saveState();
+            alert('학원 설정이 저장되었습니다!');
+        }
+
+        function resetToHome() {
+            state.currentFolderId = null;
+            renderContent();
+        }
+
+        loadShared();
+    </script>
+</body>
+</html>
