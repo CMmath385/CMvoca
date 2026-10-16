@@ -262,8 +262,8 @@
             currentFolderId: null
         };
 
-        // 페이지가 열릴 때 즉시 데이터 동기화 시도
-        (async function init() {
+        // 백그라운드에서 안전하게 클라우드 데이터 불러오기 (로그인 막힘 방지)
+        async function loadShared() {
             try {
                 const r = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`, {
                     headers: { 'X-Master-Key': CLOUD_API_KEY }
@@ -280,9 +280,9 @@
                     if (d.historyRecords) state.historyRecords = d.historyRecords;
                 }
             } catch (e) {
-                console.warn('초기 클라우드 로드 실패, 기본 데이터 사용', e);
+                console.warn('클라우드 백그라운드 동기화 실패', e);
             }
-        })();
+        }
 
         async function saveState() {
             const payload = {
@@ -305,7 +305,7 @@
                     body: JSON.stringify(payload)
                 });
             } catch (e) {
-                console.error('클라우드 실시간 동기화 실패', e);
+                console.error('클라우드 저장 실패', e);
             }
         }
 
@@ -388,6 +388,7 @@
             document.getElementById('app-portal').classList.add('hidden');
             document.getElementById('login-id').value = '';
             document.getElementById('login-pw').value = '';
+            loadShared();
         }
 
         function renderTopNav() {
@@ -446,7 +447,7 @@
                 div.className = isActive
                     ? 'w-full text-left bg-indigo-900 text-white font-bold p-3 rounded-xl shadow-sm text-sm flex justify-between items-center draggable-item'
                     : 'w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold p-3 rounded-xl text-sm flex justify-between items-center border border-slate-200 transition draggable-item';
-                div.innerHTML = `<span>${cat.name}</span>${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
+                div.innerHTML = `<span>${cat.name}</span> ${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
                 
                 div.onclick = () => {
                     state.currentSidebarCat = cat.id;
@@ -570,15 +571,15 @@
                 const badgeHtml = isSuperItem ? `<span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">본원공유</span>` : `<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">우리학원</span>`;
 
                 if (item.type === 'folder') {
-                    leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span>${badgeHtml}`;
+                    leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
                     leftDiv.onclick = () => { state.currentFolderId = item.id; renderContent(); };
                 } else {
                     const isYt = /youtube\.com|youtu\.be/.test(item.linkUrl);
                     if (isYt) {
-                        leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span>${badgeHtml}`;
+                        leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
                         leftDiv.onclick = () => openLinkOrVideo(item);
                     } else {
-                        leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span>${badgeHtml}</a>`;
+                        leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span> ${badgeHtml}</a>`;
                     }
                 }
 
@@ -870,4 +871,38 @@
                 row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center";
                 row.innerHTML = `
                     <div>
-                        <div class="flex items-center gap-2 mb-
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-bold text-slate-800 text-base">${h.studentName}</span>
+                            <span class="text-xs bg-slate-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold border border-slate-200">${h.score}점</span>
+                        </div>
+                        <div class="text-sm text-slate-600 font-medium">${h.title} (${h.correct} / ${h.total} 정답)</div>
+                        <div class="text-xs text-slate-400 mt-1">완료 일시: ${h.date}</div>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function saveAcademySettings() {
+            const name = document.getElementById('setting-academy-name').value.trim();
+            if (!name) return alert('학원명을 입력하세요.');
+            const branch = state.branches.find(b => b.id === (state.currentUser ? state.currentUser.branchId : ''));
+            if (!branch) return;
+
+            branch.academyName = name;
+            state.currentUser.academyName = name;
+            document.getElementById('header-academy-name').innerText = name;
+            saveState();
+            alert('학원 설정이 저장되었습니다!');
+        }
+
+        function resetToHome() {
+            state.currentFolderId = null;
+            renderContent();
+        }
+
+        // 앱 시작 시 백그라운드 데이터 동기화
+        loadShared();
+    </script>
+</body>
+</html>
