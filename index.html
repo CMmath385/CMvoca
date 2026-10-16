@@ -2,7 +2,27 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <!-- Firebase SDK (Modular v10.8.0) & 초기화 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDtXLBEPEa89bst8lJWJ8ayCUJgyaf7PS4",
+            authDomain: "cm-academy-8387b.firebaseapp.com",
+            projectId: "cm-academy-8387b",
+            storageBucket: "cm-academy-8387b.firebasestorage.app",
+            messagingSenderId: "371199594988",
+            appId: "1:371199594988:web:a74f2bd1cc853d15d4f0c9"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.firebaseApp = { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs };
+    </script> <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>최강수학메이드영어학원 - 스마트 학습 플랫폼</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
@@ -434,37 +454,53 @@
                 console.error('클라우드 저장 실패', e);
             }
         }
+// 로그인 검증 함수 (Firebase 인증 연동)
+    async function handleLogin(e) {
+        e.preventDefault();
+        const rawId = document.getElementById('login-id').value.trim();
+        const pw = document.getElementById('login-pw').value.trim();
+        const err = document.getElementById('login-error');
+        err.textContent = "로그인 중...";
 
-        // 로그인 검증 함수 (100% 동기식 즉시 처리)
-        function handleLogin(e) {
-            e.preventDefault();
-            const id = document.getElementById('login-id').value.trim().toLowerCase();
-            const pw = document.getElementById('login-pw').value.trim();
-            const err = document.getElementById('login-error');
+        const email = rawId.includes('@') ? rawId : `${rawId}@cmacademy.com`;
 
-            if (id === 'admin' && pw === state.superAdminPw) {
+        try {
+            if (!window.firebaseApp) {
+                err.textContent = "Firebase 초기화 중입니다. 잠시 후 다시 시도해주세요.";
+                return;
+            }
+            const { auth, signInWithEmailAndPassword } = window.firebaseApp;
+            await signInWithEmailAndPassword(auth, email, pw);
+            
+            err.textContent = "";
+            
+            // 계정 종류에 따른 기존 세션 역할 설정
+            if (rawId === 'admin') {
                 state.currentUser = { role: 'super', username: 'admin' };
-                enterPortal();
-                return;
+            } else {
+                const branch = state.branches.find(b => b.username.toLowerCase() === rawId.toLowerCase());
+                if (branch) {
+                    state.currentUser = { role: 'sub', branchId: branch.id, academyName: branch.academyName, logoImage: branch.logoImage };
+                } else {
+                    const student = state.students.find(s => s.username.toLowerCase() === rawId.toLowerCase());
+                    if (student) {
+                        const b = state.branches.find(x => x.id === student.branchId);
+                        state.currentUser = { role: 'student', branchId: student.branchId, name: student.name, academyName: b ? b.academyName : '최강수학메이드영어학원' };
+                    } else {
+                        state.currentUser = { role: 'sub', username: rawId };
+                    }
+                }
             }
 
-            const branch = state.branches.find(b => b.username.toLowerCase() === id && b.password === pw);
-            if (branch) {
-                state.currentUser = { role: 'sub', branchId: branch.id, academyName: branch.academyName, logoImage: branch.logoImage };
+            if (typeof enterPortal === 'function') {
                 enterPortal();
-                return;
             }
-
-            const student = state.students.find(s => s.username.toLowerCase() === id && s.password === pw);
-            if (student) {
-                const b = state.branches.find(x => x.id === student.branchId);
-                state.currentUser = { role: 'student', branchId: student.branchId, name: student.name, academyName: b ? b.academyName : '최강수학메이드영어학원' };
-                enterPortal();
-                return;
-            }
-
-            err.innerText = '아이디 또는 비밀번호가 올바르지 않습니다.';
+        } catch (error) {
+            console.error(error);
+            err.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
         }
+    }
+     
 
         function enterPortal() {
             document.getElementById('login-screen').classList.add('hidden');
