@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스마트 종합 학습 플랫폼 - 멀티 아카데미 (실시간 클라우드 연동)</title>
+    <title>최강수학메이드영어학원 - 실시간 클라우드 학습 플랫폼</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
@@ -20,7 +20,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen flex flex-col">
+<body class="bg-slate-100 min-h-screen flex flex-col" onload="initialLoad()">
 
     <!-- 1. LOGIN SCREEN -->
     <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
@@ -29,8 +29,8 @@
                 <div class="w-16 h-16 bg-indigo-700 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-4 shadow-lg overflow-hidden">
                     CM
                 </div>
-                <h1 class="text-2xl font-bold text-slate-800">스마트 학습 플랫폼</h1>
-                <p class="text-xs text-slate-400 mt-1">지점별 실시간 자동 동기화 시스템 (클라우드 DB 연동 완료)</p>
+                <h1 class="text-2xl font-bold text-slate-800">최강수학메이드영어학원</h1>
+                <p class="text-xs text-slate-400 mt-1">실시간 클라우드 통합 학습 포털</p>
             </div>
 
             <form onsubmit="handleLogin(event)" class="space-y-4">
@@ -125,7 +125,7 @@
                         </div>
 
                         <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자체 자료가 실시간 동기화되어 제공됩니다.</span>
+                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자료가 실시간으로 안전하게 동기화됩니다.</span>
                         </div>
 
                         <div id="content-container" class="space-y-3"></div>
@@ -185,7 +185,7 @@
                 </div>
 
                 <footer class="mt-8 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
-                    © 2026 스마트 종합 학습 플랫폼. All rights reserved.
+                    © 2026 최강수학메이드영어학원. All rights reserved.
                 </footer>
             </main>
         </div>
@@ -247,10 +247,15 @@
             currentFolderId: null
         };
 
-        async function loadShared() {
+        async function initialLoad() {
+            await fetchCloudData();
+        }
+
+        async function fetchCloudData() {
             try {
                 const r = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`, {
-                    headers: { 'X-Master-Key': CLOUD_API_KEY }
+                    headers: { 'X-Master-Key': CLOUD_API_KEY },
+                    cache: 'no-store'
                 });
                 if (r.ok) {
                     const res = await r.json();
@@ -264,12 +269,7 @@
                     if (d.historyRecords) state.historyRecords = d.historyRecords;
                 }
             } catch (e) {
-                console.warn('클라우드 로드 실패', e);
-            }
-            if (state.currentUser) {
-                renderTopNav();
-                renderSidebar();
-                renderContent();
+                console.warn('클라우드 데이터 로드 중 오류 발생', e);
             }
         }
 
@@ -294,7 +294,7 @@
                     body: JSON.stringify(payload)
                 });
             } catch (e) {
-                console.error('클라우드 실시간 동기화 실패', e);
+                console.error('클라우드 저장 실패', e);
             }
         }
 
@@ -304,7 +304,8 @@
             const pw = document.getElementById('login-pw').value.trim();
             const err = document.getElementById('login-error');
 
-            await loadShared(); // 로그인 순간 최신 클라우드 DB 강제 로드
+            // 로그인 시도 직전 무조건 클라우드 최신 데이터를 강제로 다시 불러옴
+            await fetchCloudData();
 
             if (id === 'admin' && pw === state.superAdminPw) {
                 state.currentUser = { role: 'super', username: 'admin' };
@@ -322,7 +323,7 @@
             const student = state.students.find(s => s.username.toLowerCase() === id && s.password === pw);
             if (student) {
                 const b = state.branches.find(x => x.id === student.branchId);
-                state.currentUser = { role: 'student', branchId: student.branchId, name: student.name, academyName: b ? b.academyName : '학원' };
+                state.currentUser = { role: 'student', branchId: student.branchId, name: student.name, academyName: b ? b.academyName : '최강수학메이드영어학원' };
                 enterPortal();
                 return;
             }
@@ -340,7 +341,7 @@
 
             if (state.currentUser.role === 'super') {
                 badge.innerText = '👑 최고 관리자 (본원)';
-                nameEl.innerText = '학습 플랫폼 본원 관리센터';
+                nameEl.innerText = '최강수학메이드영어학원 본원 관리센터';
                 subEl.innerText = '실시간 클라우드 전체 관리';
                 document.getElementById('super-admin-tabs').classList.remove('hidden');
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
@@ -356,7 +357,7 @@
                 document.getElementById('btn-add-tab').classList.add('hidden');
             } else {
                 badge.innerText = `👨‍🎓 ${state.currentUser.name} 학생`;
-                nameEl.innerText = state.currentUser.academyName || '학원';
+                nameEl.innerText = state.currentUser.academyName || '최강수학메이드영어학원';
                 subEl.innerText = '학생 학습관';
                 document.getElementById('super-admin-tabs').classList.add('hidden');
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
@@ -373,13 +374,13 @@
             renderContent();
         }
 
-        function logout() {
+        async function logout() {
             state.currentUser = null;
             document.getElementById('login-screen').classList.remove('hidden');
             document.getElementById('app-portal').classList.add('hidden');
             document.getElementById('login-id').value = '';
             document.getElementById('login-pw').value = '';
-            loadShared();
+            await fetchCloudData();
         }
 
         function renderTopNav() {
@@ -511,7 +512,10 @@
             return path;
         }
 
-        function renderContent() {
+        async function renderContent() {
+            // 화면 렌더링 전 항상 최신 클라우드 상태 동기화 검사
+            await fetchCloudData();
+
             const container = document.getElementById('content-container');
             const breadcrumb = document.getElementById('breadcrumb');
             const title = document.getElementById('current-title');
@@ -839,49 +843,4 @@
         }
 
         function renderSubHistory() {
-            const container = document.getElementById('sub-history-container');
-            container.innerHTML = '';
-            const myRecords = state.historyRecords.filter(h => h.branchId === (state.currentUser ? state.currentUser.branchId : ''));
-            if (myRecords.length === 0) {
-                container.innerHTML = `<div class="text-center py-12 text-slate-400 font-medium text-sm">학습 이력이 없습니다.</div>`;
-                return;
-            }
-            myRecords.slice().reverse().forEach(h => {
-                const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center";
-                row.innerHTML = `
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="font-bold text-slate-800 text-base">${h.studentName}</span>
-                            <span class="text-xs bg-slate-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold border border-slate-200">${h.score}점</span>
-                        </div>
-                        <div class="text-sm text-slate-600 font-medium">${h.title} (${h.correct} / ${h.total} 정답)</div>
-                        <div class="text-xs text-slate-400 mt-1">완료 일시: ${h.date}</div>
-                    </div>
-                `;
-                container.appendChild(row);
-            });
-        }
-
-        function saveAcademySettings() {
-            const name = document.getElementById('setting-academy-name').value.trim();
-            if (!name) return alert('학원명을 입력하세요.');
-            const branch = state.branches.find(b => b.id === (state.currentUser ? state.currentUser.branchId : ''));
-            if (!branch) return;
-
-            branch.academyName = name;
-            state.currentUser.academyName = name;
-            document.getElementById('header-academy-name').innerText = name;
-            saveState();
-            alert('학원 설정이 저장되었습니다!');
-        }
-
-        function resetToHome() {
-            state.currentFolderId = null;
-            renderContent();
-        }
-
-        loadShared();
-    </script>
-</body>
-</html>
+            const container = document.getElementById('sub-
