@@ -221,7 +221,7 @@
         const CLOUD_BIN_ID = '6ad1ab17ac6210605a360e45'; 
         const CLOUD_API_KEY = '$2a$10$xfybF8YznlSFs90Jp2N2EeJt/RMxJZSYc2FJpPM080Dh1/quk0XLa';
 
-        // 원장님의 최신 학습 데이터를 기본값으로 완전히 내장
+        // 최신 내장 데이터
         let state = {
             currentUser: null,
             superAdminPw: '1234',
@@ -387,7 +387,7 @@
             currentFolderId: null
         };
 
-        // 비동기 통신 오류 원천 차단형 백그라운드 로드
+        // 백그라운드 데이터 동기화
         async function loadShared() {
             try {
                 const r = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`, {
@@ -406,7 +406,7 @@
                     if (d.historyRecords) state.historyRecords = d.historyRecords;
                 }
             } catch (e) {
-                console.warn('클라우드 로드 실패, 내장 데이터 사용', e);
+                console.warn('동기화 대기중, 내장 데이터로 구동', e);
             }
         }
 
@@ -435,7 +435,7 @@
             }
         }
 
-        // 로그인 검증 (동기식 즉시 처리 보장)
+        // 로그인 검증 함수 (100% 동기식 즉시 처리)
         function handleLogin(e) {
             e.preventDefault();
             const id = document.getElementById('login-id').value.trim().toLowerCase();
@@ -814,221 +814,4 @@
                 };
 
                 if (state.currentUser.role === 'super') {
-                    if (!state.masterDatabase[catId]) state.masterDatabase[catId] = [];
-                    state.masterDatabase[catId].push(newItem);
-                } else {
-                    const bId = state.currentUser.branchId;
-                    if (!state.branchDatabases[bId]) state.branchDatabases[bId] = {};
-                    if (!state.branchDatabases[bId][catId]) state.branchDatabases[bId][catId] = [];
-                    state.branchDatabases[bId][catId].push(newItem);
-                }
-                renderContent();
-                saveState();
-            }
-        }
-
-        function addLinkFilePrompt() {
-            const title = prompt('학습 자료 제목을 입력하세요:');
-            if (!title) return;
-            const url = prompt('웹페이지 주소 또는 유튜브 링크 URL을 입력하세요:');
-            if (!url) return;
-
-            const catId = state.currentSidebarCat;
-            const newItem = {
-                id: 'link_' + Date.now(),
-                type: 'file',
-                name: title.trim(),
-                parentId: state.currentFolderId,
-                linkUrl: url.trim(),
-                tabId: state.currentTopTab,
-                authorRole: (state.currentUser.role === 'super' ? 'super' : state.currentUser.branchId)
-            };
-
-            if (state.currentUser.role === 'super') {
-                if (!state.masterDatabase[catId]) state.masterDatabase[catId] = [];
-                state.masterDatabase[catId].push(newItem);
-            } else {
-                const bId = state.currentUser.branchId;
-                if (!state.branchDatabases[bId]) state.branchDatabases[bId] = {};
-                if (!state.branchDatabases[bId][catId]) state.branchDatabases[bId][catId] = [];
-                state.branchDatabases[bId][catId].push(newItem);
-            }
-
-            renderContent();
-            saveState();
-            alert(`'${title}' 자료가 등록되었습니다.`);
-        }
-
-        function switchAdminView(view) {
-            state.currentSuperView = view;
-            document.getElementById('view-content').classList.toggle('hidden', view !== 'content');
-            document.getElementById('view-branches').classList.toggle('hidden', view !== 'branches');
-            document.getElementById('view-storage').classList.toggle('hidden', view !== 'storage');
-            if (view === 'content') renderContent();
-            else if (view === 'branches') renderBranches();
-        }
-
-        function switchSubView(view) {
-            state.currentSubView = view;
-            document.getElementById('view-content').classList.toggle('hidden', view !== 'content');
-            document.getElementById('view-sub-students').classList.toggle('hidden', view !== 'students');
-            document.getElementById('view-sub-history').classList.toggle('hidden', view !== 'history');
-            document.getElementById('view-sub-settings').classList.toggle('hidden', view !== 'settings');
-
-            if (view === 'content') renderContent();
-            else if (view === 'students') renderSubStudents();
-            else if (view === 'history') renderSubHistory();
-            else if (view === 'settings') {
-                if (state.currentUser) document.getElementById('setting-academy-name').value = state.currentUser.academyName || '';
-            }
-        }
-
-        function renderBranches() {
-            const container = document.getElementById('branch-list-container');
-            container.innerHTML = '';
-            state.branches.forEach(b => {
-                const card = document.createElement('div');
-                card.className = "p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between gap-3 shadow-sm";
-                card.innerHTML = `
-                    <div>
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="font-bold text-slate-800 text-lg">${b.academyName}</span>
-                        </div>
-                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-200">
-                            <div>🆔 아이디: <strong class="text-indigo-600">${b.username}</strong></div>
-                            <div>🔑 비밀번호: <strong class="text-slate-800">${b.password}</strong></div>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function addBranchPrompt() {
-            const academyName = prompt('학원 이름 (예: 남양주지점):');
-            if (!academyName) return;
-            const username = prompt('지점 로그인 아이디:');
-            if (!username) return;
-            const password = prompt('지점 로그인 비밀번호:');
-            if (!password) return;
-
-            state.branches.push({
-                id: 'branch_' + Date.now(),
-                username: username.trim(),
-                password: password.trim(),
-                academyName: academyName.trim(),
-                logoImage: ''
-            });
-            renderBranches();
-            saveState();
-            alert('신규 지점이 등록되었습니다!');
-        }
-
-        function exportDataJson() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "academy_platform_backup.json");
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
-        }
-
-        function renderSubStudents() {
-            const container = document.getElementById('sub-student-list');
-            container.innerHTML = '';
-            const myStudents = state.students.filter(s => s.branchId === (state.currentUser ? state.currentUser.branchId : ''));
-            if (myStudents.length === 0) {
-                container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 font-medium text-sm">등록된 학생이 없습니다.</div>`;
-                return;
-            }
-            myStudents.forEach(s => {
-                const card = document.createElement('div');
-                card.className = "p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between gap-3 shadow-sm";
-                card.innerHTML = `
-                    <div>
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="font-bold text-slate-800 text-lg">${s.name}</span>
-                            <span class="text-xs bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-full font-bold border border-slate-200">${s.grade}</span>
-                        </div>
-                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-200">
-                            <div>🆔 아이디: <strong class="text-indigo-600">${s.username}</strong></div>
-                            <div>🔑 비밀번호: <strong class="text-slate-800">${s.password}</strong></div>
-                        </div>
-                    </div>
-                    <button onclick="removeStudent('${s.id}')" class="text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200 transition">학생 삭제</button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function addSubStudentPrompt() {
-            const name = prompt('학생 이름:');
-            if (!name) return;
-            const username = prompt('학생 아이디:');
-            if (!username) return;
-            const password = prompt('학생 비밀번호:');
-            if (!password) return;
-            const grade = prompt('학년 (예: 중1):', '중1');
-
-            state.students.push({ id: 's_' + Date.now(), branchId: state.currentUser.branchId, username: username.trim(), password: password.trim(), name: name.trim(), grade: grade ? grade.trim() : '중1' });
-            renderSubStudents();
-            saveState();
-        }
-
-        function removeStudent(id) {
-            if (confirm('삭제하시겠습니까?')) {
-                state.students = state.students.filter(s => s.id !== id);
-                renderSubStudents();
-                saveState();
-            }
-        }
-
-        function renderSubHistory() {
-            const container = document.getElementById('sub-history-container');
-            container.innerHTML = '';
-            const myRecords = state.historyRecords.filter(h => h.branchId === (state.currentUser ? state.currentUser.branchId : ''));
-            if (myRecords.length === 0) {
-                container.innerHTML = `<div class="text-center py-12 text-slate-400 font-medium text-sm">학습 이력이 없습니다.</div>`;
-                return;
-            }
-            myRecords.slice().reverse().forEach(h => {
-                const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center";
-                row.innerHTML = `
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="font-bold text-slate-800 text-base">${h.studentName}</span>
-                            <span class="text-xs bg-slate-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold border border-slate-200">${h.score}점</span>
-                        </div>
-                        <div class="text-sm text-slate-600 font-medium">${h.title} (${h.correct} / ${h.total} 정답)</div>
-                        <div class="text-xs text-slate-400 mt-1">완료 일시: ${h.date}</div>
-                    </div>
-                `;
-                container.appendChild(row);
-            });
-        }
-
-        function saveAcademySettings() {
-            const name = document.getElementById('setting-academy-name').value.trim();
-            if (!name) return alert('학원명을 입력하세요.');
-            const branch = state.branches.find(b => b.id === (state.currentUser ? state.currentUser.branchId : ''));
-            if (!branch) return;
-
-            branch.academyName = name;
-            state.currentUser.academyName = name;
-            document.getElementById('header-academy-name').innerText = name;
-            saveState();
-            alert('학원 설정이 저장되었습니다!');
-        }
-
-        function resetToHome() {
-            state.currentFolderId = null;
-            renderContent();
-        }
-
-        // 구동 시 백그라운드에서 클라우드 데이터 동기화 시도
-        loadShared();
-    </script>
-</body>
-</html>
+                    if (!state.master
