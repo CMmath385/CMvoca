@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>최강수학메이드영어학원 - 실시간 클라우드 학습 플랫폼</title>
+    <title>최강수학메이드영어학원 - 스마트 학습 플랫폼</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
@@ -20,7 +20,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen flex flex-col" onload="initialLoad()">
+<body class="bg-slate-100 min-h-screen flex flex-col">
 
     <!-- 1. LOGIN SCREEN -->
     <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
@@ -30,7 +30,7 @@
                     CM
                 </div>
                 <h1 class="text-2xl font-bold text-slate-800">최강수학메이드영어학원</h1>
-                <p class="text-xs text-slate-400 mt-1">실시간 클라우드 통합 학습 포털</p>
+                <p class="text-xs text-slate-400 mt-1">스마트 영어 학습 포털</p>
             </div>
 
             <form onsubmit="handleLogin(event)" class="space-y-4">
@@ -99,6 +99,7 @@
                     <div id="super-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200">
                         <button onclick="switchAdminView('content')" id="sup-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">👑 본원 콘텐츠 마스터</button>
                         <button onclick="switchAdminView('branches')" id="sup-v-branches" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">🏛️ 지점장 관리</button>
+                        <button onclick="switchAdminView('storage')" id="sup-v-storage" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">💾 저장소 및 내보내기</button>
                     </div>
 
                     <div id="sub-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200">
@@ -125,7 +126,7 @@
                         </div>
 
                         <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자료가 실시간으로 안전하게 동기화됩니다.</span>
+                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자체 자료가 함께 제공됩니다.</span>
                         </div>
 
                         <div id="content-container" class="space-y-3"></div>
@@ -143,7 +144,21 @@
                         <div id="branch-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                     </div>
 
-                    <!-- VIEW 3: STUDENTS -->
+                    <!-- VIEW 3: STORAGE / BACKUP -->
+                    <div id="view-storage" class="hidden">
+                        <div class="mb-6 pb-4 border-b border-slate-100">
+                            <span class="text-xs font-bold text-indigo-600">데이터 관리</span>
+                            <h2 class="text-xl font-bold text-slate-800">저장소 및 백업 / 내보내기</h2>
+                        </div>
+                        <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xl space-y-4">
+                            <p class="text-xs text-slate-600">현재 플랫폼의 모든 설정 및 데이터(지점, 학생, 마스터 자료)를 백업하거나 JSON 코드로 확인할 수 있습니다.</p>
+                            <button onclick="exportDataJson()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition">
+                                📥 현재 데이터 JSON 백업 파일 다운로드
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- VIEW 4: STUDENTS -->
                     <div id="view-sub-students" class="hidden">
                         <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
                             <div>
@@ -155,7 +170,7 @@
                         <div id="sub-student-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                     </div>
 
-                    <!-- VIEW 4: HISTORY -->
+                    <!-- VIEW 5: HISTORY -->
                     <div id="view-sub-history" class="hidden">
                         <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
                             <div>
@@ -166,7 +181,7 @@
                         <div id="sub-history-container" class="space-y-3"></div>
                     </div>
 
-                    <!-- VIEW 5: SETTINGS -->
+                    <!-- VIEW 6: SETTINGS -->
                     <div id="view-sub-settings" class="hidden">
                         <div class="mb-6 pb-4 border-b border-slate-100">
                             <span class="text-xs font-bold text-indigo-600">학원 설정</span>
@@ -247,15 +262,10 @@
             currentFolderId: null
         };
 
-        async function initialLoad() {
-            await fetchCloudData();
-        }
-
-        async function fetchCloudData() {
+        async function loadShared() {
             try {
                 const r = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`, {
-                    headers: { 'X-Master-Key': CLOUD_API_KEY },
-                    cache: 'no-store'
+                    headers: { 'X-Master-Key': CLOUD_API_KEY }
                 });
                 if (r.ok) {
                     const res = await r.json();
@@ -269,7 +279,12 @@
                     if (d.historyRecords) state.historyRecords = d.historyRecords;
                 }
             } catch (e) {
-                console.warn('클라우드 데이터 로드 중 오류 발생', e);
+                console.warn('클라우드 로드 실패', e);
+            }
+            if (state.currentUser) {
+                renderTopNav();
+                renderSidebar();
+                renderContent();
             }
         }
 
@@ -294,18 +309,15 @@
                     body: JSON.stringify(payload)
                 });
             } catch (e) {
-                console.error('클라우드 저장 실패', e);
+                console.error('클라우드 실시간 동기화 실패', e);
             }
         }
 
-        async function handleLogin(e) {
+        function handleLogin(e) {
             e.preventDefault();
             const id = document.getElementById('login-id').value.trim().toLowerCase();
             const pw = document.getElementById('login-pw').value.trim();
             const err = document.getElementById('login-error');
-
-            // 로그인 시도 직전 무조건 클라우드 최신 데이터를 강제로 다시 불러옴
-            await fetchCloudData();
 
             if (id === 'admin' && pw === state.superAdminPw) {
                 state.currentUser = { role: 'super', username: 'admin' };
@@ -374,13 +386,13 @@
             renderContent();
         }
 
-        async function logout() {
+        function logout() {
             state.currentUser = null;
             document.getElementById('login-screen').classList.remove('hidden');
             document.getElementById('app-portal').classList.add('hidden');
             document.getElementById('login-id').value = '';
             document.getElementById('login-pw').value = '';
-            await fetchCloudData();
+            loadShared();
         }
 
         function renderTopNav() {
@@ -512,10 +524,7 @@
             return path;
         }
 
-        async function renderContent() {
-            // 화면 렌더링 전 항상 최신 클라우드 상태 동기화 검사
-            await fetchCloudData();
-
+        function renderContent() {
             const container = document.getElementById('content-container');
             const breadcrumb = document.getElementById('breadcrumb');
             const title = document.getElementById('current-title');
@@ -697,150 +706,4 @@
         }
 
         function addLinkFilePrompt() {
-            const title = prompt('학습 자료 제목을 입력하세요:');
-            if (!title) return;
-            const url = prompt('웹페이지 주소 또는 유튜브 링크 URL을 입력하세요:');
-            if (!url) return;
-
-            const catId = state.currentSidebarCat;
-            const newItem = {
-                id: 'link_' + Date.now(),
-                type: 'file',
-                name: title.trim(),
-                parentId: state.currentFolderId,
-                linkUrl: url.trim(),
-                tabId: state.currentTopTab,
-                authorRole: (state.currentUser.role === 'super' ? 'super' : state.currentUser.branchId)
-            };
-
-            if (state.currentUser.role === 'super') {
-                if (!state.masterDatabase[catId]) state.masterDatabase[catId] = [];
-                state.masterDatabase[catId].push(newItem);
-            } else {
-                const bId = state.currentUser.branchId;
-                if (!state.branchDatabases[bId]) state.branchDatabases[bId] = {};
-                if (!state.branchDatabases[bId][catId]) state.branchDatabases[bId][catId] = [];
-                state.branchDatabases[bId][catId].push(newItem);
-            }
-
-            renderContent();
-            saveState();
-            alert(`'${title}' 자료가 등록되었습니다.`);
-        }
-
-        function switchAdminView(view) {
-            state.currentSuperView = view;
-            document.getElementById('view-content').classList.toggle('hidden', view !== 'content');
-            document.getElementById('view-branches').classList.toggle('hidden', view !== 'branches');
-            if (view === 'content') renderContent();
-            else if (view === 'branches') renderBranches();
-        }
-
-        function switchSubView(view) {
-            state.currentSubView = view;
-            document.getElementById('view-content').classList.toggle('hidden', view !== 'content');
-            document.getElementById('view-sub-students').classList.toggle('hidden', view !== 'students');
-            document.getElementById('view-sub-history').classList.toggle('hidden', view !== 'history');
-            document.getElementById('view-sub-settings').classList.toggle('hidden', view !== 'settings');
-
-            if (view === 'content') renderContent();
-            else if (view === 'students') renderSubStudents();
-            else if (view === 'history') renderSubHistory();
-            else if (view === 'settings') {
-                if (state.currentUser) document.getElementById('setting-academy-name').value = state.currentUser.academyName || '';
-            }
-        }
-
-        function renderBranches() {
-            const container = document.getElementById('branch-list-container');
-            container.innerHTML = '';
-            state.branches.forEach(b => {
-                const card = document.createElement('div');
-                card.className = "p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between gap-3 shadow-sm";
-                card.innerHTML = `
-                    <div>
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="font-bold text-slate-800 text-lg">${b.academyName}</span>
-                        </div>
-                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-200">
-                            <div>🆔 아이디: <strong class="text-indigo-600">${b.username}</strong></div>
-                            <div>🔑 비밀번호: <strong class="text-slate-800">${b.password}</strong></div>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function addBranchPrompt() {
-            const academyName = prompt('학원 이름 (예: 남양주지점):');
-            if (!academyName) return;
-            const username = prompt('지점 로그인 아이디:');
-            if (!username) return;
-            const password = prompt('지점 로그인 비밀번호:');
-            if (!password) return;
-
-            state.branches.push({
-                id: 'branch_' + Date.now(),
-                username: username.trim(),
-                password: password.trim(),
-                academyName: academyName.trim(),
-                logoImage: ''
-            });
-            renderBranches();
-            saveState();
-            alert('신규 지점이 등록되었습니다!');
-        }
-
-        function renderSubStudents() {
-            const container = document.getElementById('sub-student-list');
-            container.innerHTML = '';
-            const myStudents = state.students.filter(s => s.branchId === (state.currentUser ? state.currentUser.branchId : ''));
-            if (myStudents.length === 0) {
-                container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 font-medium text-sm">등록된 학생이 없습니다.</div>`;
-                return;
-            }
-            myStudents.forEach(s => {
-                const card = document.createElement('div');
-                card.className = "p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between gap-3 shadow-sm";
-                card.innerHTML = `
-                    <div>
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="font-bold text-slate-800 text-lg">${s.name}</span>
-                            <span class="text-xs bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-full font-bold border border-slate-200">${s.grade}</span>
-                        </div>
-                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-200">
-                            <div>🆔 아이디: <strong class="text-indigo-600">${s.username}</strong></div>
-                            <div>🔑 비밀번호: <strong class="text-slate-800">${s.password}</strong></div>
-                        </div>
-                    </div>
-                    <button onclick="removeStudent('${s.id}')" class="text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200 transition">학생 삭제</button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function addSubStudentPrompt() {
-            const name = prompt('학생 이름:');
-            if (!name) return;
-            const username = prompt('학생 아이디:');
-            if (!username) return;
-            const password = prompt('학생 비밀번호:');
-            if (!password) return;
-            const grade = prompt('학년 (예: 중1):', '중1');
-
-            state.students.push({ id: 's_' + Date.now(), branchId: state.currentUser.branchId, username: username.trim(), password: password.trim(), name: name.trim(), grade: grade ? grade.trim() : '중1' });
-            renderSubStudents();
-            saveState();
-        }
-
-        function removeStudent(id) {
-            if (confirm('삭제하시겠습니까?')) {
-                state.students = state.students.filter(s => s.id !== id);
-                renderSubStudents();
-                saveState();
-            }
-        }
-
-        function renderSubHistory() {
-            const container = document.getElementById('sub-
+            const title = prompt('학습 자료 제목을 입력
