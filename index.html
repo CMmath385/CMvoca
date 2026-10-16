@@ -8,16 +8,6 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
         body { font-family: 'Pretendard', sans-serif; }
-        .draggable-item { cursor: grab; }
-        .draggable-item:active { cursor: grabbing; }
-        @media (max-width: 767px) {
-            #sidebar-container { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
-            #sidebar-container div { flex: none; width: auto; white-space: nowrap; }
-            #super-admin-tabs, #sub-admin-tabs { overflow-x: auto; }
-            #super-admin-tabs button, #sub-admin-tabs button { flex: none !important; white-space: nowrap; }
-            #content-container > div { flex-wrap: wrap; }
-            main { padding: 14px !important; }
-        }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col">
@@ -26,7 +16,7 @@
     <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative border border-slate-100">
             <div class="text-center mb-8">
-                <div class="w-16 h-16 bg-indigo-700 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-4 shadow-lg overflow-hidden">
+                <div class="w-16 h-16 bg-indigo-700 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-4 shadow-lg">
                     CM
                 </div>
                 <h1 class="text-2xl font-bold text-slate-800">최강수학메이드영어학원</h1>
@@ -36,7 +26,7 @@
             <form onsubmit="handleLogin(event)" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1.5">아이디</label>
-                    <input type="text" id="login-id" required placeholder="아이디 입력" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
+                    <input type="text" id="login-id" required placeholder="아이디 입력" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1.5">비밀번호</label>
@@ -48,21 +38,15 @@
             </form>
 
             <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500 h-4"></div>
-
-            <div class="mt-6 pt-4 border-t border-slate-100 text-center">
-                <button onclick="forceResetData()" class="text-xs text-rose-500 underline font-bold hover:text-rose-700">
-                    🚨 로그인 오류 해결 (데이터 강제 초기화)
-                </button>
-            </div>
         </div>
     </div>
 
     <!-- 2. MAIN APP PORTAL -->
     <div id="app-portal" class="hidden flex-grow flex flex-col">
         <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
-            <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
-                <div class="flex items-center space-x-3 cursor-pointer" onclick="resetToHome()">
-                    <div id="header-logo" class="w-10 h-10 bg-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm overflow-hidden">
+            <div class="max-w-[1600px] mx-auto px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm">
                         CM
                     </div>
                     <div>
@@ -70,247 +54,63 @@
                         <p id="header-academy-sub" class="text-xs text-slate-400">스마트 영어 학습 포털</p>
                     </div>
                 </div>
-
-                <div class="flex items-center gap-2">
-                    <nav id="top-nav-container" class="flex flex-wrap gap-2 text-sm font-bold items-center">
-                        <!-- Dynamic Top Tabs -->
-                    </nav>
-                    <button onclick="addTopTabPrompt()" id="btn-add-tab" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2.5 py-2 rounded-xl font-bold hover:bg-indigo-100 transition">+ 메뉴추가</button>
-                </div>
-
-                <div class="flex items-center gap-3">
-                    <span id="user-badge" class="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1.5 rounded-xl border border-indigo-100">
-                        사용자 모드
-                    </span>
-                    <button onclick="logout()" class="text-xs text-slate-500 hover:text-slate-800 font-bold border border-slate-200 px-3 py-1.5 rounded-xl transition">
-                        로그아웃
-                    </button>
-                </div>
+                <button onclick="logout()" class="text-xs text-slate-500 hover:text-slate-800 font-bold border border-slate-200 px-3 py-1.5 rounded-xl transition">
+                    로그아웃
+                </button>
             </div>
         </header>
 
-        <div class="max-w-[1600px] mx-auto w-full flex-grow flex flex-col md:flex-row p-4 gap-4">
-            <aside class="w-full md:w-64 flex-shrink-0 flex flex-col gap-2">
-                <div class="flex justify-between items-center px-1 mb-1">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">학습 카테고리</span>
-                    <button onclick="addSidebarCategoryPrompt()" id="sidebar-add-btn" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-100">+ 추가</button>
-                </div>
-                <div id="sidebar-container" class="flex flex-col gap-1.5">
-                    <!-- Dynamic Sidebar -->
-                </div>
-            </aside>
-
-            <main class="flex-grow bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
-                <div>
-                    <div id="super-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200">
-                        <button onclick="switchAdminView('content')" id="sup-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">👑 본원 콘텐츠 마스터</button>
-                        <button onclick="switchAdminView('branches')" id="sup-v-branches" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">🏛️ 지점장 관리</button>
-                        <button onclick="switchAdminView('storage')" id="sup-v-storage" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">💾 저장소 및 내보내기</button>
-                    </div>
-
-                    <div id="sub-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200">
-                        <button onclick="switchSubView('content')" id="sub-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">📂 학원 학습 자료실</button>
-                        <button onclick="switchSubView('students')" id="sub-v-students" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">👨‍🎓 학생 관리</button>
-                        <button onclick="switchSubView('history')" id="sub-v-history" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">📊 학습 이력</button>
-                        <button onclick="switchSubView('settings')" id="sub-v-settings" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">⚙️ 학원 설정</button>
-                    </div>
-
-                    <!-- VIEW 1: CONTENT -->
-                    <div id="view-content">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
-                            <div>
-                                <div id="breadcrumb" class="text-xs font-bold text-indigo-600 mb-1 flex items-center gap-1">
-                                    📁 폴더
-                                </div>
-                                <h2 id="current-title" class="text-xl font-bold text-slate-800">폴더 및 학습 목록</h2>
-                            </div>
-                            
-                            <div class="flex items-center gap-2 w-full sm:w-auto">
-                                <button onclick="addFolderPrompt()" id="btn-add-folder" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">+ 새 폴더 추가</button>
-                                <button onclick="addLinkFilePrompt()" id="btn-add-link" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">🔗 웹/링크 등록</button>
-                            </div>
-                        </div>
-
-                        <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자체 자료가 함께 제공됩니다.</span>
-                        </div>
-
-                        <div id="content-container" class="space-y-3"></div>
-                    </div>
-
-                    <!-- VIEW 2: BRANCHES -->
-                    <div id="view-branches" class="hidden">
-                        <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-                            <div>
-                                <span class="text-xs font-bold text-indigo-600">프랜차이즈 관리</span>
-                                <h2 class="text-xl font-bold text-slate-800">지점장 계정 등록 및 수정</h2>
-                            </div>
-                            <button onclick="addBranchPrompt()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold shadow-sm transition">+ 신규 지점 등록</button>
-                        </div>
-                        <div id="branch-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-                    </div>
-
-                    <!-- VIEW 3: STORAGE / BACKUP -->
-                    <div id="view-storage" class="hidden">
-                        <div class="mb-6 pb-4 border-b border-slate-100">
-                            <span class="text-xs font-bold text-indigo-600">데이터 관리</span>
-                            <h2 class="text-xl font-bold text-slate-800">저장소 및 백업 / 내보내기</h2>
-                        </div>
-                        <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xl space-y-4">
-                            <p class="text-xs text-slate-600">현재 플랫폼의 모든 학습 데이터와 설정을 백업하거나 JSON 파일로 다운로드할 수 있습니다.</p>
-                            <button onclick="exportDataJson()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition">
-                                📥 현재 데이터 JSON 백업 파일 다운로드
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- VIEW 4: STUDENTS -->
-                    <div id="view-sub-students" class="hidden">
-                        <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-                            <div>
-                                <span class="text-xs font-bold text-indigo-600">원생 관리</span>
-                                <h2 class="text-xl font-bold text-slate-800">소속 학생 관리</h2>
-                            </div>
-                            <button onclick="addSubStudentPrompt()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold shadow-sm transition">+ 소속 학생 등록</button>
-                        </div>
-                        <div id="sub-student-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-                    </div>
-
-                    <!-- VIEW 5: HISTORY -->
-                    <div id="view-sub-history" class="hidden">
-                        <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-                            <div>
-                                <span class="text-xs font-bold text-indigo-600">학습 리포트</span>
-                                <h2 class="text-xl font-bold text-slate-800">학생 테스트 점수 및 학습 이력</h2>
-                            </div>
-                        </div>
-                        <div id="sub-history-container" class="space-y-3"></div>
-                    </div>
-
-                    <!-- VIEW 6: SETTINGS -->
-                    <div id="view-sub-settings" class="hidden">
-                        <div class="mb-6 pb-4 border-b border-slate-100">
-                            <span class="text-xs font-bold text-indigo-600">학원 설정</span>
-                            <h2 class="text-xl font-bold text-slate-800">학원명 및 로고 변경</h2>
-                        </div>
-                        <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xl space-y-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1">학원명</label>
-                                <input type="text" id="setting-academy-name" class="w-full p-3 bg-white border border-slate-300 rounded-xl font-bold text-slate-800">
-                            </div>
-                            <button onclick="saveAcademySettings()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition">
-                                설정 저장하기
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <footer class="mt-8 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
-                    © 2026 최강수학메이드영어학원. All rights reserved.
-                </footer>
-            </main>
-        </div>
-    </div>
-
-    <!-- Video Modal -->
-    <div id="video-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-6 relative">
-            <button onclick="closeVideo()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
-            <h3 id="video-title" class="text-lg font-bold text-slate-800 mb-4">영상 학습</h3>
-            <div class="aspect-video w-full rounded-xl overflow-hidden bg-black">
-                <iframe id="video-iframe" class="w-full h-full" src="" frameborder="0" allowfullscreen></iframe>
+        <main class="max-w-[1600px] mx-auto w-full flex-grow p-6">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center">
+                <h2 id="welcome-msg" class="text-2xl font-bold text-slate-800 mb-4">환영합니다!</h2>
+                <p class="text-slate-600">로그인이 정상적으로 완료되었습니다.</p>
             </div>
-        </div>
+        </main>
     </div>
 
     <script>
-        const CLOUD_BIN_ID = '6ad1ab17ac6210605a360e45'; 
-        const CLOUD_API_KEY = '$2a$10$xfybF8YznlSFs90Jp2N2EeJt/RMxJZSYc2FJpPM080Dh1/quk0XLa';
+        // 기본 계정 하드코딩 설정 (충돌 원천 차단)
+        const ACCOUNTS = {
+            super: { id: 'admin', pw: '1234', name: '최고 관리자' },
+            branch: { id: 'onam', pw: '123', name: '최강수학메이드영어학원 (오남지점)' },
+            student: { id: 'student1', pw: '123', name: '김철수 학생' }
+        };
 
-        const defaultState = {
-            currentUser: null,
-            superAdminPw: '1234',
-            branches: [{"id":"branch_1","username":"onam","password":"123","academyName":"최강수학메이드영어학원","logoImage":""}],
-            students: [{"id":"s1","branchId":"branch_1","username":"student1","password":"123","name":"김철수","grade":"중1"}],
-            historyRecords: [],
-            topTabs: [{"id":"video","name":"영상학습훈련"},{"id":"voca","name":"단어"},{"id":"passage","name":"본문"}],
-            sidebarCats: [{"id":"middle_exam","name":"중등부 내신문제"},{"id":"high_exam","name":"고등부 내신문제"},{"id":"cat_1792074925468","name":"고등모의고사"},{"id":"grammar","name":"문법"},{"id":"cat_1792074950120","name":"단어"}],
-            masterDatabase: {
-                "middle_exam": [
-                    {"id":"f_g1","type":"folder","name":"중1 (개정)","parentId":null},
-                    {"id":"f_g2","type":"folder","name":"중2 (개정)","parentId":null},
-                    {"id":"f_g3","type":"folder","name":"중3","parentId":null},
-                    {"id":"f_mirae","type":"folder","name":"중1 미래엔 문영인","parentId":"f_g1"},
-                    {"id":"f_visang","type":"folder","name":"중1 비상 황종배","parentId":"f_g1"},
-                    {"id":"f_chun_so","type":"folder","name":"중1 천재 소영순","parentId":"f_g1"},
-                    {"id":"f_chun_lee","type":"folder","name":"중1 천재 이상기","parentId":"f_g1"},
-                    {"id":"f_l1","type":"folder","name":"01과","parentId":"f_chun_lee"},
-                    {"id":"f_l2","type":"folder","name":"02과","parentId":"f_chun_lee"},
-                    {"id":"f_l3","type":"folder","name":"03과","parentId":"f_chun_lee"},
-                    {"id":"f_l4","type":"folder","name":"04과","parentId":"f_chun_lee"},
-                    {"id":"f_l5","type":"folder","name":"05과","parentId":"f_chun_lee"},
-                    {"id":"f_l6","type":"folder","name":"06과","parentId":"f_chun_lee"},
-                    {"id":"f_l7","type":"folder","name":"07과","parentId":"f_chun_lee"},
-                    {"id":"f_l8","type":"folder","name":"08과","parentId":"f_chun_lee"},
-                    {"id":"file_m1_5_1","type":"file","name":"Lesson 5 단어 한글+영어 학습","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/bbe4cd395f01?social_preview=false&skid=8f8896bd-2837-4f29-9c27-f5a857e7e46f","tabId":"voca"},
-                    {"id":"file_m1_5_2","type":"file","name":"Lesson 5 단어 스펠링 테스트","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/a2fb6f3527e0?social_preview=false&skid=f041a675-4c9f-4bda-985a-0ccbef4251cf","tabId":"voca"},
-                    {"id":"file_m1_6_1","type":"file","name":"Lesson 6 단어 한글+영어 학습","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac"},
-                    {"id":"file_m1_6_2","type":"file","name":"Lesson 6 단어 스펠링 테스트","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc"},
-                    {"id":"file_m1_6_3","type":"file","name":"Lesson 6 본문 동사형 찾기","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2"},
-                    {"id":"file_m1_6_4","type":"file","name":"Lesson 6 본문 어법 선택","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032"},
-                    {"id":"file_m1_7_1","type":"file","name":"Lesson 7 단어 한글+영어 학습","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1"},
-                    {"id":"file_m1_7_2","type":"file","name":"Lesson 7 단어 스펠링 테스트","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd"},
-                    {"id":"file_m1_7_3","type":"file","name":"Lesson 7 본문 동사형 찾기","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/ea014e0adb32?skid=f472cd07-cf96-407a-ad3a-7e209dada6b6"},
-                    {"id":"file_m1_7_4","type":"file","name":"Lesson 7 본문 어법 선택","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0206674fda6a?skid=24c491df-8acb-41df-a6a7-82e677f638e8"},
-                    {"id":"file_m1_8_1","type":"file","name":"Lesson 8 단어 한글+영어 학습","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb"},
-                    {"id":"file_m1_8_2","type":"file","name":"Lesson 8 단어 스펠링 테스트","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168"},
-                    {"id":"f_m2_mirae","type":"folder","name":"중2 미래엔 문영인","parentId":"f_g2"},
-                    {"id":"f_m2_visang","type":"folder","name":"중2 비상 황종배","parentId":"f_g2"},
-                    {"id":"f_m2_chun_so","type":"folder","name":"중2 천재 소영순","parentId":"f_g2"},
-                    {"id":"f_m2_chun_lee","type":"folder","name":"중2 천재 이상기","parentId":"f_g2"},
-                    {"id":"f_m2_so_l7","type":"folder","name":"07과","parentId":"f_m2_chun_so"},
-                    {"id":"f_m2_so_l8","type":"folder","name":"08과","parentId":"f_m2_chun_so"},
-                    {"id":"file_m2_7_1","type":"file","name":"Lesson 7 단어 한글+영어 학습","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0"},
-                    {"id":"file_m2_7_2","type":"file","name":"Lesson 7 단어 스펠링 테스트","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b"},
-                    {"id":"file_m2_7_3","type":"file","name":"Lesson 7 본문 동사형 찾기","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/f155aa1e557a?skid=f44d0553-2d09-468a-94a2-0cfa0b14e51b"},
-                    {"id":"file_m2_7_4","type":"file","name":"Lesson 7 본문 어법 선택","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/dc505389312e?skid=a9720e9c-2b6b-44d5-821b-cfa5c8d79a5b"},
-                    {"id":"file_m2_7_g1","type":"file","name":"Lesson 7 본문문법개념 1","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7"},
-                    {"id":"file_m2_7_g2","type":"file","name":"Lesson 7 본문문법개념 2","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e"},
-                    {"id":"file_m2_7_g3","type":"file","name":"Lesson 7 본문문법개념 3","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37"},
-                    {"id":"file_m2_7_g4","type":"file","name":"Lesson 7 본문문법개념 4","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d"},
-                    {"id":"file_m2_7_g5","type":"file","name":"Lesson 7 본문문법개념 5","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/4ee754fa6845?skid=d02946a5-b269-4ab7-9fac-a97e97ff09da"},
-                    {"id":"file_m2_8_1","type":"file","name":"Lesson 8 단어 한글+영어 학습","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f"},
-                    {"id":"file_m2_8_2","type":"file","name":"Lesson 8 본문 동사형 찾기","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/b73c89f87c48?social_preview=false&skid=e8ec5f44-0739-42d4-bc7e-0fcadbb9e8bd"},
-                    {"id":"file_m2_8_3","type":"file","name":"Lesson 8 본문 어법 선택","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/2416be03d7e6?social_preview=false&skid=b72e8674-405f-4e88-a2a6-dd6d998bb1b3"},
-                    {"id":"link_1792075495216","type":"file","name":"본문개념1","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/29d9e9624352?skid=04832d42-72c2-4d7d-ac44-b419d302651a","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792075514469","type":"file","name":"본문개념2","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/1d14e1c12a9c?skid=896f5392-c827-4386-94e7-55f00d795db5","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792075531630","type":"file","name":"본문개념3","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/6b78c6afd5a8?skid=ce89d952-8d19-48c5-9f3c-105c4c2c2c03","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792075550982","type":"file","name":"본문개념4","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/04c82439ff95?skid=6d4bc09b-3ce2-41d9-9719-5952bde5d584","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792075577148","type":"file","name":"빈칸 한글/영어","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/337c2f429de9?skid=e063f428-9e21-47f6-9a4f-787dcc70d942","tabId":"passage","authorRole":"super"},
-                    {"id":"file_m1_5_3","type":"file","name":"Lesson 5 본문 동사형 찾기","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/81ee631ddfe4?skid=c0478af9-a1bb-4d50-bd65-2fd8e81d16b2","tabId":"passage"},
-                    {"id":"file_m1_5_4","type":"file","name":"Lesson 5 본문 어법 선택","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/b0c48cfcd008?skid=1b3a3121-1285-4e38-8002-4db10efb2be5","tabId":"passage"},
-                    {"id":"link_1792075880805","type":"file","name":"단어 한글/영어","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075899542","type":"file","name":"단어 스펠링","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075917096","type":"file","name":"본문개념1","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/cc75935b3e06?skid=f3ef47ce-1e69-4a71-ad1f-4d5c75ace824","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075932677","type":"file","name":"본문개념2","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/5a1eb78efe51?skid=26968259-9eae-4803-9e1b-c04fcf2a8574","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075955457","type":"file","name":"빈칸 한글/영어","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/9e9091e2641f?skid=dfc5f8f4-8412-452b-aba9-4cf4dd2a1fc8","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075969208","type":"file","name":"동사형찾기","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075986364","type":"file","name":"어법선택","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076030547","type":"file","name":"단어 한글/영어","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076049196","type":"file","name":"단어스펠링","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076063695","type":"file","name":"본문개념1","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/7326eeefd9dc?skid=b3511b45-3e67-4b46-bc94-150e590b4f7e","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076078409","type":"file","name":"본문개념2","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/d1ef587864b4?skid=a30e711d-3c80-414f-be5b-02491362f1e5","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076095774","type":"file","name":"본문개념3","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/ed04f42e23bb?skid=4630bd55-4186-46e6-a0a2-084eaeb00b25","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076114028","type":"file","name":"빈칸 한글/영어","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/7da83d0ca891?social_preview=false&skid=4bd5ea4e-0bab-4a7f-aca6-65a7da304ace","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076129340","type":"file","name":"동사형찾기","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/ea014e0adb32?social_preview=false&skid=f472cd07-cf96-407a-ad3a-7e209dada6b6","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076144801","type":"file","name":"어법선택","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0206674fda6a?social_preview=false&skid=24c491df-8acb-41df-a6a7-82e677f638e8","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076175755","type":"file","name":"단어 한글/영어","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076194955","type":"file","name":"단어 스펠링","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076210474","type":"file","name":"본문개념","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/4c75b5a3b955?skid=0217f95b-eb7c-45af-b85a-1631d9acd2d9","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076263071","type":"file","name":"단어 영어/한글","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076279861","type":"file","name":"단어 스펠링","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076297252","type":"file","name":"본문개념1","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076312349","type":"file","name":"본문개념2","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076332161","type":"file","name":"본문개념3","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076346563","type":"file","name":"본문개념4","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792
+        function handleLogin(e) {
+            e.preventDefault();
+            const idInput = document.getElementById('login-id').value.trim().toLowerCase();
+            const pwInput = document.getElementById('login-pw').value.trim();
+            const err = document.getElementById('login-error');
+            err.innerText = '';
+
+            if (idInput === ACCOUNTS.super.id && pwInput === ACCOUNTS.super.pw) {
+                startPortal('super', ACCOUNTS.super.name);
+                return;
+            }
+            if (idInput === ACCOUNTS.branch.id && pwInput === ACCOUNTS.branch.pw) {
+                startPortal('sub', ACCOUNTS.branch.name);
+                return;
+            }
+            if (idInput === ACCOUNTS.student.id && pwInput === ACCOUNTS.student.pw) {
+                startPortal('student', ACCOUNTS.student.name);
+                return;
+            }
+
+            err.innerText = '아이디 또는 비밀번호가 올바르지 않습니다.';
+        }
+
+        function startPortal(role, name) {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-portal').classList.remove('hidden');
+            document.getElementById('welcome-msg').innerText = `${name}님, 환영합니다!`;
+        }
+
+        function logout() {
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('app-portal').classList.add('hidden');
+            document.getElementById('login-id').value = '';
+            document.getElementById('login-pw').value = '';
+        }
+    </script>
+</body>
+</html>
