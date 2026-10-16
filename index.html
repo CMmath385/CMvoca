@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스마트 종합 학습 플랫폼 - 멀티 아카데미</title>
+    <title>스마트 종합 학습 플랫폼 - 멀티 아카데미 (실시간 클라우드 연동)</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
@@ -31,7 +30,7 @@
                     CM
                 </div>
                 <h1 class="text-2xl font-bold text-slate-800">스마트 학습 플랫폼</h1>
-                <p class="text-xs text-slate-400 mt-1">실시간 클라우드 동기화 시스템</p>
+                <p class="text-xs text-slate-400 mt-1">지점별 실시간 자동 동기화 시스템</p>
             </div>
 
             <form onsubmit="handleLogin(event)" class="space-y-4">
@@ -49,11 +48,6 @@
             </form>
 
             <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500 h-4"></div>
-            
-            <div class="mt-6 flex justify-between items-center text-xs px-2 border-t border-slate-100 pt-4">
-                <button onclick="forceResetStorage()" class="text-slate-400 font-bold underline hover:text-slate-600">저장소 초기화</button>
-                <button onclick="exportData()" class="text-indigo-600 font-bold underline hover:text-indigo-800 text-sm">📥 백업 내보내기</button>
-            </div>
         </div>
     </div>
 
@@ -131,7 +125,7 @@
                         </div>
 
                         <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 항목을 마우스로 드래그하여 순서를 바꿀 수 있으며, 우클릭하면 이름변경 및 삭제가 가능합니다.</span>
+                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자체 자료가 함께 제공됩니다.</span>
                         </div>
 
                         <div id="content-container" class="space-y-3"></div>
@@ -209,15 +203,8 @@
     </div>
 
     <script>
-        const initialMasterDatabase = {
-            'middle_exam': [
-                { id: 'f_onam_high', type: 'folder', name: '오남고 공통영어2', parentId: null, tabId: 'video', authorRole: 'super' },
-                { id: 'f_onam_l3', type: 'folder', name: 'Lesson 3', parentId: 'f_onam_high', tabId: 'video', authorRole: 'super' },
-                { id: 'f_onam_l4', type: 'folder', name: 'Lesson 4', parentId: 'f_onam_high', tabId: 'video', authorRole: 'super' }
-            ],
-            'high_exam': [],
-            'grammar': []
-        };
+        const CLOUD_BIN_ID = '6ad1ab17ac6210605a360e45'; 
+        const CLOUD_API_KEY = '$2a$10$xfybF8YznlSFs90Jp2N2EeJt/RMxJZSYc2FJpPM080Dh1/quk0XLa';
 
         let state = {
             currentUser: null,
@@ -226,7 +213,7 @@
                 { id: 'branch_1', username: 'onam', password: '123', academyName: '최강수학메이드영어학원', logoImage: '' }
             ],
             students: [
-                { id: 's1', branchId: 'branch_1', username: 'student1', password: '123', name: '김철수', grade: '고1' }
+                { id: 's1', branchId: 'branch_1', username: 'student1', password: '123', name: '김철수', grade: '중1' }
             ],
             historyRecords: [],
             topTabs: [
@@ -235,11 +222,24 @@
                 { id: 'passage', name: '본문' }
             ],
             sidebarCats: [
-                { id: 'middle_exam', name: '내신문제' },
-                { id: 'high_exam', name: '고등부 심화' },
-                { id: 'grammar', name: '문법' }
+                { id: 'middle_exam', name: '중등부 내신문제' },
+                { id: 'high_exam', name: '고등부 내신문제' },
+                { id: 'cat_1792074925468', name: '고등모의고사' },
+                { id: 'grammar', name: '문법' },
+                { id: 'cat_1792074950120', name: '단어' }
             ],
-            masterDatabase: JSON.parse(JSON.stringify(initialMasterDatabase)),
+            masterDatabase: {
+                middle_exam: [
+                    { id: "f_g1", type: "folder", name: "중1 (개정)", parentId: null },
+                    { id: "f_g2", type: "folder", name: "중2 (개정)", parentId: null },
+                    { id: "f_g3", type: "folder", name: "중3", parentId: null }
+                ],
+                high_exam: [],
+                grammar: [],
+                cat_1792074925468: [],
+                cat_1792074950120: []
+            },
+            branchDatabases: {},
             currentSuperView: 'content',
             currentSubView: 'content',
             currentTopTab: 'video',
@@ -247,60 +247,55 @@
             currentFolderId: null
         };
 
-        function forceResetStorage() {
-            localStorage.clear();
-            localStorage.removeItem('cm_admin_pc');
-            alert('초기화되었습니다.');
-            location.reload();
-        }
-
         async function loadShared() {
-            loadState();
             try {
-                const r = await fetch('data.json?v=' + Date.now(), { cache: 'no-store' });
+                const r = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`, {
+                    headers: { 'X-Master-Key': CLOUD_API_KEY }
+                });
                 if (r.ok) {
-                    const d = await r.json();
-                    ['branches','students','masterDatabase','topTabs','sidebarCats'].forEach(k => { if (d[k]) state[k] = d[k]; });
+                    const res = await r.json();
+                    const d = res.record;
+                    if (d.masterDatabase && Object.keys(d.masterDatabase).length > 0) state.masterDatabase = d.masterDatabase;
+                    if (d.branchDatabases) state.branchDatabases = d.branchDatabases;
+                    if (d.branches && d.branches.length > 0) state.branches = d.branches;
+                    if (d.students && d.students.length > 0) state.students = d.students;
+                    if (d.topTabs && d.topTabs.length > 0) state.topTabs = d.topTabs;
+                    if (d.sidebarCats && d.sidebarCats.length > 0) state.sidebarCats = d.sidebarCats;
+                    if (d.historyRecords) state.historyRecords = d.historyRecords;
                 }
-            } catch (e) {}
-        }
-
-        function exportData() {
-            const data = { branches: state.branches, students: state.students, masterDatabase: state.masterDatabase, topTabs: state.topTabs, sidebarCats: state.sidebarCats };
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
-            a.download = 'data.json';
-            a.click();
-        }
-
-        function loadState() {
-            const saved = localStorage.getItem('multi_academy_portal_v26');
-            if (saved) {
-                try {
-                    const p = JSON.parse(saved);
-                    state.branches = p.branches && p.branches.length > 0 ? p.branches : state.branches;
-                    state.students = p.students && p.students.length > 0 ? p.students : state.students;
-                    state.historyRecords = p.historyRecords || [];
-                    state.masterDatabase = p.masterDatabase && Object.keys(p.masterDatabase).length > 0 ? p.masterDatabase : JSON.parse(JSON.stringify(initialMasterDatabase));
-                    state.topTabs = p.topTabs && p.topTabs.length > 0 ? p.topTabs : state.topTabs;
-                    state.sidebarCats = p.sidebarCats && p.sidebarCats.length > 0 ? p.sidebarCats : state.sidebarCats;
-                } catch(e){
-                    state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
-                }
-            } else {
-                state.masterDatabase = JSON.parse(JSON.stringify(initialMasterDatabase));
+            } catch (e) {
+                console.warn('클라우드 로드 실패, 내장 원본 백업 데이터 사용 중', e);
+            }
+            if (state.currentUser) {
+                renderTopNav();
+                renderSidebar();
+                renderContent();
             }
         }
 
-        function saveState() {
-            localStorage.setItem('multi_academy_portal_v26', JSON.stringify({
+        async function saveState() {
+            const payload = {
                 branches: state.branches,
                 students: state.students,
                 historyRecords: state.historyRecords,
                 masterDatabase: state.masterDatabase,
+                branchDatabases: state.branchDatabases,
                 topTabs: state.topTabs,
                 sidebarCats: state.sidebarCats
-            }));
+            };
+
+            try {
+                await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': CLOUD_API_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) {
+                console.error('클라우드 실시간 동기화 실패', e);
+            }
         }
 
         function handleLogin(e) {
@@ -311,7 +306,6 @@
 
             if (id === 'admin' && pw === state.superAdminPw) {
                 state.currentUser = { role: 'super', username: 'admin' };
-                localStorage.setItem('cm_admin_pc', '1');
                 enterPortal();
                 return;
             }
@@ -345,7 +339,7 @@
             if (state.currentUser.role === 'super') {
                 badge.innerText = '👑 최고 관리자 (본원)';
                 nameEl.innerText = '학습 플랫폼 본원 관리센터';
-                subEl.innerText = '전체 시스템 및 지점 관리';
+                subEl.innerText = '실시간 클라우드 전체 관리';
                 document.getElementById('super-admin-tabs').classList.remove('hidden');
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
                 document.getElementById('sidebar-add-btn').classList.remove('hidden');
@@ -383,6 +377,7 @@
             document.getElementById('app-portal').classList.add('hidden');
             document.getElementById('login-id').value = '';
             document.getElementById('login-pw').value = '';
+            loadShared();
         }
 
         function renderTopNav() {
@@ -402,7 +397,6 @@
                     renderContent();
                 };
 
-                // 최고관리자인 경우 상단 탭 우클릭 시 이름변경/삭제 지원
                 if (state.currentUser && state.currentUser.role === 'super') {
                     btn.oncontextmenu = (e) => {
                         e.preventDefault();
@@ -451,7 +445,6 @@
                     renderContent();
                 };
 
-                // 카테고리 우클릭 설정 (최고관리자만)
                 if (state.currentUser && state.currentUser.role === 'super') {
                     div.oncontextmenu = (e) => {
                         e.preventDefault();
@@ -468,23 +461,6 @@
                         }
                     };
                 }
-
-                // 드래그 앤 드롭으로 카테고리 순서 변경
-                div.draggable = true;
-                div.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); };
-                div.ondragover = (e) => { e.preventDefault(); };
-                div.ondrop = (e) => {
-                    e.preventDefault();
-                    const srcIdx = parseInt(e.dataTransfer.getData('text/plain'));
-                    const targetIdx = index;
-                    if (srcIdx !== targetIdx) {
-                        const moved = state.sidebarCats.splice(srcIdx, 1)[0];
-                        state.sidebarCats.splice(targetIdx, 0, moved);
-                        renderSidebar();
-                        saveState();
-                    }
-                };
-
                 container.appendChild(div);
             });
         }
@@ -501,10 +477,27 @@
             }
         }
 
+        function getCurrentActiveItems() {
+            const catId = state.currentSidebarCat;
+            const masterItems = state.masterDatabase[catId] || [];
+
+            if (state.currentUser.role === 'super') {
+                return masterItems;
+            }
+
+            const branchId = state.currentUser.branchId;
+            if (!state.branchDatabases[branchId]) {
+                state.branchDatabases[branchId] = {};
+            }
+            const branchItems = state.branchDatabases[branchId][catId] || [];
+
+            return [...masterItems, ...branchItems];
+        }
+
         function getBreadcrumbPath(folderId) {
             const path = [];
             let currId = folderId;
-            const items = state.masterDatabase[state.currentSidebarCat] || [];
+            const items = getCurrentActiveItems();
 
             while (currId) {
                 const found = items.find(i => i.id === currId);
@@ -532,7 +525,7 @@
             });
             breadcrumb.innerHTML = trailHtml;
 
-            let items = state.masterDatabase[state.currentSidebarCat] || [];
+            let items = getCurrentActiveItems();
             let currentChildren = items.filter(item => {
                 const matchesParent = item.parentId === state.currentFolderId;
                 if (!matchesParent) return false;
@@ -558,13 +551,13 @@
 
             currentChildren.forEach((item, index) => {
                 const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center gap-3 font-bold text-slate-700 text-sm hover:border-slate-300 transition draggable-item";
+                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center gap-3 font-bold text-slate-700 text-sm hover:border-slate-300 transition";
                 
                 const leftDiv = document.createElement('div');
                 leftDiv.className = "flex items-center gap-2.5 cursor-pointer flex-grow";
 
-                const isSuperItem = (item.authorRole === 'super');
-                const badgeHtml = isSuperItem ? `<span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">공유됨</span>` : `<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">우리학원</span>`;
+                const isSuperItem = (item.authorRole === 'super' || !item.authorRole);
+                const badgeHtml = isSuperItem ? `<span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">본원공유</span>` : `<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">우리학원</span>`;
 
                 if (item.type === 'folder') {
                     leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
@@ -581,7 +574,6 @@
 
                 row.appendChild(leftDiv);
 
-                // 마우스 우클릭 시 이름변경/삭제 메뉴 (권한에 맞게)
                 const isSuperUser = (state.currentUser && state.currentUser.role === 'super');
                 const isSubUser = (state.currentUser && state.currentUser.role === 'sub');
                 const canModifyThisItem = isSuperUser || (isSubUser && !isSuperItem);
@@ -589,7 +581,7 @@
                 if (canModifyThisItem && state.currentUser && state.currentUser.role !== 'student') {
                     row.oncontextmenu = (e) => {
                         e.preventDefault();
-                        const cmd = prompt(`[${item.name}] 항목 설정:\n1. 이름 변경\n2. 탭 이동(🔀)\n3. 삭제`, '1');
+                        const cmd = prompt(`[${item.name}] 항목 설정:\n1. 이름 변경\n2. 삭제`, '1');
                         if (cmd === '1') {
                             const newName = prompt('새 이름:', item.name);
                             if (newName) {
@@ -600,33 +592,11 @@
                                 }
                                 renderContent(); saveState();
                             }
-                        } else if (cmd === '2' && item.type === 'file') {
-                            moveItemTabPrompt(item.id);
-                        } else if (cmd === '3') {
-                            deleteMasterItem(item.id);
+                        } else if (cmd === '2') {
+                            deleteItem(item.id, isSuperItem);
                         }
                     };
                 }
-
-                // 드래그 앤 드롭으로 항목 순서 변경
-                row.draggable = true;
-                row.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); };
-                row.ondragover = (e) => { e.preventDefault(); };
-                row.ondrop = (e) => {
-                    e.preventDefault();
-                    const srcIdx = parseInt(e.dataTransfer.getData('text/plain'));
-                    const targetIdx = index;
-                    const fullArr = state.masterDatabase[state.currentSidebarCat];
-                    // 현재 폴더/탭 필터 내부에서의 순서를 전체 배열에 반영
-                    if (srcIdx !== targetIdx) {
-                        const moved = currentChildren.splice(srcIdx, 1)[0];
-                        currentChildren.splice(targetIdx, 0, moved);
-                        // 전체 masterDatabase 순서 재배치
-                        state.masterDatabase[state.currentSidebarCat] = fullArr.filter(x => !currentChildren.includes(x)).concat(currentChildren);
-                        renderContent();
-                        saveState();
-                    }
-                };
 
                 const rightBox = document.createElement('div');
                 rightBox.className = 'flex items-center gap-1.5 flex-shrink-0';
@@ -677,50 +647,44 @@
             document.getElementById('video-iframe').src = '';
         }
 
-        function moveItemTabPrompt(itemId) {
-            const item = state.masterDatabase[state.currentSidebarCat].find(i => i.id === itemId);
-            if (!item) return;
-            if (state.currentUser.role === 'sub' && item.authorRole === 'super') {
-                return alert('본원에서 공유해 준 자료는 탭을 이동할 수 없습니다.');
-            }
-
-            const tabListStr = state.topTabs.map((t, idx) => `${idx + 1}. ${t.name}`).join('\n');
-            const choice = prompt(`이동할 상단 메뉴(탭) 번호:\n\n${tabListStr}`);
-            if (!choice) return;
-            const idx = parseInt(choice) - 1;
-            if (isNaN(idx) || idx < 0 || idx >= state.topTabs.length) return;
-
-            item.tabId = state.topTabs[idx].id;
-            renderContent();
-            saveState();
-            alert(`[${state.topTabs[idx].name}] 탭으로 이동되었습니다.`);
-        }
-
-        function deleteMasterItem(id) {
-            const item = state.masterDatabase[state.currentSidebarCat].find(i => i.id === id);
-            if (item && state.currentUser.role === 'sub' && item.authorRole === 'super') {
-                return alert('본원에서 공유해 준 자료는 삭제할 수 없습니다.');
+        function deleteItem(id, isSuperItem) {
+            if (state.currentUser.role === 'sub' && isSuperItem) {
+                return alert('본원에서 공유해 준 공통 자료는 삭제할 수 없습니다.');
             }
             if (confirm('해당 폴더/자료를 삭제하시겠습니까?')) {
-                state.masterDatabase[state.currentSidebarCat] = state.masterDatabase[state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
+                if (state.currentUser.role === 'super') {
+                    state.masterDatabase[state.currentSidebarCat] = state.masterDatabase[state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
+                } else {
+                    const bId = state.currentUser.branchId;
+                    state.branchDatabases[bId][state.currentSidebarCat] = state.branchDatabases[bId][state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
+                }
                 renderContent();
                 saveState();
             }
         }
 
         function addFolderPrompt() {
-            const name = prompt('새 폴더 이름을 입력하세요 (예: Lesson 5):');
+            const name = prompt('새 폴더 이름을 입력하세요:');
             if (name) {
-                if (!state.masterDatabase[state.currentSidebarCat]) state.masterDatabase[state.currentSidebarCat] = [];
-                const role = (state.currentUser && state.currentUser.role === 'super') ? 'super' : 'sub';
-                state.masterDatabase[state.currentSidebarCat].push({
+                const catId = state.currentSidebarCat;
+                const newItem = {
                     id: 'f_' + Date.now(),
                     type: 'folder',
                     name: name.trim(),
                     parentId: state.currentFolderId,
                     tabId: state.currentTopTab,
-                    authorRole: role
-                });
+                    authorRole: (state.currentUser.role === 'super' ? 'super' : state.currentUser.branchId)
+                };
+
+                if (state.currentUser.role === 'super') {
+                    if (!state.masterDatabase[catId]) state.masterDatabase[catId] = [];
+                    state.masterDatabase[catId].push(newItem);
+                } else {
+                    const bId = state.currentUser.branchId;
+                    if (!state.branchDatabases[bId]) state.branchDatabases[bId] = {};
+                    if (!state.branchDatabases[bId][catId]) state.branchDatabases[bId][catId] = [];
+                    state.branchDatabases[bId][catId].push(newItem);
+                }
                 renderContent();
                 saveState();
             }
@@ -732,19 +696,26 @@
             const url = prompt('웹페이지 주소 또는 유튜브 링크 URL을 입력하세요:');
             if (!url) return;
 
-            const fileId = 'link_' + Date.now();
-            if (!state.masterDatabase[state.currentSidebarCat]) state.masterDatabase[state.currentSidebarCat] = [];
-
-            const role = (state.currentUser && state.currentUser.role === 'super') ? 'super' : 'sub';
-            state.masterDatabase[state.currentSidebarCat].push({
-                id: fileId,
+            const catId = state.currentSidebarCat;
+            const newItem = {
+                id: 'link_' + Date.now(),
                 type: 'file',
                 name: title.trim(),
                 parentId: state.currentFolderId,
                 linkUrl: url.trim(),
                 tabId: state.currentTopTab,
-                authorRole: role
-            });
+                authorRole: (state.currentUser.role === 'super' ? 'super' : state.currentUser.branchId)
+            };
+
+            if (state.currentUser.role === 'super') {
+                if (!state.masterDatabase[catId]) state.masterDatabase[catId] = [];
+                state.masterDatabase[catId].push(newItem);
+            } else {
+                const bId = state.currentUser.branchId;
+                if (!state.branchDatabases[bId]) state.branchDatabases[bId] = {};
+                if (!state.branchDatabases[bId][catId]) state.branchDatabases[bId][catId] = [];
+                state.branchDatabases[bId][catId].push(newItem);
+            }
 
             renderContent();
             saveState();
@@ -795,6 +766,26 @@
             });
         }
 
+        function addBranchPrompt() {
+            const academyName = prompt('학원 이름 (예: 남양주지점):');
+            if (!academyName) return;
+            const username = prompt('지점 로그인 아이디:');
+            if (!username) return;
+            const password = prompt('지점 로그인 비밀번호:');
+            if (!password) return;
+
+            state.branches.push({
+                id: 'branch_' + Date.now(),
+                username: username.trim(),
+                password: password.trim(),
+                academyName: academyName.trim(),
+                logoImage: ''
+            });
+            renderBranches();
+            saveState();
+            alert('신규 지점이 등록되었습니다!');
+        }
+
         function renderSubStudents() {
             const container = document.getElementById('sub-student-list');
             container.innerHTML = '';
@@ -830,9 +821,9 @@
             if (!username) return;
             const password = prompt('학생 비밀번호:');
             if (!password) return;
-            const grade = prompt('학년 (예: 고1):', '고1');
+            const grade = prompt('학년 (예: 중1):', '중1');
 
-            state.students.push({ id: 's_' + Date.now(), branchId: state.currentUser.branchId, username: username.trim(), password: password.trim(), name: name.trim(), grade: grade ? grade.trim() : '고1' });
+            state.students.push({ id: 's_' + Date.now(), branchId: state.currentUser.branchId, username: username.trim(), password: password.trim(), name: name.trim(), grade: grade ? grade.trim() : '중1' });
             renderSubStudents();
             saveState();
         }
