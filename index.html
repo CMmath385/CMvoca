@@ -30,7 +30,7 @@
                     CM
                 </div>
                 <h1 class="text-2xl font-bold text-slate-800">스마트 학습 플랫폼</h1>
-                <p class="text-xs text-slate-400 mt-1">지점별 실시간 자동 동기화 시스템</p>
+                <p class="text-xs text-slate-400 mt-1">지점별 실시간 자동 동기화 시스템 (클라우드 DB 연동 완료)</p>
             </div>
 
             <form onsubmit="handleLogin(event)" class="space-y-4">
@@ -125,7 +125,7 @@
                         </div>
 
                         <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자체 자료가 함께 제공됩니다.</span>
+                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자체 자료가 실시간 동기화되어 제공됩니다.</span>
                         </div>
 
                         <div id="content-container" class="space-y-3"></div>
@@ -264,7 +264,7 @@
                     if (d.historyRecords) state.historyRecords = d.historyRecords;
                 }
             } catch (e) {
-                console.warn('클라우드 로드 실패, 내장 원본 백업 데이터 사용 중', e);
+                console.warn('클라우드 로드 실패', e);
             }
             if (state.currentUser) {
                 renderTopNav();
@@ -298,11 +298,13 @@
             }
         }
 
-        function handleLogin(e) {
+        async function handleLogin(e) {
             e.preventDefault();
             const id = document.getElementById('login-id').value.trim().toLowerCase();
             const pw = document.getElementById('login-pw').value.trim();
             const err = document.getElementById('login-error');
+
+            await loadShared(); // 로그인 순간 최신 클라우드 DB 강제 로드
 
             if (id === 'admin' && pw === state.superAdminPw) {
                 state.currentUser = { role: 'super', username: 'admin' };
