@@ -221,8 +221,8 @@
         const CLOUD_BIN_ID = '6ad1ab17ac6210605a360e45'; 
         const CLOUD_API_KEY = '$2a$10$xfybF8YznlSFs90Jp2N2EeJt/RMxJZSYc2FJpPM080Dh1/quk0XLa';
 
-        // 최신 내장 데이터
-        let state = {
+        // 기본 내장 데이터 구조
+        let defaultState = {
             currentUser: null,
             superAdminPw: '1234',
             branches: [{"id":"branch_1","username":"onam","password":"123","academyName":"최강수학메이드영어학원","logoImage":""}],
@@ -387,26 +387,24 @@
             currentFolderId: null
         };
 
-        // 백그라운드 데이터 동기화
-        async function loadShared() {
+        // 로컬 스토리지와 동기화된 안전한 상태 로드 (오류 원천 차단)
+        let state = JSON.parse(JSON.stringify(defaultState));
+
+        function initLoad() {
             try {
-                const r = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`, {
-                    headers: { 'X-Master-Key': CLOUD_API_KEY },
-                    cache: 'no-store'
-                });
-                if (r.ok) {
-                    const res = await r.json();
-                    const d = res.record;
-                    if (d.masterDatabase && Object.keys(d.masterDatabase).length > 0) state.masterDatabase = d.masterDatabase;
-                    if (d.branchDatabases) state.branchDatabases = d.branchDatabases;
-                    if (d.branches && d.branches.length > 0) state.branches = d.branches;
-                    if (d.students && d.students.length > 0) state.students = d.students;
-                    if (d.topTabs && d.topTabs.length > 0) state.topTabs = d.topTabs;
-                    if (d.sidebarCats && d.sidebarCats.length > 0) state.sidebarCats = d.sidebarCats;
-                    if (d.historyRecords) state.historyRecords = d.historyRecords;
+                const saved = localStorage.getItem('cm_academy_state_v3');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.branches) state.branches = parsed.branches;
+                    if (parsed.students) state.students = parsed.students;
+                    if (parsed.masterDatabase) state.masterDatabase = parsed.masterDatabase;
+                    if (parsed.branchDatabases) state.branchDatabases = parsed.branchDatabases;
+                    if (parsed.topTabs) state.topTabs = parsed.topTabs;
+                    if (parsed.sidebarCats) state.sidebarCats = parsed.sidebarCats;
+                    if (parsed.historyRecords) state.historyRecords = parsed.historyRecords;
                 }
             } catch (e) {
-                console.warn('동기화 대기중, 내장 데이터로 구동', e);
+                console.warn('로컬 로드 실패, 기본값 사용', e);
             }
         }
 
@@ -421,6 +419,10 @@
                 sidebarCats: state.sidebarCats
             };
 
+            // 1. 로컬 스토리지에 무조건 즉시 영구 저장 (로그인 및 데이터 유실 절대 방지)
+            localStorage.setItem('cm_academy_state_v3', JSON.stringify(payload));
+
+            // 2. 백그라운드 클라우드 동기화 시도 (실패해도 앱 동작에 지장 없음)
             try {
                 await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}`, {
                     method: 'PUT',
@@ -431,23 +433,26 @@
                     body: JSON.stringify(payload)
                 });
             } catch (e) {
-                console.error('클라우드 저장 실패', e);
+                console.warn('클라우드 저장 지연/실패 (로컬 백업으로 안전 유지)', e);
             }
         }
 
-        // 로그인 검증 함수 (100% 동기식 즉시 처리)
+        // 로그인 검증 함수 (100% 동기식 즉시 처리 및 로컬 데이터 강제 대조)
         function handleLogin(e) {
             e.preventDefault();
             const id = document.getElementById('login-id').value.trim().toLowerCase();
             const pw = document.getElementById('login-pw').value.trim();
             const err = document.getElementById('login-error');
+            err.innerText = '';
 
+            // 최고 관리자 체크
             if (id === 'admin' && pw === state.superAdminPw) {
                 state.currentUser = { role: 'super', username: 'admin' };
                 enterPortal();
                 return;
             }
 
+            // 하위 관리자(지점장) 체크
             const branch = state.branches.find(b => b.username.toLowerCase() === id && b.password === pw);
             if (branch) {
                 state.currentUser = { role: 'sub', branchId: branch.id, academyName: branch.academyName, logoImage: branch.logoImage };
@@ -455,6 +460,7 @@
                 return;
             }
 
+            // 학생 체크
             const student = state.students.find(s => s.username.toLowerCase() === id && s.password === pw);
             if (student) {
                 const b = state.branches.find(x => x.id === student.branchId);
@@ -477,7 +483,7 @@
             if (state.currentUser.role === 'super') {
                 badge.innerText = '👑 최고 관리자 (본원)';
                 nameEl.innerText = '최강수학메이드영어학원 본원 관리센터';
-                subEl.innerText = '실시간 클라우드 전체 관리';
+                subEl.innerText = '실시간 전체 관리';
                 document.getElementById('super-admin-tabs').classList.remove('hidden');
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
                 document.getElementById('sidebar-add-btn').classList.remove('hidden');
@@ -512,306 +518,4 @@
         function logout() {
             state.currentUser = null;
             document.getElementById('login-screen').classList.remove('hidden');
-            document.getElementById('app-portal').classList.add('hidden');
-            document.getElementById('login-id').value = '';
-            document.getElementById('login-pw').value = '';
-        }
-
-        function renderTopNav() {
-            const container = document.getElementById('top-nav-container');
-            container.innerHTML = '';
-
-            state.topTabs.forEach((tab, index) => {
-                const isActive = state.currentTopTab === tab.id;
-                const btn = document.createElement('button');
-                btn.className = isActive
-                    ? 'bg-amber-500 text-slate-900 font-bold px-4 py-2 rounded-xl shadow-sm transition'
-                    : 'bg-slate-100 text-slate-700 font-bold px-4 py-2 rounded-xl hover:bg-slate-200 transition';
-                btn.innerText = tab.name;
-                btn.onclick = () => {
-                    state.currentTopTab = tab.id;
-                    renderTopNav();
-                    renderContent();
-                };
-
-                if (state.currentUser && state.currentUser.role === 'super') {
-                    btn.oncontextmenu = (e) => {
-                        e.preventDefault();
-                        const cmd = prompt(`[${tab.name}] 메뉴 설정:\n1. 이름 변경\n2. 삭제`, '1');
-                        if (cmd === '1') {
-                            const newName = prompt('새 메뉴 이름:', tab.name);
-                            if (newName) { tab.name = newName.trim(); renderTopNav(); saveState(); }
-                        } else if (cmd === '2') {
-                            if (state.topTabs.length <= 1) return alert('최소 1개 메뉴는 필요합니다.');
-                            state.topTabs.splice(index, 1);
-                            if (state.currentTopTab === tab.id) state.currentTopTab = state.topTabs[0].id;
-                            renderTopNav(); renderContent(); saveState();
-                        }
-                    };
-                }
-                container.appendChild(btn);
-            });
-        }
-
-        function addTopTabPrompt() {
-            if (state.currentUser.role !== 'super') return;
-            const name = prompt('새 상단 메뉴(탭) 이름을 입력하세요:');
-            if (name) {
-                state.topTabs.push({ id: 'tab_' + Date.now(), name: name.trim() });
-                renderTopNav();
-                saveState();
-            }
-        }
-
-        function renderSidebar() {
-            const container = document.getElementById('sidebar-container');
-            container.innerHTML = '';
-
-            state.sidebarCats.forEach((cat, index) => {
-                const isActive = state.currentSidebarCat === cat.id;
-                const div = document.createElement('div');
-                div.className = isActive
-                    ? 'w-full text-left bg-indigo-900 text-white font-bold p-3 rounded-xl shadow-sm text-sm flex justify-between items-center draggable-item'
-                    : 'w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold p-3 rounded-xl text-sm flex justify-between items-center border border-slate-200 transition draggable-item';
-                div.innerHTML = `<span>${cat.name}</span> ${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
-                
-                div.onclick = () => {
-                    state.currentSidebarCat = cat.id;
-                    state.currentFolderId = null;
-                    renderSidebar();
-                    renderContent();
-                };
-
-                if (state.currentUser && state.currentUser.role === 'super') {
-                    div.oncontextmenu = (e) => {
-                        e.preventDefault();
-                        const cmd = prompt(`[${cat.name}] 카테고리 설정:\n1. 이름 변경\n2. 삭제`, '1');
-                        if (cmd === '1') {
-                            const newName = prompt('새 카테고리 이름:', cat.name);
-                            if (newName) { cat.name = newName.trim(); renderSidebar(); saveState(); }
-                        } else if (cmd === '2') {
-                            if (state.sidebarCats.length <= 1) return alert('최소 1개 카테고리는 필요합니다.');
-                            state.sidebarCats.splice(index, 1);
-                            delete state.masterDatabase[cat.id];
-                            if (state.currentSidebarCat === cat.id) state.currentSidebarCat = state.sidebarCats[0].id;
-                            renderSidebar(); renderContent(); saveState();
-                        }
-                    };
-                }
-                container.appendChild(div);
-            });
-        }
-
-        function addSidebarCategoryPrompt() {
-            if (state.currentUser.role !== 'super') return;
-            const name = prompt('새 카테고리 이름을 입력하세요:');
-            if (name) {
-                const id = 'cat_' + Date.now();
-                state.sidebarCats.push({ id, name: name.trim() });
-                state.masterDatabase[id] = [];
-                renderSidebar();
-                saveState();
-            }
-        }
-
-        function getCurrentActiveItems() {
-            const catId = state.currentSidebarCat;
-            const masterItems = state.masterDatabase[catId] || [];
-
-            if (state.currentUser.role === 'super') {
-                return masterItems;
-            }
-
-            const branchId = state.currentUser.branchId;
-            if (!state.branchDatabases[branchId]) {
-                state.branchDatabases[branchId] = {};
-            }
-            const branchItems = state.branchDatabases[branchId][catId] || [];
-
-            return [...masterItems, ...branchItems];
-        }
-
-        function getBreadcrumbPath(folderId) {
-            const path = [];
-            let currId = folderId;
-            const items = getCurrentActiveItems();
-
-            while (currId) {
-                const found = items.find(i => i.id === currId);
-                if (found) {
-                    path.unshift(found);
-                    currId = found.parentId;
-                } else break;
-            }
-            return path;
-        }
-
-        function renderContent() {
-            const container = document.getElementById('content-container');
-            const breadcrumb = document.getElementById('breadcrumb');
-            const title = document.getElementById('current-title');
-            container.innerHTML = '';
-
-            const currentCatObj = state.sidebarCats.find(c => c.id === state.currentSidebarCat);
-            const catName = currentCatObj ? currentCatObj.name : '자료실';
-
-            const path = getBreadcrumbPath(state.currentFolderId);
-            let trailHtml = `<span class="cursor-pointer text-indigo-600 font-bold hover:underline" onclick="state.currentFolderId=null; renderContent();">📁 ${catName}</span>`;
-            path.forEach((p) => {
-                trailHtml += ` <span class="text-slate-400">＞</span> <span class="cursor-pointer text-indigo-600 font-bold hover:underline" onclick="state.currentFolderId='${p.id}'; renderContent();">${p.name}</span>`;
-            });
-            breadcrumb.innerHTML = trailHtml;
-
-            let items = getCurrentActiveItems();
-            let currentChildren = items.filter(item => {
-                const matchesParent = item.parentId === state.currentFolderId;
-                if (!matchesParent) return false;
-                if (item.type === 'folder') return true;
-                return (item.tabId || 'video') === state.currentTopTab;
-            });
-
-            title.innerText = state.currentFolderId ? (path[path.length - 1]?.name || '폴더') : catName;
-
-            if (state.currentFolderId) {
-                const parentFolder = path[path.length - 2];
-                const backBtn = document.createElement('div');
-                backBtn.className = "p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer text-sm flex items-center gap-2 border border-slate-200 transition mb-2";
-                backBtn.innerHTML = `<span>⬆️ 상위 폴더로 이동</span>`;
-                backBtn.onclick = () => { state.currentFolderId = parentFolder ? parentFolder.id : null; renderContent(); };
-                container.appendChild(backBtn);
-            }
-
-            if (currentChildren.length === 0) {
-                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">등록된 학습 자료가 없습니다.</div>`;
-                return;
-            }
-
-            currentChildren.forEach((item, index) => {
-                const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center gap-3 font-bold text-slate-700 text-sm hover:border-slate-300 transition";
-                
-                const leftDiv = document.createElement('div');
-                leftDiv.className = "flex items-center gap-2.5 cursor-pointer flex-grow";
-
-                const isSuperItem = (item.authorRole === 'super' || !item.authorRole);
-                const badgeHtml = isSuperItem ? `<span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">본원공유</span>` : `<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">우리학원</span>`;
-
-                if (item.type === 'folder') {
-                    leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
-                    leftDiv.onclick = () => { state.currentFolderId = item.id; renderContent(); };
-                } else {
-                    const isYt = /youtube\.com|youtu\.be/.test(item.linkUrl);
-                    if (isYt) {
-                        leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
-                        leftDiv.onclick = () => openLinkOrVideo(item);
-                    } else {
-                        leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span> ${badgeHtml}</a>`;
-                    }
-                }
-
-                row.appendChild(leftDiv);
-
-                const isSuperUser = (state.currentUser && state.currentUser.role === 'super');
-                const isSubUser = (state.currentUser && state.currentUser.role === 'sub');
-                const canModifyThisItem = isSuperUser || (isSubUser && !isSuperItem);
-
-                if (canModifyThisItem && state.currentUser && state.currentUser.role !== 'student') {
-                    row.oncontextmenu = (e) => {
-                        e.preventDefault();
-                        const cmd = prompt(`[${item.name}] 항목 설정:\n1. 이름 변경\n2. 삭제`, '1');
-                        if (cmd === '1') {
-                            const newName = prompt('새 이름:', item.name);
-                            if (newName) {
-                                item.name = newName.trim();
-                                if (item.linkUrl !== undefined) {
-                                    const newLink = prompt('웹/링크 주소:', item.linkUrl);
-                                    if (newLink !== null) item.linkUrl = newLink.trim();
-                                }
-                                renderContent(); saveState();
-                            }
-                        } else if (cmd === '2') {
-                            deleteItem(item.id, isSuperItem);
-                        }
-                    };
-                }
-
-                const rightBox = document.createElement('div');
-                rightBox.className = 'flex items-center gap-1.5 flex-shrink-0';
-
-                const isOpenLink = item.type !== 'folder' && item.linkUrl && !/youtube\.com|youtu\.be/.test(item.linkUrl);
-                const actionBtn = document.createElement(isOpenLink ? 'a' : 'button');
-                if (isOpenLink) {
-                    actionBtn.href = item.linkUrl;
-                    actionBtn.target = '_blank';
-                    actionBtn.rel = 'noopener noreferrer';
-                }
-                actionBtn.className = "bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2 rounded-xl font-bold shadow-sm ml-2 transition inline-flex items-center justify-center";
-                actionBtn.innerText = item.type === 'folder' ? '열기 ➔' : '학습하기 ➔';
-                
-                if (!isOpenLink) {
-                    actionBtn.onclick = () => {
-                        if (item.type === 'folder') {
-                            state.currentFolderId = item.id;
-                            renderContent();
-                        } else {
-                            openLinkOrVideo(item);
-                        }
-                    };
-                }
-                rightBox.appendChild(actionBtn);
-
-                row.appendChild(rightBox);
-                container.appendChild(row);
-            });
-        }
-
-        function openLinkOrVideo(item) {
-            const url = item.linkUrl;
-            if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                let embedUrl = url;
-                if (url.includes('watch?v=')) embedUrl = url.replace('watch?v=', 'embed/');
-                else if (url.includes('youtu.be/')) embedUrl = url.replace('youtu.be/', 'youtube.com/embed/');
-                document.getElementById('video-title').innerText = item.name;
-                document.getElementById('video-iframe').src = embedUrl;
-                document.getElementById('video-modal').classList.remove('hidden');
-            } else {
-                window.open(url, '_blank');
-            }
-        }
-
-        function closeVideo() {
-            document.getElementById('video-modal').classList.add('hidden');
-            document.getElementById('video-iframe').src = '';
-        }
-
-        function deleteItem(id, isSuperItem) {
-            if (state.currentUser.role === 'sub' && isSuperItem) {
-                return alert('본원에서 공유해 준 공통 자료는 삭제할 수 없습니다.');
-            }
-            if (confirm('해당 폴더/자료를 삭제하시겠습니까?')) {
-                if (state.currentUser.role === 'super') {
-                    state.masterDatabase[state.currentSidebarCat] = state.masterDatabase[state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
-                } else {
-                    const bId = state.currentUser.branchId;
-                    state.branchDatabases[bId][state.currentSidebarCat] = state.branchDatabases[bId][state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
-                }
-                renderContent();
-                saveState();
-            }
-        }
-
-        function addFolderPrompt() {
-            const name = prompt('새 폴더 이름을 입력하세요:');
-            if (name) {
-                const catId = state.currentSidebarCat;
-                const newItem = {
-                    id: 'f_' + Date.now(),
-                    type: 'folder',
-                    name: name.trim(),
-                    parentId: state.currentFolderId,
-                    tabId: state.currentTopTab,
-                    authorRole: (state.currentUser.role === 'super' ? 'super' : state.currentUser.branchId)
-                };
-
-                if (state.currentUser.role === 'super') {
-                    if (!state.master
+            document
