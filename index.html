@@ -125,8 +125,8 @@ const FB = {
 };
 const DOMAIN = '@cmacademy.com', ADMIN_ID = 'admin', MAX_STUDENTS = 10;
 const FOLDERS = [
-  { id: 'B', name: 'B · 본원 공용 자료' },
   { id: 'A', name: 'A · 우리 지점 전용' },
+  { id: 'B', name: 'B · 본원 공용 자료' },
   { id: 'C', name: 'C · 수학' },
   { id: 'D', name: 'D · 국어' },
   { id: 'E', name: 'E · 전과목 통합' }
@@ -140,6 +140,7 @@ if (configured) firebase.initializeApp(FB);
 const auth = configured ? firebase.auth() : null;
 const db = configured ? firebase.firestore() : null;
 const st = configured ? firebase.storage() : null;
+if (st) { st.setMaxUploadRetryTime(30000); st.setMaxOperationRetryTime(30000); } // 업로드가 무한 대기하지 않고 오류를 보여주도록
 // 관리자 로그인 상태를 유지한 채 새 계정을 만들기 위한 보조 앱
 const auth2 = configured ? firebase.initializeApp(FB, 'sec').auth() : null;
  
@@ -281,8 +282,8 @@ function drawContent() {
   const path = []; let cur = S.folderId;
   while (cur) { const it = S.items.find(i => i.id === cur); if (!it) break; path.unshift(it); cur = it.parentId || null; }
   const crumb = $('crumb'); crumb.innerHTML = '';
-  const root = h('span', 'cursor-pointer hover:underline', '📁 ' + f.name); root.onclick = () => { S.folderId = null; drawContent(); }; crumb.append(root);
-  path.forEach(p => { crumb.append(h('span', 'text-slate-400', '＞')); const s = h('span', 'cursor-pointer hover:underline', p.name); s.onclick = () => { S.folderId = p.id; drawContent(); }; crumb.append(s); });
+  const root = h('span', 'cursor-pointer hover:underline', '📁 ' + f.name); root.onclick = () => { S.folderId = null; drawContent(); }; crumb.append(root); if (edit) wireDropTarget(root, null);
+  path.forEach(p => { crumb.append(h('span', 'text-slate-400', '＞')); const s = h('span', 'cursor-pointer hover:underline', p.name); s.onclick = () => { S.folderId = p.id; drawContent(); }; crumb.append(s); if (edit) wireDropTarget(s, p.id); });
   $('title').textContent = path.length ? path[path.length - 1].name : f.name;
  
   // 안내문
@@ -326,9 +327,12 @@ function drawContent() {
   const list = $('list'); list.innerHTML = '';
   if (S.folderId) {
     const par = path[path.length - 2];
-    list.append(btn('⬆️ 상위 폴더로 이동', 'w-full text-left p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm border border-slate-200', () => { S.folderId = par ? par.id : null; drawContent(); }));
+    const upBtn = btn('⬆️ 상위 폴더로 이동', 'w-full text-left p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm border border-slate-200', () => { S.folderId = par ? par.id : null; drawContent(); });
+    if (edit) wireDropTarget(upBtn, par ? par.id : null);
+    list.append(upBtn);
   }
-  const kids = S.items.filter(i => (i.parentId || null) === S.folderId && (i.type === 'folder' || tabOf(i) === S.tab)).sort((a, b) => (a.type === b.type ? byName(a, b) : a.type === 'folder' ? -1 : 1));
+  const kids = visibleKids();
+  if (edit && kids.length) list.append(h('div', 'text-[11px] text-slate-400 font-bold px-1', '↕ 항목을 끌어서 순서를 바꾸거나, 폴더 위(가운데)에 놓으면 그 폴더로 이동합니다. 위쪽 경로나 "상위 폴더로 이동"에 놓으면 그 위치로 이동합니다.'));
   if (!kids.length) { list.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', '등록된 학습 자료가 없습니다.')); return; }
   kids.forEach(it => {
     const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap justify-between items-center gap-3 font-bold text-slate-700 text-sm');
@@ -345,9 +349,67 @@ function drawContent() {
       if (S.folder === 'A') r.append(btn(it.visible ? '🔒 비공개로' : '🔓 학생 공개', B2, async () => { await db.collection('items').doc(it.id).update({ visible: !it.visible }); it.visible = !it.visible; drawContent(); }));
       r.append(btn('✏️', B2, () => renameItem(it)), btn('🗑', B2, () => deleteItem(it)));
     }
-    row.append(r); list.append(row);
+    row.append(r); if (edit) wireDrag(row, it); list.append(row);
   });
 }
+ 
+/* DND-START */
+const ordOf = x => (typeof x.order === 'number' ? x.order : 1e12);
+function visibleKids() {
+  return S.items.filter(i => (i.parentId || null) === S.folderId && (i.type === 'folder' || tabOf(i) === S.tab))
+    .sort((a, b) => a.type !== b.type ? (a.type === 'folder' ? -1 : 1) : (ordOf(a) - ordOf(b) || byName(a, b)));
+}
+function descendants(id) {
+  const out = new Set([id]); let ch = true;
+  while (ch) { ch = false; S.items.forEach(i => { if (i.parentId && out.has(i.parentId) && !out.has(i.id)) { out.add(i.id); ch = true; } }); }
+  return out;
+}
+async function moveInto(dragId, target) {
+  const it = S.items.find(i => i.id === dragId); if (!it) return;
+  target = target || null;
+  if ((it.parentId || null) === target) return;
+  if (target && descendants(dragId).has(target)) return alert('폴더를 자기 자신이나 그 하위 폴더로 옮길 수 없습니다.');
+  await db.collection('items').doc(dragId).update({ parentId: target, order: firebase.firestore.FieldValue.delete() });
+  it.parentId = target; delete it.order; drawContent();
+}
+async function reorder(dragId, targetId, after) {
+  const d = S.items.find(i => i.id === dragId), t = S.items.find(i => i.id === targetId);
+  if (!d || !t || d.id === t.id || d.type !== t.type || (d.parentId || null) !== (t.parentId || null)) return;
+  const sib = visibleKids().filter(i => i.type === d.type && i.id !== d.id);
+  sib.splice(sib.findIndex(i => i.id === t.id) + (after ? 1 : 0), 0, d);
+  const ch = []; sib.forEach((i, k) => { const o = (k + 1) * 1000; if (i.order !== o) { ch.push([i, o]); } });
+  for (let i = 0; i < ch.length; i += 400) { const b = db.batch(); ch.slice(i, i + 400).forEach(([x, o]) => b.update(db.collection('items').doc(x.id), { order: o })); await b.commit(); }
+  ch.forEach(([x, o]) => { x.order = o; }); drawContent();
+}
+function markDrop(el, z) {
+  el.style.boxShadow = z === 'before' ? 'inset 0 3px 0 0 #6366f1' : z === 'after' ? 'inset 0 -3px 0 0 #6366f1' : z === 'in' ? '0 0 0 3px #6366f1' : '';
+  el.style.background = z === 'in' ? '#eef2ff' : '';
+}
+function dropZone(e, row, it) {
+  const d = S.items.find(i => i.id === S.drag); if (!d) return null;
+  if (it.type === 'folder' && d.type !== 'folder') return 'in';
+  if (it.type !== 'folder' && d.type === 'folder') return null;
+  const r = row.getBoundingClientRect(), y = (e.clientY - r.top) / r.height;
+  if (it.type === 'folder') return y < 0.25 ? 'before' : y > 0.75 ? 'after' : 'in';
+  return y < 0.5 ? 'before' : 'after';
+}
+function wireDrag(row, it) {
+  row.draggable = true; row.style.cursor = 'grab';
+  row.ondragstart = e => { S.drag = it.id; e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => row.classList.add('opacity-40'), 0); };
+  row.ondragend = () => { S.drag = null; row.classList.remove('opacity-40'); };
+  row.ondragover = e => { if (!S.drag || S.drag === it.id) return; const z = dropZone(e, row, it); if (!z) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; markDrop(row, z); };
+  row.ondragleave = () => markDrop(row, null);
+  row.ondrop = e => {
+    e.preventDefault(); const id = S.drag, z = dropZone(e, row, it); S.drag = null; markDrop(row, null); if (!id || !z) return;
+    safe(() => z === 'in' ? moveInto(id, it.id) : reorder(id, it.id, z === 'after'));
+  };
+}
+function wireDropTarget(el, parentId) {
+  el.ondragover = e => { if (!S.drag) return; e.preventDefault(); markDrop(el, 'in'); };
+  el.ondragleave = () => markDrop(el, null);
+  el.ondrop = e => { e.preventDefault(); markDrop(el, null); const id = S.drag; S.drag = null; if (id) safe(() => moveInto(id, parentId)); };
+}
+/* DND-END */
  
 function baseItem() {
   return { folder: S.folder, parentId: S.folderId, tabId: S.tab, visible: S.folder !== 'A', createdAt: Date.now(), ...(S.folder === 'A' ? { branchId: curBranch() } : {}) };
@@ -667,22 +729,35 @@ async function pdfToPng(file) {
   if (!blob) throw new Error('PDF를 이미지로 변환하지 못했습니다.');
   return new File([blob], file.name.replace(/\.pdf$/i, '') + '.png', { type: 'image/png' });
 }
+const withTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
+function fileToLogo(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 320 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(img.width * k)); cv.height = Math.max(1, Math.round(img.height * k));
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url);
+      let d = cv.toDataURL('image/webp', 0.9); if (!d.startsWith('data:image/webp')) d = cv.toDataURL('image/png');
+      d.length > 700000 ? rej(new Error('로고 이미지가 너무 큽니다. 더 단순한 이미지를 사용하세요.')) : res(d);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('이미지를 읽을 수 없습니다. PNG, JPG, WEBP, GIF 또는 PDF 파일을 올려 주세요.')); };
+    img.src = url;
+  });
+}
 async function setLogo(file) {
-  if (file && file.type === 'application/pdf') { toast('PDF 변환 중...'); file = await pdfToPng(file); toast(''); }
+  const sup = S.me.role === 'super', id = sup ? 'main' : S.me.uid;
+  let data = '';
   if (file) {
+    toast('로고 처리 중...');
+    if (file.type === 'application/pdf') file = await withTimeout(pdfToPng(file), 20000, 'PDF 변환이 너무 오래 걸립니다. PNG나 JPG 이미지로 올려 보세요.');
     if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) throw new Error('PNG, JPG, WEBP, GIF 이미지 또는 PDF 파일만 올릴 수 있습니다.');
-    if (file.size > 1024 * 1024) throw new Error('로고 파일은 1MB 이하여야 합니다.');
+    if (file.size > 10 * 1024 * 1024) throw new Error('파일 크기는 10MB 이하여야 합니다.');
+    data = await fileToLogo(file);
   }
-  const sup = S.me.role === 'super', id = sup ? 'main' : S.me.uid, oldPath = sup ? S.hqLogoPath : S.me.logoPath;
-  let url = '', path = '';
-  if (file) {
-    toast('로고 업로드 중...');
-    const ref = st.ref('logo/' + id + '/' + Date.now() + '_' + file.name.replace(/[^\w.-]/g, '_'));
-    await ref.put(file, { contentType: file.type }); url = await ref.getDownloadURL(); path = ref.fullPath;
-  }
-  if (sup) { await db.collection('config').doc('main').set({ logoUrl: url, logoPath: path }, { merge: true }); S.hqLogo = url; S.hqLogoPath = path; }
-  else { await db.collection('branches').doc(id).update({ logoUrl: url, logoPath: path }); S.me.logoUrl = url; S.me.logoPath = path; }
-  if (oldPath) st.ref(oldPath).delete().catch(() => {});
+  toast('로고 저장 중...');
+  const save = sup ? db.collection('config').doc('main').set({ logoUrl: data, logoPath: '' }, { merge: true }) : db.collection('branches').doc(id).update({ logoUrl: data, logoPath: '' });
+  await withTimeout(save, 15000, '저장 응답이 없습니다. 인터넷 연결과 Firestore 규칙을 확인하세요.');
+  if (sup) { S.hqLogo = data; S.hqLogoPath = ''; } else { S.me.logoUrl = data; S.me.logoPath = ''; }
   toast(''); drawLogo(); renderSettings();
 }
 function renderSettings() {
@@ -697,7 +772,7 @@ function renderSettings() {
       S.me.academyName = n; $('hd-name').textContent = n; $('badge').textContent = '🏛️ ' + n + ' 원장님'; alert('학원명이 저장되었습니다.');
     }));
   }
-  box.append(h('label', 'block text-xs font-bold text-slate-600', sup ? '본원 로고 (로고가 없는 지점의 기본 로고로도 쓰입니다)' : '학원 로고 (PNG·JPG·WEBP·GIF 1MB 이하, 또는 PDF 첫 페이지)'));
+  box.append(h('label', 'block text-xs font-bold text-slate-600', sup ? '본원 로고 (로고가 없는 지점의 기본 로고로도 쓰입니다)' : '학원 로고 (PNG·JPG·WEBP·GIF 또는 PDF 첫 페이지 · 크기는 자동으로 줄어듭니다)'));
   const cur = sup ? S.hqLogo : S.me.logoUrl;
   const pv = h('div', 'w-20 h-20 rounded-2xl bg-indigo-700 text-white font-bold text-xl flex items-center justify-center overflow-hidden');
   if (cur) { const i = h('img', 'w-full h-full object-contain'); i.src = cur; i.alt = '로고'; pv.append(i); } else pv.textContent = 'CM';
@@ -737,4 +812,3 @@ if (!configured) setErr('index.html 상단의 Firebase 설정값(FB)을 먼저 �
 </script>
 </body>
 </html>
- 
