@@ -1,1034 +1,682 @@
+x · HTML
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>최강수학메이드영어학원 - 스마트 학습 플랫폼</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
-        body { font-family: 'Pretendard', sans-serif; }
-        .draggable-item { cursor: grab; }
-        .draggable-item:active { cursor: grabbing; }
-        @media (max-width: 767px) {
-            #sidebar-container { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
-            #sidebar-container div { flex: none; width: auto; white-space: nowrap; }
-            #super-admin-tabs, #sub-admin-tabs { overflow-x: auto; }
-            #super-admin-tabs button, #sub-admin-tabs button { flex: none !important; white-space: nowrap; }
-            #content-container > div { flex-wrap: wrap; }
-            main { padding: 14px !important; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>최강수학메이드영어학원 - 스마트 학습 플랫폼</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+body{font-family:'Pretendard',sans-serif}
+@media(max-width:767px){#side{flex-direction:row;overflow-x:auto}#side button{flex:none;white-space:nowrap}#view-nav{overflow-x:auto}#view-nav button{flex:none;white-space:nowrap}main{padding:14px!important}}
+</style>
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col">
-
-    <!-- 1. LOGIN SCREEN -->
-    <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative border border-slate-100">
-            <div class="text-center mb-8">
-                <div class="w-16 h-16 bg-indigo-700 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-4 shadow-lg overflow-hidden">
-                    CM
-                </div>
-                <h1 class="text-2xl font-bold text-slate-800">최강수학메이드영어학원</h1>
-                <p class="text-xs text-slate-400 mt-1">스마트 영어 학습 포털</p>
-            </div>
-
-            <form onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1.5">아이디</label>
-                    <input type="text" id="login-id" required placeholder="아이디 입력" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1.5">비밀번호</label>
-                    <input type="password" id="login-pw" required placeholder="비밀번호 입력" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
-                </div>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-md transition">
-                    로그인
-                </button>
-            </form>
-
-            <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500 h-4"></div>
-        </div>
+ 
+<!-- 로그인 -->
+<div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
+    <div class="text-center mb-8">
+      <div class="w-16 h-16 bg-indigo-700 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-4">CM</div>
+      <h1 class="text-2xl font-bold text-slate-800">최강수학메이드영어학원</h1>
+      <p class="text-xs text-slate-400 mt-1">스마트 영어 학습 포털</p>
     </div>
-
-    <!-- 2. MAIN APP PORTAL -->
-    <div id="app-portal" class="hidden flex-grow flex flex-col">
-        <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
-            <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
-                <div class="flex items-center space-x-3 cursor-pointer" onclick="resetToHome()">
-                    <div id="header-logo" class="w-10 h-10 bg-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm overflow-hidden">
-                        CM
-                    </div>
-                    <div>
-                        <h1 id="header-academy-name" class="font-bold text-slate-800 text-lg leading-tight">최강수학메이드영어학원</h1>
-                        <p id="header-academy-sub" class="text-xs text-slate-400">스마트 영어 학습 포털</p>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <nav id="top-nav-container" class="flex flex-wrap gap-2 text-sm font-bold items-center">
-                        <!-- Dynamic Top Tabs -->
-                    </nav>
-                    <button onclick="addTopTabPrompt()" id="btn-add-tab" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2.5 py-2 rounded-xl font-bold hover:bg-indigo-100 transition">+ 메뉴추가</button>
-                </div>
-
-                <div class="flex items-center gap-3">
-                    <span id="user-badge" class="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1.5 rounded-xl border border-indigo-100">
-                        사용자 모드
-                    </span>
-                    <button onclick="logout()" class="text-xs text-slate-500 hover:text-slate-800 font-bold border border-slate-200 px-3 py-1.5 rounded-xl transition">
-                        로그아웃
-                    </button>
-                </div>
-            </div>
-        </header>
-
-        <div class="max-w-[1600px] mx-auto w-full flex-grow flex flex-col md:flex-row p-4 gap-4">
-            <aside class="w-full md:w-64 flex-shrink-0 flex flex-col gap-2">
-                <div class="flex justify-between items-center px-1 mb-1">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">학습 카테고리</span>
-                    <button onclick="addSidebarCategoryPrompt()" id="sidebar-add-btn" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-100">+ 추가</button>
-                </div>
-                <div id="sidebar-container" class="flex flex-col gap-1.5">
-                    <!-- Dynamic Sidebar -->
-                </div>
-            </aside>
-
-            <main class="flex-grow bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
-                <div>
-                    <div id="super-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200">
-                        <button onclick="switchAdminView('content')" id="sup-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">👑 본원 콘텐츠 마스터</button>
-                        <button onclick="switchAdminView('branches')" id="sup-v-branches" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">🏛️ 지점장 관리</button>
-                        <button onclick="switchAdminView('storage')" id="sup-v-storage" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">💾 저장소 및 내보내기</button>
-                    </div>
-
-                    <div id="sub-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200">
-                        <button onclick="switchSubView('content')" id="sub-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">📂 학원 학습 자료실</button>
-                        <button onclick="switchSubView('students')" id="sub-v-students" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">👨‍🎓 학생 관리</button>
-                        <button onclick="switchSubView('history')" id="sub-v-history" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">📊 학습 이력</button>
-                        <button onclick="switchSubView('settings')" id="sub-v-settings" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">⚙️ 학원 설정</button>
-                    </div>
-
-                    <!-- VIEW 1: CONTENT -->
-                    <div id="view-content">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
-                            <div>
-                                <div id="breadcrumb" class="text-xs font-bold text-indigo-600 mb-1 flex items-center gap-1">
-                                    📁 폴더
-                                </div>
-                                <h2 id="current-title" class="text-xl font-bold text-slate-800">폴더 및 학습 목록</h2>
-                            </div>
-                            
-                            <div class="flex items-center gap-2 w-full sm:w-auto">
-                                <button onclick="addFolderPrompt()" id="btn-add-folder" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">+ 새 폴더 추가</button>
-                                <button onclick="addLinkFilePrompt()" id="btn-add-link" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">🔗 웹/링크 등록</button>
-                            </div>
-                        </div>
-
-                        <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                            <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자체 자료가 함께 제공됩니다.</span>
-                        </div>
-
-                        <div id="content-container" class="space-y-3"></div>
-                    </div>
-
-                    <!-- VIEW 2: BRANCHES -->
-                    <div id="view-branches" class="hidden">
-                        <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-                            <div>
-                                <span class="text-xs font-bold text-indigo-600">프랜차이즈 관리</span>
-                                <h2 class="text-xl font-bold text-slate-800">지점장 계정 등록 및 수정</h2>
-                            </div>
-                            <button onclick="addBranchPrompt()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold shadow-sm transition">+ 신규 지점 등록</button>
-                        </div>
-                        <div id="branch-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-                    </div>
-
-                    <!-- VIEW 3: STORAGE / BACKUP -->
-                    <div id="view-storage" class="hidden">
-                        <div class="mb-6 pb-4 border-b border-slate-100">
-                            <span class="text-xs font-bold text-indigo-600">데이터 관리</span>
-                            <h2 class="text-xl font-bold text-slate-800">저장소 및 백업 / 내보내기</h2>
-                        </div>
-                        <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xl space-y-4">
-                            <p class="text-xs text-slate-600">현재 플랫폼의 모든 학습 데이터와 설정을 백업하거나 JSON 파일로 다운로드할 수 있습니다.</p>
-                            <button onclick="exportDataJson()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition">
-                                📥 현재 데이터 JSON 백업 파일 다운로드
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- VIEW 4: STUDENTS -->
-                    <div id="view-sub-students" class="hidden">
-                        <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-                            <div>
-                                <span class="text-xs font-bold text-indigo-600">원생 관리</span>
-                                <h2 class="text-xl font-bold text-slate-800">소속 학생 관리</h2>
-                            </div>
-                            <button onclick="addSubStudentPrompt()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold shadow-sm transition">+ 소속 학생 등록</button>
-                        </div>
-                        <div id="sub-student-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-                    </div>
-
-                    <!-- VIEW 5: HISTORY -->
-                    <div id="view-sub-history" class="hidden">
-                        <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-                            <div>
-                                <span class="text-xs font-bold text-indigo-600">학습 리포트</span>
-                                <h2 class="text-xl font-bold text-slate-800">학생 테스트 점수 및 학습 이력</h2>
-                            </div>
-                        </div>
-                        <div id="sub-history-container" class="space-y-3"></div>
-                    </div>
-
-                    <!-- VIEW 6: SETTINGS -->
-                    <div id="view-sub-settings" class="hidden">
-                        <div class="mb-6 pb-4 border-b border-slate-100">
-                            <span class="text-xs font-bold text-indigo-600">학원 설정</span>
-                            <h2 class="text-xl font-bold text-slate-800">학원명 및 로고 변경</h2>
-                        </div>
-                        <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xl space-y-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1">학원명</label>
-                                <input type="text" id="setting-academy-name" class="w-full p-3 bg-white border border-slate-300 rounded-xl font-bold text-slate-800">
-                            </div>
-                            <button onclick="saveAcademySettings()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition">
-                                설정 저장하기
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <footer class="mt-8 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
-                    © 2026 최강수학메이드영어학원. All rights reserved.
-                </footer>
-            </main>
-        </div>
+    <form onsubmit="handleLogin(event)" class="space-y-4">
+      <div><label class="block text-xs font-bold text-slate-600 mb-1.5">아이디</label>
+        <input id="login-id" required placeholder="아이디 입력" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:border-indigo-600"></div>
+      <div><label class="block text-xs font-bold text-slate-600 mb-1.5">비밀번호</label>
+        <input id="login-pw" type="password" required placeholder="비밀번호 입력" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:border-indigo-600"></div>
+      <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-md transition">로그인</button>
+    </form>
+    <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500 min-h-4"></div>
+  </div>
+</div>
+ 
+<!-- 포털 -->
+<div id="app" class="hidden flex-grow flex flex-col">
+  <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
+    <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div id="hd-logo" class="w-10 h-10 bg-indigo-700 rounded-xl flex items-center justify-center text-white font-bold overflow-hidden">CM</div>
+        <div><h1 id="hd-name" class="font-bold text-slate-800 text-lg leading-tight"></h1><p id="hd-sub" class="text-xs text-slate-400"></p></div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="badge" class="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1.5 rounded-xl border border-indigo-100"></span>
+        <button onclick="auth.signOut()" class="text-xs text-slate-500 hover:text-slate-800 font-bold border border-slate-200 px-3 py-1.5 rounded-xl">로그아웃</button>
+      </div>
     </div>
-
-    <!-- Video Modal -->
-    <div id="video-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-6 relative">
-            <button onclick="closeVideo()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
-            <h3 id="video-title" class="text-lg font-bold text-slate-800 mb-4">영상 학습</h3>
-            <div class="aspect-video w-full rounded-xl overflow-hidden bg-black">
-                <iframe id="video-iframe" class="w-full h-full" src="" frameborder="0" allowfullscreen></iframe>
-            </div>
+  </header>
+ 
+  <div class="max-w-[1600px] mx-auto w-full flex-grow flex flex-col md:flex-row p-4 gap-4">
+    <aside class="w-full md:w-64 flex-shrink-0 flex flex-col gap-2">
+      <span class="text-xs font-bold text-slate-400 px-1">학습 폴더</span>
+      <div id="side" class="flex flex-col gap-1.5"></div>
+    </aside>
+ 
+    <main class="flex-grow bg-white rounded-2xl shadow-sm border border-slate-200 p-6 min-w-0">
+      <div id="view-nav" class="mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200"></div>
+ 
+      <section id="view-content">
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4 pb-4 border-b border-slate-100">
+          <div><div id="crumb" class="text-xs font-bold text-indigo-600 mb-1 flex flex-wrap items-center gap-1"></div>
+            <h2 id="title" class="text-xl font-bold text-slate-800"></h2></div>
+          <div id="tools" class="flex flex-wrap items-center gap-2"></div>
         </div>
+        <div id="branch-pick" class="hidden mb-4"></div>
+        <div id="note" class="mb-4 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 text-xs font-bold text-indigo-900"></div>
+        <div id="tabs" class="flex flex-wrap gap-2 mb-4"></div>
+        <div id="list" class="space-y-3"></div>
+      </section>
+ 
+      <section id="view-students" class="hidden"></section>
+      <section id="view-history" class="hidden"></section>
+      <section id="view-settings" class="hidden"></section>
+      <section id="view-branches" class="hidden"></section>
+ 
+      <section id="view-import" class="hidden">
+        <h2 class="text-xl font-bold text-slate-800 mb-4">백업 · 가져오기</h2>
+        <button onclick="safe(exportData)" class="mb-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-md transition">📥 전체 데이터 JSON 백업 다운로드</button>
+        <h3 class="text-sm font-bold text-slate-700 mb-2">백업 파일 가져오기</h3>
+        <p class="text-xs text-slate-600 mb-4 max-w-xl">이 화면에서 받은 새 백업 JSON을 올리면 자료(폴더·링크·PDF 정보)와 메뉴가 복원됩니다. 이전 버전의 백업 JSON(academy_platform_backup.json)을 올리면, 기존 카테고리가 B 폴더(본원 공용)의 최상위 폴더로 옮겨집니다. 같은 파일을 다시 올려도 중복되지 않고 덮어씁니다.</p>
+        <input type="file" id="import-file" accept="application/json" class="text-xs">
+      </section>
+ 
+      <footer class="mt-8 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">© 2026 최강수학메이드영어학원. All rights reserved.</footer>
+    </main>
+  </div>
+</div>
+ 
+<div id="study-modal" class="hidden fixed inset-0 bg-slate-900/70 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+    <h3 class="text-lg font-bold text-slate-800 mb-1">학습을 마쳤나요?</h3>
+    <p id="study-info" class="text-xs text-slate-500 mb-4"></p>
+    <label class="block text-xs font-bold text-slate-600 mb-1.5">학습 후 화면에 나온 점수 (0~100, 없으면 비워 두세요)</label>
+    <input id="study-score" type="number" min="0" max="100" inputmode="numeric" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold mb-4">
+    <div class="flex gap-2">
+      <button onclick="safe(saveStudy)" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-3 rounded-xl">학습 완료 저장</button>
+      <button onclick="hideStudyModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold py-3 rounded-xl">아직 학습 중</button>
     </div>
-
-    <script>
-        const CLOUD_BIN_ID = '6ad1ab17ac6210605a360e45'; 
-        const CLOUD_API_KEY = '$2a$10$xfybF8YznlSFs90Jp2N2EeJt/RMxJZSYc2FJpPM080Dh1/quk0XLa';
-
-        // 최신 데이터 내장
-        let state = {
-            currentUser: null,
-            superAdminPw: '1234',
-            branches: [{"id":"branch_1","username":"onam","password":"123","academyName":"최강수학메이드영어학원","logoImage":""}],
-            students: [{"id":"s1","branchId":"branch_1","username":"student1","password":"123","name":"김철수","grade":"중1"}],
-            historyRecords: [],
-            topTabs: [{"id":"video","name":"영상학습훈련"},{"id":"voca","name":"단어"},{"id":"passage","name":"본문"}],
-            sidebarCats: [{"id":"middle_exam","name":"중등부 내신문제"},{"id":"high_exam","name":"고등부 내신문제"},{"id":"cat_1792074925468","name":"고등모의고사"},{"id":"grammar","name":"문법"},{"id":"cat_1792074950120","name":"단어"}],
-            masterDatabase: {
-                "middle_exam": [
-                    {"id":"f_g1","type":"folder","name":"중1 (개정)","parentId":null},
-                    {"id":"f_g2","type":"folder","name":"중2 (개정)","parentId":null},
-                    {"id":"f_g3","type":"folder","name":"중3","parentId":null},
-                    {"id":"f_mirae","type":"folder","name":"중1 미래엔 문영인","parentId":"f_g1"},
-                    {"id":"f_visang","type":"folder","name":"중1 비상 황종배","parentId":"f_g1"},
-                    {"id":"f_chun_so","type":"folder","name":"중1 천재 소영순","parentId":"f_g1"},
-                    {"id":"f_chun_lee","type":"folder","name":"중1 천재 이상기","parentId":"f_g1"},
-                    {"id":"f_l1","type":"folder","name":"01과","parentId":"f_chun_lee"},
-                    {"id":"f_l2","type":"folder","name":"02과","parentId":"f_chun_lee"},
-                    {"id":"f_l3","type":"folder","name":"03과","parentId":"f_chun_lee"},
-                    {"id":"f_l4","type":"folder","name":"04과","parentId":"f_chun_lee"},
-                    {"id":"f_l5","type":"folder","name":"05과","parentId":"f_chun_lee"},
-                    {"id":"f_l6","type":"folder","name":"06과","parentId":"f_chun_lee"},
-                    {"id":"f_l7","type":"folder","name":"07과","parentId":"f_chun_lee"},
-                    {"id":"f_l8","type":"folder","name":"08과","parentId":"f_chun_lee"},
-                    {"id":"file_m1_5_1","type":"file","name":"Lesson 5 단어 한글+영어 학습","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/bbe4cd395f01?social_preview=false&skid=8f8896bd-2837-4f29-9c27-f5a857e7e46f","tabId":"voca"},
-                    {"id":"file_m1_5_2","type":"file","name":"Lesson 5 단어 스펠링 테스트","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/a2fb6f3527e0?social_preview=false&skid=f041a675-4c9f-4bda-985a-0ccbef4251cf","tabId":"voca"},
-                    {"id":"file_m1_6_1","type":"file","name":"Lesson 6 단어 한글+영어 학습","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac"},
-                    {"id":"file_m1_6_2","type":"file","name":"Lesson 6 단어 스펠링 테스트","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc"},
-                    {"id":"file_m1_6_3","type":"file","name":"Lesson 6 본문 동사형 찾기","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2"},
-                    {"id":"file_m1_6_4","type":"file","name":"Lesson 6 본문 어법 선택","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032"},
-                    {"id":"file_m1_7_1","type":"file","name":"Lesson 7 단어 한글+영어 학습","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1"},
-                    {"id":"file_m1_7_2","type":"file","name":"Lesson 7 단어 스펠링 테스트","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd"},
-                    {"id":"file_m1_7_3","type":"file","name":"Lesson 7 본문 동사형 찾기","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/ea014e0adb32?skid=f472cd07-cf96-407a-ad3a-7e209dada6b6"},
-                    {"id":"file_m1_7_4","type":"file","name":"Lesson 7 본문 어법 선택","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0206674fda6a?skid=24c491df-8acb-41df-a6a7-82e677f638e8"},
-                    {"id":"file_m1_8_1","type":"file","name":"Lesson 8 단어 한글+영어 학습","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb"},
-                    {"id":"file_m1_8_2","type":"file","name":"Lesson 8 단어 스펠링 테스트","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168"},
-                    {"id":"f_m2_mirae","type":"folder","name":"중2 미래엔 문영인","parentId":"f_g2"},
-                    {"id":"f_m2_visang","type":"folder","name":"중2 비상 황종배","parentId":"f_g2"},
-                    {"id":"f_m2_chun_so","type":"folder","name":"중2 천재 소영순","parentId":"f_g2"},
-                    {"id":"f_m2_chun_lee","type":"folder","name":"중2 천재 이상기","parentId":"f_g2"},
-                    {"id":"f_m2_so_l7","type":"folder","name":"07과","parentId":"f_m2_chun_so"},
-                    {"id":"f_m2_so_l8","type":"folder","name":"08과","parentId":"f_m2_chun_so"},
-                    {"id":"file_m2_7_1","type":"file","name":"Lesson 7 단어 한글+영어 학습","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0"},
-                    {"id":"file_m2_7_2","type":"file","name":"Lesson 7 단어 스펠링 테스트","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b"},
-                    {"id":"file_m2_7_3","type":"file","name":"Lesson 7 본문 동사형 찾기","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/f155aa1e557a?skid=f44d0553-2d09-468a-94a2-0cfa0b14e51b"},
-                    {"id":"file_m2_7_4","type":"file","name":"Lesson 7 본문 어법 선택","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/dc505389312e?skid=a9720e9c-2b6b-44d5-821b-cfa5c8d79a5b"},
-                    {"id":"file_m2_7_g1","type":"file","name":"Lesson 7 본문문법개념 1","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7"},
-                    {"id":"file_m2_7_g2","type":"file","name":"Lesson 7 본문문법개념 2","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e"},
-                    {"id":"file_m2_7_g3","type":"file","name":"Lesson 7 본문문법개념 3","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37"},
-                    {"id":"file_m2_7_g4","type":"file","name":"Lesson 7 본문문법개념 4","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d"},
-                    {"id":"file_m2_7_g5","type":"file","name":"Lesson 7 본문문법개념 5","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/4ee754fa6845?skid=d02946a5-b269-4ab7-9fac-a97e97ff09da"},
-                    {"id":"file_m2_8_1","type":"file","name":"Lesson 8 단어 한글+영어 학습","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f"},
-                    {"id":"file_m2_8_2","type":"file","name":"Lesson 8 본문 동사형 찾기","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/b73c89f87c48?social_preview=false&skid=e8ec5f44-0739-42d4-bc7e-0fcadbb9e8bd"},
-                    {"id":"file_m2_8_3","type":"file","name":"Lesson 8 본문 어법 선택","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/2416be03d7e6?social_preview=false&skid=b72e8674-405f-4e88-a2a6-dd6d998bb1b3"},
-                    {"id":"link_1792075495216","type":"file","name":"본문개념1","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/29d9e9624352?skid=04832d42-72c2-4d7d-ac44-b419d302651a","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792075514469","type":"file","name":"본문개념2","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/1d14e1c12a9c?skid=896f5392-c827-4386-94e7-55f00d795db5","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792075531630","type":"file","name":"본문개념3","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/6b78c6afd5a8?skid=ce89d952-8d19-48c5-9f3c-105c4c2c2c03","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792075550982","type":"file","name":"본문개념4","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/04c82439ff95?skid=6d4bc09b-3ce2-41d9-9719-5952bde5d584","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792075577148","type":"file","name":"빈칸 한글/영어","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/337c2f429de9?skid=e063f428-9e21-47f6-9a4f-787dcc70d942","tabId":"passage","authorRole":"super"},
-                    {"id":"file_m1_5_3","type":"file","name":"Lesson 5 본문 동사형 찾기","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/81ee631ddfe4?skid=c0478af9-a1bb-4d50-bd65-2fd8e81d16b2","tabId":"passage"},
-                    {"id":"file_m1_5_4","type":"file","name":"Lesson 5 본문 어법 선택","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/b0c48cfcd008?skid=1b3a3121-1285-4e38-8002-4db10efb2be5","tabId":"passage"},
-                    {"id":"link_1792075880805","type":"file","name":"단어 한글/영어","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075899542","type":"file","name":"단어 스펠링","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075917096","type":"file","name":"본문개념1","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/cc75935b3e06?skid=f3ef47ce-1e69-4a71-ad1f-4d5c75ace824","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075932677","type":"file","name":"본문개념2","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/5a1eb78efe51?skid=26968259-9eae-4803-9e1b-c04fcf2a8574","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075955457","type":"file","name":"빈칸 한글/영어","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/9e9091e2641f?skid=dfc5f8f4-8412-452b-aba9-4cf4dd2a1fc8","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075969208","type":"file","name":"동사형찾기","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792075986364","type":"file","name":"어법선택","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076030547","type":"file","name":"단어 한글/영어","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076049196","type":"file","name":"단어스펠링","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076063695","type":"file","name":"본문개념1","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/7326eeefd9dc?skid=b3511b45-3e67-4b46-bc94-150e590b4f7e","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076078409","type":"file","name":"본문개념2","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/d1ef587864b4?skid=a30e711d-3c80-414f-be5b-02491362f1e5","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076095774","type":"file","name":"본문개념3","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/ed04f42e23bb?skid=4630bd55-4186-46e6-a0a2-084eaeb00b25","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076114028","type":"file","name":"빈칸 한글/영어","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/7da83d0ca891?social_preview=false&skid=4bd5ea4e-0bab-4a7f-aca6-65a7da304ace","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076129340","type":"file","name":"동사형찾기","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/ea014e0adb32?social_preview=false&skid=f472cd07-cf96-407a-ad3a-7e209dada6b6","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076144801","type":"file","name":"어법선택","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0206674fda6a?skid=24c491df-8acb-41df-a6a7-82e677f638e8","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076175755","type":"file","name":"단어 한글/영어","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076194955","type":"file","name":"단어 스펠링","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076210474","type":"file","name":"본문개념","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/4c75b5a3b955?skid=0217f95b-eb7c-45af-b85a-1631d9acd2d9","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076263071","type":"file","name":"단어 영어/한글","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076279861","type":"file","name":"단어 스펠링","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076297252","type":"file","name":"본문개념1","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076312349","type":"file","name":"본문개념2","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076332161","type":"file","name":"본문개념3","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076346563","type":"file","name":"본문개념4","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076364519","type":"file","name":"본문개념5","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/4ee754fa6845?skid=d02946a5-b269-4ab7-9fac-a97e97ff09da","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076381136","type":"file","name":"빈칸 영어/한글","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/ef7b03596f6d?skid=fcce6465-efc0-4ab6-af67-b1b49b3cf8bc","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076397884","type":"file","name":"동사형찾기","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/f155aa1e557a?skid=f44d0553-2d09-468a-94a2-0cfa0b14e51b","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076415052","type":"file","name":"어법선택","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/dc505389312e?skid=a9720e9c-2b6b-44d5-821b-cfa5c8d79a5b","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076472626","type":"file","name":"단어 한글/영어","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076490526","type":"file","name":"빈칸 영어/한글","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/82c99b5aa04e?social_preview=false&skid=4bd8af62-ee1c-4d7f-8654-5249c11eab29","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076504784","type":"file","name":"동사형찾기","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/b73c89f87c48?social_preview=false&skid=e8ec5f44-0739-42d4-bc7e-0fcadbb9e8bd","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792076518696","type":"file","name":"어법선택","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/2416be03d7e6?social_preview=false&skid=b72e8674-405f-4e88-a2a6-dd6d998bb1b3","tabId":"voca","authorRole":"super"}
-                ],
-                "high_exam": [
-                    {"id":"f_1792074970787","type":"folder","name":"고1","parentId":null,"tabId":"video","authorRole":"super"},
-                    {"id":"f_1792074974500","type":"folder","name":"고2","parentId":null,"tabId":"video","authorRole":"super"},
-                    {"id":"f_1792074988487","type":"folder","name":"공통영어1","parentId":"f_1792074970787","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792074996174","type":"folder","name":"공통영어2","parentId":"f_1792074970787","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075048638","type":"folder","name":"고3","parentId":null,"tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075065224","type":"folder","name":"공통영어1","parentId":"f_1792074988487","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075059953","type":"folder","name":"공통영어2","parentId":"f_1792074988487","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075127813","type":"folder","name":"진건고","parentId":"f_1792075065224","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075131932","type":"folder","name":"오남고","parentId":"f_1792075065224","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075143795","type":"folder","name":"진건고","parentId":"f_1792075059953","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075147645","type":"folder","name":"오남고","parentId":"f_1792075059953","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075218788","type":"folder","name":"진건고","parentId":"f_1792074996174","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075222513","type":"folder","name":"오남고","parentId":"f_1792074996174","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075252087","type":"folder","name":"1과","parentId":"f_1792075222513","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075255505","type":"folder","name":"2과","parentId":"f_1792075222513","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075258642","type":"folder","name":"3과","parentId":"f_1792075222513","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075261718","type":"folder","name":"4과","parentId":"f_1792075222513","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075271920","type":"folder","name":"1과","parentId":"f_1792075218788","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075275084","type":"folder","name":"2과","parentId":"f_1792075218788","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075277911","type":"folder","name":"3과","parentId":"f_1792075218788","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075281010","type":"folder","name":"4과","parentId":"f_1792075218788","tabId":"video","authorRole":"super"},
-                    {"id":"link_1792079647385","type":"file","name":"단어 한글/영어","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/6515c6f6e298?social_preview=false&skid=d33bda66-120b-471c-8a6e-077fdfd99c5d","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792079661536","type":"file","name":"본문개념1","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/11209f23b9ef?skid=9e9522a2-ccfe-4f93-8e94-5a7799b53fde","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079677807","type":"file","name":"본문개념2","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/724d2a575861?skid=bd9ba269-8afc-418d-89a8-df38f69dce68","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079695222","type":"file","name":"본문개념3","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/4a6cd7d3651a?skid=0503495e-0778-41b8-ad94-462efe974fba","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079712527","type":"file","name":"본문개념4","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/4a86e93669fe?skid=550e3eea-1fa7-4e31-977e-8df032fe3828","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079727151","type":"file","name":"본문개념5","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/087637886f3f?skid=3d8a4d96-b3ab-47bf-8c65-4e0651030a2f","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079742345","type":"file","name":"빈칸 한글/영어","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/0bfc8f8a53e2?skid=5f0b8f65-75a7-44e6-855d-5a84e73d5b3e","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079759477","type":"file","name":"동사형찾기","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/42b1e22af65f?skid=e96d8c0e-206d-48ea-a613-ad3d7e1e4b4e","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079773962","type":"file","name":"어법선택","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/782e1e5fb558?skid=80fd2f71-73a8-461d-b752-1bdb8f7b0a26","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079799001","type":"file","name":"단어 한글/영어","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/b855a6f78198?social_preview=false&skid=04de87be-d4b7-4939-bada-846800095f0a","tabId":"voca","authorRole":"super"},
-                    {"id":"link_1792079821389","type":"file","name":"본문개념1","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/8eb7a16ece0c?skid=d46cf0b4-4e3d-4428-bf17-96bcdd24f7cb","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079837455","type":"file","name":"본문개념2","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/1ca030aa4792?skid=a233daac-1500-4171-9fc6-52413ed561e0","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079853766","type":"file","name":"본문개념3","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/ece5fd958726?skid=989916d5-38eb-498b-b4f6-1a6c35cb4b47","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079869565","type":"file","name":"본문개념4","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/153b060edd0b?skid=345dee89-85c0-4d2e-9553-f495646cdef9","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079890855","type":"file","name":"본문개념5","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/6416685220f8?skid=1fe367a6-85d3-44a7-99bb-010be533febb","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079907105","type":"file","name":"빈칸 한글/영어","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/115ff452d793?skid=5bc30834-4eb9-401c-9dd0-d329f3670812","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079927723","type":"file","name":"동사형찾기","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/4ed486a1f7e0?skid=c92ae778-6b29-49c0-ab8b-7fbe376c6a89","tabId":"passage","authorRole":"super"},
-                    {"id":"link_1792079941169","type":"file","name":"어법선택","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/e9e77da110ab?skid=5de32ab4-f5d0-4a2a-ab38-c29c5bad5d58","tabId":"passage","authorRole":"super"}
-                ],
-                "grammar": [
-                    {"id":"f_1792075362334","type":"folder","name":"중등문법","parentId":null,"tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075366127","type":"folder","name":"고등문법","parentId":null,"tabId":"video","authorRole":"super"}
-                ],
-                "cat_1792074925468": [
-                    {"id":"f_1792075308265","type":"folder","name":"26년3월","parentId":null,"tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075314708","type":"folder","name":"26년6월","parentId":null,"tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075320309","type":"folder","name":"26년9월","parentId":null,"tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075327197","type":"folder","name":"26년10월","parentId":null,"tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075333592","type":"folder","name":"고1","parentId":"f_1792075308265","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075343045","type":"folder","name":"고1","parentId":"f_1792075320309","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075349066","type":"folder","name":"고1","parentId":"f_1792075327197","tabId":"video","authorRole":"super"}
-                ],
-                "cat_1792074950120": [
-                    {"id":"f_1792075374212","type":"folder","name":"워드마스터","parentId":null,"tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075380552","type":"folder","name":"기본","parentId":"f_1792075374212","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075383916","type":"folder","name":"실력","parentId":"f_1792075374212","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075387352","type":"folder","name":"고난이도","parentId":"f_1792075374212","tabId":"video","authorRole":"super"},
-                    {"id":"f_1792075390204","type":"folder","name":"수능","parentId":"f_1792075374212","tabId":"video","authorRole":"super"}
-                ]
-            },
-            branchDatabases: {},
-            currentSuperView: 'content',
-            currentSubView: 'content',
-            currentTopTab: 'video',
-            currentSidebarCat: 'middle_exam',
-            currentFolderId: null
-        };
-
-        // 비동기 통신 에러가 로그인에 영향을 주지 않도록 안전 분리
-        async function loadShared() {
-            try {
-                const r = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`, {
-                    headers: { 'X-Master-Key': CLOUD_API_KEY },
-                    cache: 'no-store'
-                });
-                if (r.ok) {
-                    const res = await r.json();
-                    const d = res.record;
-                    if (d.masterDatabase && Object.keys(d.masterDatabase).length > 0) state.masterDatabase = d.masterDatabase;
-                    if (d.branchDatabases) state.branchDatabases = d.branchDatabases;
-                    if (d.branches && d.branches.length > 0) state.branches = d.branches;
-                    if (d.students && d.students.length > 0) state.students = d.students;
-                    if (d.topTabs && d.topTabs.length > 0) state.topTabs = d.topTabs;
-                    if (d.sidebarCats && d.sidebarCats.length > 0) state.sidebarCats = d.sidebarCats;
-                    if (d.historyRecords) state.historyRecords = d.historyRecords;
-                }
-            } catch (e) {
-                console.warn('백그라운드 동기화 대기중, 내장 데이터로 구동', e);
-            }
-        }
-
-        async function saveState() {
-            const payload = {
-                branches: state.branches,
-                students: state.students,
-                historyRecords: state.historyRecords,
-                masterDatabase: state.masterDatabase,
-                branchDatabases: state.branchDatabases,
-                topTabs: state.topTabs,
-                sidebarCats: state.sidebarCats
-            };
-
-            try {
-                await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': CLOUD_API_KEY
-                    },
-                    body: JSON.stringify(payload)
-                });
-            } catch (e) {
-                console.error('클라우드 저장 실패', e);
-            }
-        }
-
-        // 로그인 검증 함수 (100% 동기식 즉시 처리)
-        function handleLogin(e) {
-            e.preventDefault();
-            const id = document.getElementById('login-id').value.trim().toLowerCase();
-            const pw = document.getElementById('login-pw').value.trim();
-            const err = document.getElementById('login-error');
-
-            if (id === 'admin' && pw === state.superAdminPw) {
-                state.currentUser = { role: 'super', username: 'admin' };
-                enterPortal();
-                return;
-            }
-
-            const branch = state.branches.find(b => b.username.toLowerCase() === id && b.password === pw);
-            if (branch) {
-                state.currentUser = { role: 'sub', branchId: branch.id, academyName: branch.academyName, logoImage: branch.logoImage };
-                enterPortal();
-                return;
-            }
-
-            const student = state.students.find(s => s.username.toLowerCase() === id && s.password === pw);
-            if (student) {
-                const b = state.branches.find(x => x.id === student.branchId);
-                state.currentUser = { role: 'student', branchId: student.branchId, name: student.name, academyName: b ? b.academyName : '최강수학메이드영어학원' };
-                enterPortal();
-                return;
-            }
-
-            err.innerText = '아이디 또는 비밀번호가 올바르지 않습니다.';
-        }
-
-        function enterPortal() {
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('app-portal').classList.remove('hidden');
-
-            const badge = document.getElementById('user-badge');
-            const nameEl = document.getElementById('header-academy-name');
-            const subEl = document.getElementById('header-academy-sub');
-
-            if (state.currentUser.role === 'super') {
-                badge.innerText = '👑 최고 관리자 (본원)';
-                nameEl.innerText = '최강수학메이드영어학원 본원 관리센터';
-                subEl.innerText = '실시간 클라우드 전체 관리';
-                document.getElementById('super-admin-tabs').classList.remove('hidden');
-                document.getElementById('sub-admin-tabs').classList.add('hidden');
-                document.getElementById('sidebar-add-btn').classList.remove('hidden');
-                document.getElementById('btn-add-tab').classList.remove('hidden');
-            } else if (state.currentUser.role === 'sub') {
-                badge.innerText = `🏛️ ${state.currentUser.academyName} 원장님`;
-                nameEl.innerText = state.currentUser.academyName;
-                subEl.innerText = '지점 관리자 모드';
-                document.getElementById('super-admin-tabs').classList.add('hidden');
-                document.getElementById('sub-admin-tabs').classList.remove('hidden');
-                document.getElementById('sidebar-add-btn').classList.add('hidden');
-                document.getElementById('btn-add-tab').classList.add('hidden');
-            } else {
-                badge.innerText = `👨‍🎓 ${state.currentUser.name} 학생`;
-                nameEl.innerText = state.currentUser.academyName || '최강수학메이드영어학원';
-                subEl.innerText = '학생 학습관';
-                document.getElementById('super-admin-tabs').classList.add('hidden');
-                document.getElementById('sub-admin-tabs').classList.add('hidden');
-                document.getElementById('sidebar-add-btn').classList.add('hidden');
-                document.getElementById('btn-add-tab').classList.add('hidden');
-            }
-
-            if (!state.topTabs.some(t => t.id === state.currentTopTab) && state.topTabs.length > 0) {
-                state.currentTopTab = state.topTabs[0].id;
-            }
-
-            renderTopNav();
-            renderSidebar();
-            renderContent();
-        }
-
-        function logout() {
-            state.currentUser = null;
-            document.getElementById('login-screen').classList.remove('hidden');
-            document.getElementById('app-portal').classList.add('hidden');
-            document.getElementById('login-id').value = '';
-            document.getElementById('login-pw').value = '';
-        }
-
-        function renderTopNav() {
-            const container = document.getElementById('top-nav-container');
-            container.innerHTML = '';
-
-            state.topTabs.forEach((tab, index) => {
-                const isActive = state.currentTopTab === tab.id;
-                const btn = document.createElement('button');
-                btn.className = isActive
-                    ? 'bg-amber-500 text-slate-900 font-bold px-4 py-2 rounded-xl shadow-sm transition'
-                    : 'bg-slate-100 text-slate-700 font-bold px-4 py-2 rounded-xl hover:bg-slate-200 transition';
-                btn.innerText = tab.name;
-                btn.onclick = () => {
-                    state.currentTopTab = tab.id;
-                    renderTopNav();
-                    renderContent();
-                };
-
-                if (state.currentUser && state.currentUser.role === 'super') {
-                    btn.oncontextmenu = (e) => {
-                        e.preventDefault();
-                        const cmd = prompt(`[${tab.name}] 메뉴 설정:\n1. 이름 변경\n2. 삭제`, '1');
-                        if (cmd === '1') {
-                            const newName = prompt('새 메뉴 이름:', tab.name);
-                            if (newName) { tab.name = newName.trim(); renderTopNav(); saveState(); }
-                        } else if (cmd === '2') {
-                            if (state.topTabs.length <= 1) return alert('최소 1개 메뉴는 필요합니다.');
-                            state.topTabs.splice(index, 1);
-                            if (state.currentTopTab === tab.id) state.currentTopTab = state.topTabs[0].id;
-                            renderTopNav(); renderContent(); saveState();
-                        }
-                    };
-                }
-                container.appendChild(btn);
-            });
-        }
-
-        function addTopTabPrompt() {
-            if (state.currentUser.role !== 'super') return;
-            const name = prompt('새 상단 메뉴(탭) 이름을 입력하세요:');
-            if (name) {
-                state.topTabs.push({ id: 'tab_' + Date.now(), name: name.trim() });
-                renderTopNav();
-                saveState();
-            }
-        }
-
-        function renderSidebar() {
-            const container = document.getElementById('sidebar-container');
-            container.innerHTML = '';
-
-            state.sidebarCats.forEach((cat, index) => {
-                const isActive = state.currentSidebarCat === cat.id;
-                const div = document.createElement('div');
-                div.className = isActive
-                    ? 'w-full text-left bg-indigo-900 text-white font-bold p-3 rounded-xl shadow-sm text-sm flex justify-between items-center draggable-item'
-                    : 'w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold p-3 rounded-xl text-sm flex justify-between items-center border border-slate-200 transition draggable-item';
-                div.innerHTML = `<span>${cat.name}</span> ${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
-                
-                div.onclick = () => {
-                    state.currentSidebarCat = cat.id;
-                    state.currentFolderId = null;
-                    renderSidebar();
-                    renderContent();
-                };
-
-                if (state.currentUser && state.currentUser.role === 'super') {
-                    div.oncontextmenu = (e) => {
-                        e.preventDefault();
-                        const cmd = prompt(`[${cat.name}] 카테고리 설정:\n1. 이름 변경\n2. 삭제`, '1');
-                        if (cmd === '1') {
-                            const newName = prompt('새 카테고리 이름:', cat.name);
-                            if (newName) { cat.name = newName.trim(); renderSidebar(); saveState(); }
-                        } else if (cmd === '2') {
-                            if (state.sidebarCats.length <= 1) return alert('최소 1개 카테고리는 필요합니다.');
-                            state.sidebarCats.splice(index, 1);
-                            delete state.masterDatabase[cat.id];
-                            if (state.currentSidebarCat === cat.id) state.currentSidebarCat = state.sidebarCats[0].id;
-                            renderSidebar(); renderContent(); saveState();
-                        }
-                    };
-                }
-                container.appendChild(div);
-            });
-        }
-
-        function addSidebarCategoryPrompt() {
-            if (state.currentUser.role !== 'super') return;
-            const name = prompt('새 카테고리 이름을 입력하세요:');
-            if (name) {
-                const id = 'cat_' + Date.now();
-                state.sidebarCats.push({ id, name: name.trim() });
-                state.masterDatabase[id] = [];
-                renderSidebar();
-                saveState();
-            }
-        }
-
-        function getCurrentActiveItems() {
-            const catId = state.currentSidebarCat;
-            const masterItems = state.masterDatabase[catId] || [];
-
-            if (state.currentUser.role === 'super') {
-                return masterItems;
-            }
-
-            const branchId = state.currentUser.branchId;
-            if (!state.branchDatabases[branchId]) {
-                state.branchDatabases[branchId] = {};
-            }
-            const branchItems = state.branchDatabases[branchId][catId] || [];
-
-            return [...masterItems, ...branchItems];
-        }
-
-        function getBreadcrumbPath(folderId) {
-            const path = [];
-            let currId = folderId;
-            const items = getCurrentActiveItems();
-
-            while (currId) {
-                const found = items.find(i => i.id === currId);
-                if (found) {
-                    path.unshift(found);
-                    currId = found.parentId;
-                } else break;
-            }
-            return path;
-        }
-
-        function renderContent() {
-            const container = document.getElementById('content-container');
-            const breadcrumb = document.getElementById('breadcrumb');
-            const title = document.getElementById('current-title');
-            container.innerHTML = '';
-
-            const currentCatObj = state.sidebarCats.find(c => c.id === state.currentSidebarCat);
-            const catName = currentCatObj ? currentCatObj.name : '자료실';
-
-            const path = getBreadcrumbPath(state.currentFolderId);
-            let trailHtml = `<span class="cursor-pointer text-indigo-600 font-bold hover:underline" onclick="state.currentFolderId=null; renderContent();">📁 ${catName}</span>`;
-            path.forEach((p) => {
-                trailHtml += ` <span class="text-slate-400">＞</span> <span class="cursor-pointer text-indigo-600 font-bold hover:underline" onclick="state.currentFolderId='${p.id}'; renderContent();">${p.name}</span>`;
-            });
-            breadcrumb.innerHTML = trailHtml;
-
-            let items = getCurrentActiveItems();
-            let currentChildren = items.filter(item => {
-                const matchesParent = item.parentId === state.currentFolderId;
-                if (!matchesParent) return false;
-                if (item.type === 'folder') return true;
-                return (item.tabId || 'video') === state.currentTopTab;
-            });
-
-            title.innerText = state.currentFolderId ? (path[path.length - 1]?.name || '폴더') : catName;
-
-            if (state.currentFolderId) {
-                const parentFolder = path[path.length - 2];
-                const backBtn = document.createElement('div');
-                backBtn.className = "p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer text-sm flex items-center gap-2 border border-slate-200 transition mb-2";
-                backBtn.innerHTML = `<span>⬆️ 상위 폴더로 이동</span>`;
-                backBtn.onclick = () => { state.currentFolderId = parentFolder ? parentFolder.id : null; renderContent(); };
-                container.appendChild(backBtn);
-            }
-
-            if (currentChildren.length === 0) {
-                container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">등록된 학습 자료가 없습니다.</div>`;
-                return;
-            }
-
-            currentChildren.forEach((item, index) => {
-                const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center gap-3 font-bold text-slate-700 text-sm hover:border-slate-300 transition";
-                
-                const leftDiv = document.createElement('div');
-                leftDiv.className = "flex items-center gap-2.5 cursor-pointer flex-grow";
-
-                const isSuperItem = (item.authorRole === 'super' || !item.authorRole);
-                const badgeHtml = isSuperItem ? `<span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">본원공유</span>` : `<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">우리학원</span>`;
-
-                if (item.type === 'folder') {
-                    leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
-                    leftDiv.onclick = () => { state.currentFolderId = item.id; renderContent(); };
-                } else {
-                    const isYt = /youtube\.com|youtu\.be/.test(item.linkUrl);
-                    if (isYt) {
-                        leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
-                        leftDiv.onclick = () => openLinkOrVideo(item);
-                    } else {
-                        leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span> ${badgeHtml}</a>`;
-                    }
-                }
-
-                row.appendChild(leftDiv);
-
-                const isSuperUser = (state.currentUser && state.currentUser.role === 'super');
-                const isSubUser = (state.currentUser && state.currentUser.role === 'sub');
-                const canModifyThisItem = isSuperUser || (isSubUser && !isSuperItem);
-
-                if (canModifyThisItem && state.currentUser && state.currentUser.role !== 'student') {
-                    row.oncontextmenu = (e) => {
-                        e.preventDefault();
-                        const cmd = prompt(`[${item.name}] 항목 설정:\n1. 이름 변경\n2. 삭제`, '1');
-                        if (cmd === '1') {
-                            const newName = prompt('새 이름:', item.name);
-                            if (newName) {
-                                item.name = newName.trim();
-                                if (item.linkUrl !== undefined) {
-                                    const newLink = prompt('웹/링크 주소:', item.linkUrl);
-                                    if (newLink !== null) item.linkUrl = newLink.trim();
-                                }
-                                renderContent(); saveState();
-                            }
-                        } else if (cmd === '2') {
-                            deleteItem(item.id, isSuperItem);
-                        }
-                    };
-                }
-
-                const rightBox = document.createElement('div');
-                rightBox.className = 'flex items-center gap-1.5 flex-shrink-0';
-
-                const isOpenLink = item.type !== 'folder' && item.linkUrl && !/youtube\.com|youtu\.be/.test(item.linkUrl);
-                const actionBtn = document.createElement(isOpenLink ? 'a' : 'button');
-                if (isOpenLink) {
-                    actionBtn.href = item.linkUrl;
-                    actionBtn.target = '_blank';
-                    actionBtn.rel = 'noopener noreferrer';
-                }
-                actionBtn.className = "bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2 rounded-xl font-bold shadow-sm ml-2 transition inline-flex items-center justify-center";
-                actionBtn.innerText = item.type === 'folder' ? '열기 ➔' : '학습하기 ➔';
-                
-                if (!isOpenLink) {
-                    actionBtn.onclick = () => {
-                        if (item.type === 'folder') {
-                            state.currentFolderId = item.id;
-                            renderContent();
-                        } else {
-                            openLinkOrVideo(item);
-                        }
-                    };
-                }
-                rightBox.appendChild(actionBtn);
-
-                row.appendChild(rightBox);
-                container.appendChild(row);
-            });
-        }
-
-        function openLinkOrVideo(item) {
-            const url = item.linkUrl;
-            if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                let embedUrl = url;
-                if (url.includes('watch?v=')) embedUrl = url.replace('watch?v=', 'embed/');
-                else if (url.includes('youtu.be/')) embedUrl = url.replace('youtu.be/', 'youtube.com/embed/');
-                document.getElementById('video-title').innerText = item.name;
-                document.getElementById('video-iframe').src = embedUrl;
-                document.getElementById('video-modal').classList.remove('hidden');
-            } else {
-                window.open(url, '_blank');
-            }
-        }
-
-        function closeVideo() {
-            document.getElementById('video-modal').classList.add('hidden');
-            document.getElementById('video-iframe').src = '';
-        }
-
-        function deleteItem(id, isSuperItem) {
-            if (state.currentUser.role === 'sub' && isSuperItem) {
-                return alert('본원에서 공유해 준 공통 자료는 삭제할 수 없습니다.');
-            }
-            if (confirm('해당 폴더/자료를 삭제하시겠습니까?')) {
-                if (state.currentUser.role === 'super') {
-                    state.masterDatabase[state.currentSidebarCat] = state.masterDatabase[state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
-                } else {
-                    const bId = state.currentUser.branchId;
-                    state.branchDatabases[bId][state.currentSidebarCat] = state.branchDatabases[bId][state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
-                }
-                renderContent();
-                saveState();
-            }
-        }
-
-        function addFolderPrompt() {
-            const name = prompt('새 폴더 이름을 입력하세요:');
-            if (name) {
-                const catId = state.currentSidebarCat;
-                const newItem = {
-                    id: 'f_' + Date.now(),
-                    type: 'folder',
-                    name: name.trim(),
-                    parentId: state.currentFolderId,
-                    tabId: state.currentTopTab,
-                    authorRole: (state.currentUser.role === 'super' ? 'super' : state.currentUser.branchId)
-                };
-
-                if (state.currentUser.role === 'super') {
-                    if (!state.masterDatabase[catId]) state.masterDatabase[catId] = [];
-                    state.masterDatabase[catId].push(newItem);
-                } else {
-                    const bId = state.currentUser.branchId;
-                    if (!state.branchDatabases[bId]) state.branchDatabases[bId] = {};
-                    if (!state.branchDatabases[bId][catId]) state.branchDatabases[bId][catId] = [];
-                    state.branchDatabases[bId][catId].push(newItem);
-                }
-                renderContent();
-                saveState();
-            }
-        }
-
-        function addLinkFilePrompt() {
-            const title = prompt('학습 자료 제목을 입력하세요:');
-            if (!title) return;
-            const url = prompt('웹페이지 주소 또는 유튜브 링크 URL을 입력하세요:');
-            if (!url) return;
-
-            const catId = state.currentSidebarCat;
-            const newItem = {
-                id: 'link_' + Date.now(),
-                type: 'file',
-                name: title.trim(),
-                parentId: state.currentFolderId,
-                linkUrl: url.trim(),
-                tabId: state.currentTopTab,
-                authorRole: (state.currentUser.role === 'super' ? 'super' : state.currentUser.branchId)
-            };
-
-            if (state.currentUser.role === 'super') {
-                if (!state.masterDatabase[catId]) state.masterDatabase[catId] = [];
-                state.masterDatabase[catId].push(newItem);
-            } else {
-                const bId = state.currentUser.branchId;
-                if (!state.branchDatabases[bId]) state.branchDatabases[bId] = {};
-                if (!state.branchDatabases[bId][catId]) state.branchDatabases[bId][catId] = [];
-                state.branchDatabases[bId][catId].push(newItem);
-            }
-
-            renderContent();
-            saveState();
-            alert(`'${title}' 자료가 등록되었습니다.`);
-        }
-
-        function switchAdminView(view) {
-            state.currentSuperView = view;
-            document.getElementById('view-content').classList.toggle('hidden', view !== 'content');
-            document.getElementById('view-branches').classList.toggle('hidden', view !== 'branches');
-            document.getElementById('view-storage').classList.toggle('hidden', view !== 'storage');
-            if (view === 'content') renderContent();
-            else if (view === 'branches') renderBranches();
-        }
-
-        function switchSubView(view) {
-            state.currentSubView = view;
-            document.getElementById('view-content').classList.toggle('hidden', view !== 'content');
-            document.getElementById('view-sub-students').classList.toggle('hidden', view !== 'students');
-            document.getElementById('view-sub-history').classList.toggle('hidden', view !== 'history');
-            document.getElementById('view-sub-settings').classList.toggle('hidden', view !== 'settings');
-
-            if (view === 'content') renderContent();
-            else if (view === 'students') renderSubStudents();
-            else if (view === 'history') renderSubHistory();
-            else if (view === 'settings') {
-                if (state.currentUser) document.getElementById('setting-academy-name').value = state.currentUser.academyName || '';
-            }
-        }
-
-        function renderBranches() {
-            const container = document.getElementById('branch-list-container');
-            container.innerHTML = '';
-            state.branches.forEach(b => {
-                const card = document.createElement('div');
-                card.className = "p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between gap-3 shadow-sm";
-                card.innerHTML = `
-                    <div>
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="font-bold text-slate-800 text-lg">${b.academyName}</span>
-                        </div>
-                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-200">
-                            <div>🆔 아이디: <strong class="text-indigo-600">${b.username}</strong></div>
-                            <div>🔑 비밀번호: <strong class="text-slate-800">${b.password}</strong></div>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function addBranchPrompt() {
-            const academyName = prompt('학원 이름 (예: 남양주지점):');
-            if (!academyName) return;
-            const username = prompt('지점 로그인 아이디:');
-            if (!username) return;
-            const password = prompt('지점 로그인 비밀번호:');
-            if (!password) return;
-
-            state.branches.push({
-                id: 'branch_' + Date.now(),
-                username: username.trim(),
-                password: password.trim(),
-                academyName: academyName.trim(),
-                logoImage: ''
-            });
-            renderBranches();
-            saveState();
-            alert('신규 지점이 등록되었습니다!');
-        }
-
-        function exportDataJson() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "academy_platform_backup.json");
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
-        }
-
-        function renderSubStudents() {
-            const container = document.getElementById('sub-student-list');
-            container.innerHTML = '';
-            const myStudents = state.students.filter(s => s.branchId === (state.currentUser ? state.currentUser.branchId : ''));
-            if (myStudents.length === 0) {
-                container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 font-medium text-sm">등록된 학생이 없습니다.</div>`;
-                return;
-            }
-            myStudents.forEach(s => {
-                const card = document.createElement('div');
-                card.className = "p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between gap-3 shadow-sm";
-                card.innerHTML = `
-                    <div>
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="font-bold text-slate-800 text-lg">${s.name}</span>
-                            <span class="text-xs bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-full font-bold border border-slate-200">${s.grade}</span>
-                        </div>
-                        <div class="text-xs text-slate-600 space-y-1 bg-white p-3 rounded-xl border border-slate-200">
-                            <div>🆔 아이디: <strong class="text-indigo-600">${s.username}</strong></div>
-                            <div>🔑 비밀번호: <strong class="text-slate-800">${s.password}</strong></div>
-                        </div>
-                    </div>
-                    <button onclick="removeStudent('${s.id}')" class="text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200 transition">학생 삭제</button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function addSubStudentPrompt() {
-            const name = prompt('학생 이름:');
-            if (!name) return;
-            const username = prompt('학생 아이디:');
-            if (!username) return;
-            const password = prompt('학생 비밀번호:');
-            if (!password) return;
-            const grade = prompt('학년 (예: 중1):', '중1');
-
-            state.students.push({ id: 's_' + Date.now(), branchId: state.currentUser.branchId, username: username.trim(), password: password.trim(), name: name.trim(), grade: grade ? grade.trim() : '중1' });
-            renderSubStudents();
-            saveState();
-        }
-
-        function removeStudent(id) {
-            if (confirm('삭제하시겠습니까?')) {
-                state.students = state.students.filter(s => s.id !== id);
-                renderSubStudents();
-                saveState();
-            }
-        }
-
-        function renderSubHistory() {
-            const container = document.getElementById('sub-history-container');
-            container.innerHTML = '';
-            const myRecords = state.historyRecords.filter(h => h.branchId === (state.currentUser ? state.currentUser.branchId : ''));
-            if (myRecords.length === 0) {
-                container.innerHTML = `<div class="text-center py-12 text-slate-400 font-medium text-sm">학습 이력이 없습니다.</div>`;
-                return;
-            }
-            myRecords.slice().reverse().forEach(h => {
-                const row = document.createElement('div');
-                row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center";
-                row.innerHTML = `
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="font-bold text-slate-800 text-base">${h.studentName}</span>
-                            <span class="text-xs bg-slate-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold border border-slate-200">${h.score}점</span>
-                        </div>
-                        <div class="text-sm text-slate-600 font-medium">${h.title} (${h.correct} / ${h.total} 정답)</div>
-                        <div class="text-xs text-slate-400 mt-1">완료 일시: ${h.date}</div>
-                    </div>
-                `;
-                container.appendChild(row);
-            });
-        }
-
-        function saveAcademySettings() {
-            const name = document.getElementById('setting-academy-name').value.trim();
-            if (!name) return alert('학원명을 입력하세요.');
-            const branch = state.branches.find(b => b.id === (state.currentUser ? state.currentUser.branchId : ''));
-            if (!branch) return;
-
-            branch.academyName = name;
-            state.currentUser.academyName = name;
-            document.getElementById('header-academy-name').innerText = name;
-            saveState();
-            alert('학원 설정이 저장되었습니다!');
-        }
-
-        function resetToHome() {
-            state.currentFolderId = null;
-            renderContent();
-        }
-
-        // 백그라운드 싱크 비동기 호출
-        loadShared();
-    </script>
+  </div>
+</div>
+<div id="yt-modal" class="hidden fixed inset-0 bg-slate-900/80 z-50 items-center justify-center p-4" onclick="if(event.target===this)closeYt()">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-6 relative">
+    <button onclick="closeYt()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
+    <h3 id="yt-title" class="text-lg font-bold text-slate-800 mb-4 pr-8"></h3>
+    <div class="aspect-video w-full rounded-xl overflow-hidden bg-black"><iframe id="yt-frame" class="w-full h-full" src="" allow="autoplay; encrypted-media; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+  </div>
+</div>
+<input type="file" id="pdf-input" accept="application/pdf" class="hidden">
+<div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl z-50"></div>
+ 
+<script>
+/* ===== 설정: Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)의 값을 붙여넣으세요 ===== */
+const FB = {
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'YOUR_PROJECT.firebaseapp.com',
+  projectId: 'YOUR_PROJECT',
+  storageBucket: 'YOUR_PROJECT.appspot.com',
+  messagingSenderId: 'YOUR_SENDER_ID',
+  appId: 'YOUR_APP_ID'
+};
+const DOMAIN = '@cmacademy.com', ADMIN_ID = 'admin', MAX_STUDENTS = 10;
+const FOLDERS = [
+  { id: 'B', name: 'B · 본원 공용 자료' },
+  { id: 'A', name: 'A · 우리 지점 전용' },
+  { id: 'C', name: 'C · 수학' },
+  { id: 'D', name: 'D · 국어' },
+  { id: 'E', name: 'E · 전과목 통합' }
+];
+let TABS = [['video', '영상학습훈련'], ['voca', '단어'], ['passage', '본문']];
+const tabOf = i => { const t = i.tabId || 'video'; return TABS.some(x => x[0] === t) ? t : TABS[0][0]; };
+ 
+const $ = id => document.getElementById(id);
+const configured = !FB.apiKey.startsWith('YOUR');
+if (configured) firebase.initializeApp(FB);
+const auth = configured ? firebase.auth() : null;
+const db = configured ? firebase.firestore() : null;
+const st = configured ? firebase.storage() : null;
+// 관리자 로그인 상태를 유지한 채 새 계정을 만들기 위한 보조 앱
+const auth2 = configured ? firebase.initializeApp(FB, 'sec').auth() : null;
+ 
+const S = { me: null, view: 'content', folder: 'B', folderId: null, tab: 'video', items: [], branches: [], viewBranch: 'main', stuBranch: 'main', pdfTitle: '', hqLogo: '', hqLogoPath: '', hFilter: '' };
+ 
+function h(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+function btn(txt, cls, fn) { const b = h('button', cls, txt); b.onclick = () => safe(fn); return b; }
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const toast = m => { const t = $('toast'); t.textContent = m; t.classList.toggle('hidden', !m); };
+const safe = async f => { try { await f(); } catch (e) { toast(''); alert(e.message || '오류가 발생했습니다.'); } };
+const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ko', { numeric: true });
+const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
+const B1 = 'bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition';
+const B2 = 'bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-2 rounded-xl font-bold transition';
+const branchName = id => id === 'main' ? '본원' : ((S.branches.find(b => b.id === id) || {}).academyName || id);
+ 
+/* ===== 계정 생성 (Firebase Auth) ===== */
+async function createAuth(id, pw) {
+  if (!/^[a-z0-9._-]{3,30}$/.test(id)) throw new Error('아이디는 영문 소문자·숫자·._- 조합 3~30자로 입력하세요.');
+  if (pw.length < 6) throw new Error('비밀번호는 6자리 이상이어야 합니다.');
+  const email = id + DOMAIN; let uid;
+  try { uid = (await auth2.createUserWithEmailAndPassword(email, pw)).user.uid; }
+  catch (e) {
+    if (e.code !== 'auth/email-already-in-use') throw e;
+    // 삭제된 계정(프로필 없음)은 같은 비밀번호로 재등록 가능
+    try { uid = (await auth2.signInWithEmailAndPassword(email, pw)).user.uid; if ((await db.collection('users').doc(uid).get()).exists) uid = null; } catch (_) { uid = null; }
+    if (!uid) { await auth2.signOut().catch(() => {}); throw new Error('이미 사용 중인 아이디입니다.'); }
+  }
+  await auth2.signOut();
+  return uid;
+}
+ 
+/* ===== 로그인 ===== */
+const setErr = m => { $('login-error').textContent = m; };
+async function handleLogin(e) {
+  e.preventDefault();
+  if (!configured) return setErr('index.html 상단의 Firebase 설정값(FB)을 먼저 입력하세요.');
+  setErr('');
+  const id = $('login-id').value.trim().toLowerCase(), pw = $('login-pw').value;
+  try { await auth.signInWithEmailAndPassword(id + DOMAIN, pw); }
+  catch (x) { setErr('아이디 또는 비밀번호가 올바르지 않습니다.'); }
+}
+if (configured) auth.onAuthStateChanged(async u => {
+  if (!u) { S.me = null; $('login-screen').classList.remove('hidden'); $('app').classList.add('hidden'); return; }
+  try {
+    let p;
+    if (u.email === ADMIN_ID + DOMAIN) {
+      p = { role: 'super', name: '본원 관리자', branchId: 'main' };
+      await db.collection('users').doc(u.uid).set({ role: 'super', name: p.name, loginId: ADMIN_ID, branchId: 'main' }, { merge: true });
+    } else {
+      const d = await db.collection('users').doc(u.uid).get();
+      if (!d.exists) { await auth.signOut(); return setErr('삭제되었거나 등록되지 않은 계정입니다.'); }
+      p = d.data();
+    }
+    S.me = { uid: u.uid, ...p };
+    if (p.role !== 'super') {
+      const b = await db.collection('branches').doc(p.branchId).get();
+      S.me.academyName = b.exists ? b.data().academyName : '최강수학메이드영어학원';
+      S.me.logoUrl = b.exists ? (b.data().logoUrl || '') : ''; S.me.logoPath = b.exists ? (b.data().logoPath || '') : '';
+    }
+    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
+    if (p.role === 'super') await loadBranches();
+    enterPortal();
+  } catch (e) { await auth.signOut(); setErr('로그인 처리 중 오류: ' + e.message); }
+});
+ 
+function enterPortal() {
+  const m = S.me;
+  $('login-screen').classList.add('hidden'); $('app').classList.remove('hidden');
+  $('hd-name').textContent = m.role === 'super' ? '최강수학메이드영어학원 본원 관리센터' : m.academyName;
+  $('hd-sub').textContent = { super: '전체 관리', sub: '지점 관리자 모드', student: '학생 학습관' }[m.role];
+  $('badge').textContent = m.role === 'super' ? '👑 최고 관리자' : m.role === 'sub' ? '🏛️ ' + m.academyName + ' 원장님' : '👨‍🎓 ' + m.name + ' 학생';
+  S.folder = 'B'; S.folderId = null; S.viewBranch = 'main'; S.stuBranch = 'main'; S.tab = TABS[0][0]; drawLogo(); setTimeout(showStudyModal, 600);
+  buildSide(); setView('content');
+}
+ 
+async function loadBranches() {
+  const s = await db.collection('branches').get();
+  S.branches = s.docs.map(d => ({ id: d.id, ...d.data() })).sort(byName.bind(null));
+  S.branches.sort((a, b) => (a.academyName || '').localeCompare(b.academyName || '', 'ko'));
+}
+ 
+/* ===== 내비게이션 ===== */
+function buildSide() {
+  const c = $('side'); c.innerHTML = '';
+  FOLDERS.forEach(f => {
+    const on = S.folder === f.id;
+    c.append(btn(f.name, 'w-full text-left font-bold p-3 rounded-xl text-sm border transition ' + (on ? 'bg-indigo-900 text-white border-indigo-900' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'), async () => {
+      S.folder = f.id; S.folderId = null; buildSide(); setView('content');
+    }));
+  });
+}
+function setView(v) {
+  S.view = v;
+  ['content', 'students', 'history', 'settings', 'branches', 'import'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== v));
+  $('side').parentElement.classList.toggle('hidden', v !== 'content');
+  const views = [['content', '📂 학습 자료실']];
+  if (S.me.role !== 'student') views.push(['students', '👨‍🎓 학생 관리'], ['history', '📊 학습 이력']);
+  if (S.me.role !== 'student') views.push(['settings', S.me.role === 'sub' ? '⚙️ 학원 설정' : '⚙️ 본원 로고']);
+  if (S.me.role === 'super') views.push(['branches', '🏛️ 지점 관리'], ['import', '💾 백업·가져오기']);
+  const nav = $('view-nav'); nav.innerHTML = '';
+  nav.classList.toggle('hidden', views.length < 2);
+  views.forEach(([id, label]) => nav.append(btn(label, 'flex-1 py-2 rounded-lg text-xs font-bold ' + (v === id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'), () => setView(id))));
+  safe(async () => { if (v === 'content') await renderContent(); else if (v === 'students') await renderStudents(); else if (v === 'branches') await renderBranches(); else if (v === 'history') await renderHistory(); else if (v === 'settings') renderSettings(); });
+}
+ 
+/* ===== 학습 자료 ===== */
+const isEdit = () => S.me.role === 'super' || (S.me.role === 'sub' && S.folder === 'A');
+const curBranch = () => S.me.role === 'super' ? S.viewBranch : S.me.branchId;
+ 
+async function loadItems() {
+  let q = db.collection('items').where('folder', '==', S.folder);
+  if (S.folder === 'A') {
+    q = q.where('branchId', '==', curBranch());
+    if (S.me.role === 'student') q = q.where('visible', '==', true);
+  }
+  S.items = (await q.get()).docs.map(d => ({ id: d.id, ...d.data() }));
+}
+async function renderContent() { toast('불러오는 중...'); await loadItems(); toast(''); drawContent(); }
+ 
+function drawContent() {
+  const f = FOLDERS.find(x => x.id === S.folder), edit = isEdit();
+  // 경로
+  const path = []; let cur = S.folderId;
+  while (cur) { const it = S.items.find(i => i.id === cur); if (!it) break; path.unshift(it); cur = it.parentId || null; }
+  const crumb = $('crumb'); crumb.innerHTML = '';
+  const root = h('span', 'cursor-pointer hover:underline', '📁 ' + f.name); root.onclick = () => { S.folderId = null; drawContent(); }; crumb.append(root);
+  path.forEach(p => { crumb.append(h('span', 'text-slate-400', '＞')); const s = h('span', 'cursor-pointer hover:underline', p.name); s.onclick = () => { S.folderId = p.id; drawContent(); }; crumb.append(s); });
+  $('title').textContent = path.length ? path[path.length - 1].name : f.name;
+ 
+  // 안내문
+  const notes = {
+    B: '본원 공용 자료입니다. 모든 지점과 학생에게 공유되며 PDF 자료는 열어서 인쇄할 수 있습니다.',
+    A: S.me.role === 'student' ? '우리 지점에서 공개한 자료입니다.' : '우리 지점 전용 폴더입니다. 자료마다 학생 공개/비공개를 정할 수 있고, 새 자료는 비공개로 시작합니다.',
+    C: '수학 전용 폴더입니다.', D: '국어 전용 폴더입니다.', E: '전과목 통합 폴더입니다.'
+  };
+  $('note').textContent = '💡 ' + notes[S.folder];
+ 
+  // 슈퍼관리자: A 폴더에서 지점 선택
+  const bp = $('branch-pick'); bp.innerHTML = '';
+  bp.classList.toggle('hidden', !(S.me.role === 'super' && S.folder === 'A'));
+  if (S.me.role === 'super' && S.folder === 'A') {
+    bp.append(h('span', 'text-xs font-bold text-slate-600 mr-2', '지점 선택'));
+    const sel = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold');
+    [{ id: 'main', academyName: '본원' }, ...S.branches].forEach(b => { const o = h('option', '', b.academyName); o.value = b.id; sel.append(o); });
+    sel.value = S.viewBranch;
+    sel.onchange = () => { S.viewBranch = sel.value; S.folderId = null; safe(renderContent); };
+    bp.append(sel);
+  }
+ 
+  // 도구
+  const tools = $('tools'); tools.innerHTML = '';
+  if (edit) {
+    tools.append(btn('+ 새 폴더', B1, () => addItem('folder')), btn('🔗 링크 등록', 'bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('link')), btn('📄 PDF 등록', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('pdf')));
+  }
+ 
+  // 탭
+  const tabs = $('tabs'); tabs.innerHTML = '';
+  if (!TABS.some(t => t[0] === S.tab)) S.tab = TABS[0][0];
+  TABS.forEach(([id, name]) => {
+    const w = h('div', 'flex items-center gap-1');
+    w.append(btn(name, 'font-bold text-sm px-4 py-2 rounded-xl transition ' + (S.tab === id ? 'bg-amber-500 text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'), () => { S.tab = id; drawContent(); }));
+    if (S.me.role === 'super') w.append(btn('✏️', B2, () => editTab(id)), btn('🗑', B2, () => delTab(id)));
+    tabs.append(w);
+  });
+  if (S.me.role === 'super') tabs.append(btn('+ 메뉴 추가', B2, addTab));
+ 
+  // 목록
+  const list = $('list'); list.innerHTML = '';
+  if (S.folderId) {
+    const par = path[path.length - 2];
+    list.append(btn('⬆️ 상위 폴더로 이동', 'w-full text-left p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm border border-slate-200', () => { S.folderId = par ? par.id : null; drawContent(); }));
+  }
+  const kids = S.items.filter(i => (i.parentId || null) === S.folderId && (i.type === 'folder' || tabOf(i) === S.tab)).sort((a, b) => (a.type === b.type ? byName(a, b) : a.type === 'folder' ? -1 : 1));
+  if (!kids.length) { list.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', '등록된 학습 자료가 없습니다.')); return; }
+  kids.forEach(it => {
+    const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap justify-between items-center gap-3 font-bold text-slate-700 text-sm');
+    const l = h('div', 'flex items-center gap-2.5 flex-grow min-w-0');
+    l.append(h('span', 'text-xl', it.type === 'folder' ? '📂' : it.pdfUrl ? '📄' : '🔗'), h('span', 'text-base break-all', it.name));
+    if (S.folder === 'A' && edit) l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (it.visible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'), it.visible ? '학생공개' : '비공개'));
+    if (it.type === 'folder') { l.classList.add('cursor-pointer'); l.onclick = () => { S.folderId = it.id; drawContent(); }; }
+    row.append(l);
+    const r = h('div', 'flex flex-wrap items-center gap-1.5');
+    if (it.type === 'folder') r.append(btn('열기', B1, () => { S.folderId = it.id; drawContent(); }));
+    if (it.linkUrl) r.append(btn('학습하기', B1, () => openLink(it)));
+    if (it.pdfUrl) r.append(btn('📄 PDF 열기·인쇄', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => { startStudy(it); window.open(it.pdfUrl, '_blank', 'noopener'); }));
+    if (edit) {
+      if (S.folder === 'A') r.append(btn(it.visible ? '🔒 비공개로' : '🔓 학생 공개', B2, async () => { await db.collection('items').doc(it.id).update({ visible: !it.visible }); it.visible = !it.visible; drawContent(); }));
+      r.append(btn('✏️', B2, () => renameItem(it)), btn('🗑', B2, () => deleteItem(it)));
+    }
+    row.append(r); list.append(row);
+  });
+}
+ 
+function baseItem() {
+  return { folder: S.folder, parentId: S.folderId, tabId: S.tab, visible: S.folder !== 'A', createdAt: Date.now(), ...(S.folder === 'A' ? { branchId: curBranch() } : {}) };
+}
+async function addItem(kind) {
+  const name = prompt(kind === 'folder' ? '새 폴더 이름:' : '학습 자료 제목:'); if (!name || !name.trim()) return;
+  const d = { ...baseItem(), name: name.trim() };
+  if (kind === 'folder') { d.type = 'folder'; }
+  else if (kind === 'link') {
+    const u = safeUrl((prompt('웹페이지 주소(https://...):') || '').trim());
+    if (!u) return alert('올바른 http(s) 주소를 입력하세요.');
+    d.type = 'file'; d.linkUrl = u;
+  } else { S.pdfTitle = d.name; $('pdf-input').click(); return; }
+  await db.collection('items').add(d); await renderContent();
+}
+$('pdf-input').onchange = e => {
+  const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+  safe(async () => {
+    if (file.type !== 'application/pdf') throw new Error('PDF 파일만 올릴 수 있습니다.');
+    if (file.size > 20 * 1024 * 1024) throw new Error('파일 크기는 20MB 이하여야 합니다.');
+    toast('PDF 업로드 중...');
+    const ref = st.ref('pdf/' + S.folder + '/' + Date.now() + '_' + file.name.replace(/[^\w.-]/g, '_'));
+    await ref.put(file, { contentType: 'application/pdf' });
+    const url = await ref.getDownloadURL();
+    await db.collection('items').add({ ...baseItem(), name: S.pdfTitle, type: 'file', pdfUrl: url, pdfPath: ref.fullPath });
+    await renderContent();
+  });
+};
+async function renameItem(it) {
+  const n = prompt('새 이름:', it.name); if (!n || !n.trim()) return;
+  const upd = { name: n.trim() };
+  if (it.linkUrl) { const u = safeUrl((prompt('웹/링크 주소:', it.linkUrl) || '').trim()); if (!u) return alert('올바른 http(s) 주소를 입력하세요.'); upd.linkUrl = u; }
+  await db.collection('items').doc(it.id).update(upd); await renderContent();
+}
+async function deleteItem(it) {
+  if (!confirm('"' + it.name + '" ' + (it.type === 'folder' ? '폴더와 하위 자료를 모두 ' : '') + '삭제할까요?')) return;
+  const ids = new Set(); const walk = id => { ids.add(id); S.items.forEach(i => { if (i.parentId === id) walk(i.id); }); }; walk(it.id);
+  const targets = S.items.filter(i => ids.has(i.id));
+  for (let i = 0; i < targets.length; i += 400) { const b = db.batch(); targets.slice(i, i + 400).forEach(t => b.delete(db.collection('items').doc(t.id))); await b.commit(); }
+  for (const t of targets) if (t.pdfPath) st.ref(t.pdfPath).delete().catch(() => {});
+  await renderContent();
+}
+ 
+/* ===== 지점 관리 (어드민) ===== */
+async function renderBranches() {
+  await loadBranches();
+  const v = $('view-branches'); v.innerHTML = '';
+  const top = h('div', 'flex justify-between items-center mb-6 pb-4 border-b border-slate-100');
+  top.append(h('h2', 'text-xl font-bold text-slate-800', '지점장 계정 등록'), btn('+ 신규 지점 등록', B1, addBranch));
+  const grid = h('div', 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4');
+  if (!S.branches.length) grid.append(h('div', 'col-span-full text-center py-12 text-slate-400 text-sm', '등록된 지점이 없습니다.'));
+  S.branches.forEach(b => {
+    const c = h('div', 'p-5 bg-slate-50 border border-slate-200 rounded-2xl');
+    c.append(h('div', 'font-bold text-slate-800 text-lg mb-2', b.academyName), h('div', 'text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200', '🆔 아이디: ' + b.loginId), btn('지점 삭제', 'mt-3 w-full text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200', () => delBranch(b)));
+    grid.append(c);
+  });
+  v.append(top, grid);
+}
+async function addBranch() {
+  const academyName = (prompt('학원 이름 (예: 남양주지점):') || '').trim(); if (!academyName) return;
+  const loginId = (prompt('지점 로그인 아이디 (영문 소문자·숫자):') || '').trim().toLowerCase(); if (!loginId) return;
+  const pw = prompt('지점 로그인 비밀번호 (6자리 이상):'); if (!pw) return;
+  toast('계정 생성 중...');
+  const uid = await createAuth(loginId, pw);
+  const b = db.batch();
+  b.set(db.collection('users').doc(uid), { role: 'sub', name: academyName, academyName, loginId, branchId: uid });
+  b.set(db.collection('branches').doc(uid), { academyName, loginId });
+  await b.commit(); toast('');
+  alert('지점이 등록되었습니다. 지금 바로 로그인할 수 있습니다.\n아이디: ' + loginId);
+  await renderBranches();
+}
+ 
+/* ===== 학생 관리 ===== */
+async function renderStudents() {
+  const sup = S.me.role === 'super', bid = sup ? S.stuBranch : S.me.uid;
+  const snap = await db.collection('users').where('branchId', '==', bid).where('role', '==', 'student').get();
+  const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(byName);
+  const v = $('view-students'); v.innerHTML = '';
+  const top = h('div', 'flex flex-wrap justify-between items-center gap-3 mb-6 pb-4 border-b border-slate-100');
+  const left = h('div', 'flex flex-wrap items-center gap-3');
+  left.append(h('h2', 'text-xl font-bold text-slate-800', sup ? '학생 관리' : '소속 학생 관리'));
+  if (sup) {
+    const sel = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold');
+    [{ id: 'main', academyName: '본원' }, ...S.branches].forEach(b => { const o = h('option', '', b.academyName); o.value = b.id; sel.append(o); });
+    sel.value = S.stuBranch; sel.onchange = () => { S.stuBranch = sel.value; safe(renderStudents); }; left.append(sel);
+  }
+  left.append(h('span', 'text-xs font-bold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full', sup ? list.length + '명 (제한 없음)' : list.length + ' / ' + MAX_STUDENTS + '명'));
+  top.append(left, btn('+ 학생 등록', B1, () => addStudent(bid, list.length)));
+  const grid = h('div', 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4');
+  if (!list.length) grid.append(h('div', 'col-span-full text-center py-12 text-slate-400 text-sm', '등록된 학생이 없습니다.'));
+  list.forEach(s => {
+    const c = h('div', 'p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-3');
+    const hd = h('div', 'flex justify-between items-start');
+    hd.append(h('span', 'font-bold text-slate-800 text-lg', s.name), h('span', 'text-xs bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-full font-bold border border-slate-200', s.grade || ''));
+    c.append(hd, h('div', 'text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200', '🆔 아이디: ' + s.loginId),
+      btn('학생 삭제', 'text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200', async () => {
+        if (!confirm(s.name + ' 학생을 삭제할까요? 삭제 즉시 로그인이 차단됩니다.')) return;
+        await db.collection('users').doc(s.id).delete(); await renderStudents();
+      }));
+    grid.append(c);
+  });
+  v.append(top, grid);
+}
+async function addStudent(bid, count) {
+  if (S.me.role === 'sub' && count >= MAX_STUDENTS) return alert('학생은 최대 ' + MAX_STUDENTS + '명까지 등록할 수 있습니다.\n추가 등록이 필요하면 본원 관리자에게 요청해 주세요.');
+  const name = (prompt('학생 이름:') || '').trim(); if (!name) return;
+  const loginId = (prompt('학생 아이디 (영문 소문자·숫자):') || '').trim().toLowerCase(); if (!loginId) return;
+  const pw = prompt('학생 비밀번호 (6자리 이상):'); if (!pw) return;
+  const grade = (prompt('학년 (예: 중1):', '중1') || '').trim();
+  toast('계정 생성 중...');
+  const uid = await createAuth(loginId, pw);
+  await db.collection('users').doc(uid).set({ role: 'student', name, grade, loginId, branchId: bid });
+  toast(''); alert('학생이 등록되었습니다. 지금 바로 로그인할 수 있습니다.');
+  await renderStudents();
+}
+ 
+/* ===== 기존 데이터 가져오기 ===== */
+$('import-file').onchange = e => {
+  const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+  safe(async () => {
+    const j = JSON.parse(await file.text()), md = j.masterDatabase, cats = j.sidebarCats || [];
+    if (j.items) {
+      if (!confirm('백업의 자료 ' + j.items.length + '개를 복원할까요? (같은 ID의 자료는 덮어씁니다)')) return;
+      toast('복원 중...');
+      for (let i = 0; i < j.items.length; i += 400) { const b = db.batch(); j.items.slice(i, i + 400).forEach(({ id, ...d }) => b.set(db.collection('items').doc(id), d)); await b.commit(); }
+      if (j.tabs && j.tabs.length) { TABS = j.tabs.map(t => [t.id, t.name]); await saveTabs(); }
+      toast(''); return alert('자료를 복원했습니다. (계정은 Firebase Auth에서 관리되어 복원 대상이 아닙니다.)');
+    }
+    if (!md) throw new Error('지원하지 않는 백업 파일입니다.');
+    const ops = [];
+    Object.keys(md).forEach(cid => {
+      const root = 'cat_' + cid;
+      ops.push([root, { folder: 'B', type: 'folder', name: (cats.find(c => c.id === cid) || {}).name || cid, parentId: null, tabId: 'video', visible: true }]);
+      md[cid].forEach(i => ops.push([cid + '__' + i.id, { folder: 'B', type: i.type, name: i.name, parentId: i.parentId ? cid + '__' + i.parentId : root, tabId: i.tabId || 'video', visible: true, ...(i.linkUrl && safeUrl(i.linkUrl) ? { linkUrl: i.linkUrl } : {}) }]));
+    });
+    if (!confirm(ops.length + '개 항목을 B 폴더로 가져올까요?')) return;
+    toast('가져오는 중...');
+    for (let i = 0; i < ops.length; i += 400) { const b = db.batch(); ops.slice(i, i + 400).forEach(([id, d]) => b.set(db.collection('items').doc(id), d)); await b.commit(); }
+    toast(''); alert(ops.length + '개 항목을 가져왔습니다.');
+  });
+};
+ 
+/* ===== 상단 메뉴 관리 ===== */
+const saveTabs = () => db.collection('config').doc('main').set({ tabs: TABS.map(([id, name]) => ({ id, name })) }, { merge: true });
+async function addTab() { const n = (prompt('새 메뉴 이름:') || '').trim(); if (!n) return; TABS.push(['tab_' + Date.now(), n]); await saveTabs(); S.tab = TABS[TABS.length - 1][0]; drawContent(); }
+async function editTab(id) { const t = TABS.find(x => x[0] === id), n = (prompt('메뉴 이름 변경:', t[1]) || '').trim(); if (!n) return; t[1] = n; await saveTabs(); drawContent(); }
+async function delTab(id) {
+  if (TABS.length <= 1) return alert('최소 1개의 메뉴는 필요합니다.');
+  const t = TABS.find(x => x[0] === id);
+  if (!confirm('"' + t[1] + '" 메뉴를 삭제할까요?\n이 메뉴의 자료는 삭제되지 않고 첫 번째 메뉴에 표시됩니다.')) return;
+  TABS = TABS.filter(x => x[0] !== id); await saveTabs(); S.tab = TABS[0][0]; drawContent();
+}
+ 
+/* ===== 유튜브 팝업 ===== */
+function ytId(u) {
+  try {
+    const x = new URL(u), host = x.hostname.replace(/^www\.|^m\./, ''); let id = null;
+    if (host === 'youtu.be') id = x.pathname.slice(1);
+    else if (host === 'youtube.com') id = x.searchParams.get('v') || (x.pathname.match(/^\/(?:embed|shorts|live)\/([\w-]+)/) || [])[1];
+    return id && /^[\w-]{6,20}$/.test(id) ? id : null;
+  } catch { return null; }
+}
+function openLink(it) {
+  startStudy(it);
+  const id = ytId(it.linkUrl);
+  if (!id) { window.open(it.linkUrl, '_blank', 'noopener'); return; }
+  $('yt-title').textContent = it.name; $('yt-frame').src = 'https://www.youtube.com/embed/' + id;
+  $('yt-modal').classList.remove('hidden'); $('yt-modal').classList.add('flex');
+}
+function closeYt() { $('yt-frame').src = ''; $('yt-modal').classList.add('hidden'); $('yt-modal').classList.remove('flex'); showStudyModal(); }
+ 
+/* ===== 학습 이력 ===== */
+/* 학습 시작 → 완료 기록 (학생) */
+const KEEP = 30 * 24 * 3600 * 1000; // 학습 이력 보관 기간: 30일
+let pend = null; try { pend = JSON.parse(sessionStorage.getItem('pend') || 'null'); } catch (_) {}
+const dayOf = ts => { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const fmtT = ts => new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const fmtD = s => Math.floor(s / 60) + '분 ' + (s % 60) + '초';
+function startStudy(it) {
+  if (S.me.role !== 'student') return;
+  const start = Date.now();
+  db.collection('history').add({ kind: 'study', branchId: S.me.branchId, studentUid: S.me.uid, studentName: S.me.name, title: it.name, folder: S.folder, itemId: it.id, startTs: start, ts: start, day: dayOf(start), endTs: null, durationSec: null, score: null, status: 'started', expireAt: firebase.firestore.Timestamp.fromMillis(start + KEEP) })
+    .then(r => { pend = { id: r.id, title: it.name, start, uid: S.me.uid }; sessionStorage.setItem('pend', JSON.stringify(pend)); }).catch(() => {});
+}
+function showStudyModal() {
+  if (!pend || !S.me || S.me.role !== 'student' || pend.uid !== S.me.uid) return;
+  if (!$('yt-modal').classList.contains('hidden')) return;
+  $('study-info').textContent = '"' + pend.title + '" · 시작 ' + fmtT(pend.start) + ' · 경과 ' + fmtD(Math.round((Date.now() - pend.start) / 1000));
+  $('study-score').value = '';
+  $('study-modal').classList.remove('hidden'); $('study-modal').classList.add('flex');
+}
+function hideStudyModal() { $('study-modal').classList.add('hidden'); $('study-modal').classList.remove('flex'); }
+async function saveStudy() {
+  if (!pend) return hideStudyModal();
+  const sv = $('study-score').value.trim(); let score = null;
+  if (sv !== '') { score = Number(sv); if (!(score >= 0 && score <= 100)) return alert('점수는 0~100 사이로 입력하세요.'); }
+  const end = Date.now();
+  await db.collection('history').doc(pend.id).update({ endTs: end, durationSec: Math.round((end - pend.start) / 1000), score, status: 'done' });
+  pend = null; sessionStorage.removeItem('pend'); hideStudyModal();
+  toast('학습 기록이 저장되었습니다.'); setTimeout(() => toast(''), 2000);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) showStudyModal(); });
+ 
+/* 학습 이력 보기 (지점장·어드민) */
+function histRow(r, sup) {
+  const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl mb-2');
+  const hd = h('div', 'flex flex-wrap items-center gap-2 mb-1');
+  hd.append(h('span', 'font-bold text-slate-800 text-base', r.studentName || ''));
+  if (r.kind === 'study') {
+    const done = r.status === 'done';
+    hd.append(h('span', 'text-xs px-2 py-0.5 rounded-full font-bold ' + (done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'), done ? '학습 완료' : '완료 기록 없음'));
+    if (done) hd.append(h('span', 'text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold', r.score != null ? r.score + '점' : '점수 미입력'));
+  } else if (r.kind === 'score') hd.append(h('span', 'text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold', r.score + '점'));
+  if (sup) hd.append(h('span', 'text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold', branchName(r.branchId)));
+  row.append(hd, h('div', 'text-sm text-slate-600 font-medium', r.kind === 'score' ? r.title + ' (' + r.correct + ' / ' + r.total + ' 정답)' : '📖 ' + r.title));
+  const t = r.kind === 'study' ? '시작 ' + fmtT(r.startTs) + (r.endTs ? ' → 완료 ' + fmtT(r.endTs) + ' (소요 ' + fmtD(r.durationSec) + ')' : '') : fmtT(r.ts) + ' 기록';
+  row.append(h('div', 'text-xs text-slate-400 mt-1', t));
+  return row;
+}
+async function renderHistory() {
+  const sup = S.me.role === 'super', cut = Date.now() - KEEP;
+  const snap = await (sup ? db.collection('history').orderBy('ts', 'desc').limit(500) : db.collection('history').where('branchId', '==', S.me.uid)).get();
+  const old = snap.docs.filter(d => d.data().ts < cut);
+  if (sup) { try { (await db.collection('history').where('ts', '<', cut).limit(400).get()).docs.forEach(d => { if (!old.some(o => o.id === d.id)) old.push(d); }); } catch (_) {} }
+  for (let i = 0; i < old.length; i += 400) { const b = db.batch(); old.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit().catch(() => {}); }
+  let rec = snap.docs.filter(d => d.data().ts >= cut).map(d => d.data()).sort((a, b) => b.ts - a.ts);
+  const names = [...new Set(rec.map(r => r.studentName).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+  const flt = names.includes(S.hFilter) ? S.hFilter : ''; S.hFilter = flt;
+  if (flt) rec = rec.filter(r => r.studentName === flt);
+  const v = $('view-history'); v.innerHTML = '';
+  const top = h('div', 'flex flex-wrap justify-between items-center gap-3 mb-2 pb-4 border-b border-slate-100');
+  const left = h('div', 'flex flex-wrap items-center gap-3');
+  left.append(h('h2', 'text-xl font-bold text-slate-800', '학생 학습 이력'));
+  const sel = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold');
+  [''].concat(names).forEach(n => { const o = h('option', '', n || '전체 학생'); o.value = n; sel.append(o); });
+  sel.value = flt; sel.onchange = () => { S.hFilter = sel.value; safe(renderHistory); }; left.append(sel);
+  top.append(left, btn('+ 점수 입력', B1, addScore));
+  v.append(top, h('p', 'text-xs text-slate-400 mb-4', '학습 이력은 30일 동안 보관되고 이후 자동 삭제됩니다.'));
+  if (!rec.length) v.append(h('div', 'text-center py-12 text-slate-400 text-sm', '학습 이력이 없습니다. 학생이 자료를 열면 시작 시각이 자동으로 기록됩니다.'));
+  const days = {}; rec.forEach(r => { (days[r.day || dayOf(r.ts)] ||= []).push(r); });
+  Object.keys(days).sort().reverse().forEach(day => {
+    v.append(h('h3', 'text-sm font-bold text-indigo-700 mt-5 mb-2', day + ' · ' + days[day].length + '건'));
+    days[day].forEach(r => v.append(histRow(r, sup)));
+  });
+}
+async function addScore() {
+  const bid = S.me.role === 'super' ? S.stuBranch : S.me.uid;
+  const name = (prompt('학생 이름 (' + branchName(bid) + ' 기록):') || '').trim(); if (!name) return;
+  const title = (prompt('시험/학습 제목:') || '').trim(); if (!title) return;
+  const total = parseInt(prompt('전체 문항 수:', '20'), 10), correct = parseInt(prompt('맞힌 문항 수:'), 10);
+  if (!(total > 0) || !(correct >= 0) || correct > total) return alert('문항 수를 올바르게 입력하세요.');
+  const now = Date.now();
+  await db.collection('history').add({ branchId: bid, studentName: name, title, kind: 'score', correct, total, score: Math.round(correct / total * 100), ts: now, day: dayOf(now), expireAt: firebase.firestore.Timestamp.fromMillis(now + KEEP) });
+  await renderHistory();
+}
+ 
+/* ===== 학원 설정 (지점장) ===== */
+function drawLogo() {
+  const u = S.me.role === 'super' ? S.hqLogo : (S.me.logoUrl || S.hqLogo), box = $('hd-logo'); box.innerHTML = '';
+  if (u) { const i = h('img', 'w-full h-full object-contain'); i.src = u; i.alt = '학원 로고'; box.append(i); } else box.textContent = 'CM';
+}
+async function pdfToPng(file) {
+  if (!window.pdfjsLib) throw new Error('PDF 변환 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('PDF 로고 파일은 10MB 이하여야 합니다.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pg = await pdf.getPage(1), v0 = pg.getViewport({ scale: 1 });
+  const vp = pg.getViewport({ scale: Math.min(4, 600 / Math.max(v0.width, v0.height)) });
+  const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+  await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+  const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  if (!blob) throw new Error('PDF를 이미지로 변환하지 못했습니다.');
+  return new File([blob], file.name.replace(/\.pdf$/i, '') + '.png', { type: 'image/png' });
+}
+async function setLogo(file) {
+  if (file && file.type === 'application/pdf') { toast('PDF 변환 중...'); file = await pdfToPng(file); toast(''); }
+  if (file) {
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) throw new Error('PNG, JPG, WEBP, GIF 이미지 또는 PDF 파일만 올릴 수 있습니다.');
+    if (file.size > 1024 * 1024) throw new Error('로고 파일은 1MB 이하여야 합니다.');
+  }
+  const sup = S.me.role === 'super', id = sup ? 'main' : S.me.uid, oldPath = sup ? S.hqLogoPath : S.me.logoPath;
+  let url = '', path = '';
+  if (file) {
+    toast('로고 업로드 중...');
+    const ref = st.ref('logo/' + id + '/' + Date.now() + '_' + file.name.replace(/[^\w.-]/g, '_'));
+    await ref.put(file, { contentType: file.type }); url = await ref.getDownloadURL(); path = ref.fullPath;
+  }
+  if (sup) { await db.collection('config').doc('main').set({ logoUrl: url, logoPath: path }, { merge: true }); S.hqLogo = url; S.hqLogoPath = path; }
+  else { await db.collection('branches').doc(id).update({ logoUrl: url, logoPath: path }); S.me.logoUrl = url; S.me.logoPath = path; }
+  if (oldPath) st.ref(oldPath).delete().catch(() => {});
+  toast(''); drawLogo(); renderSettings();
+}
+function renderSettings() {
+  const sup = S.me.role === 'super', v = $('view-settings'); v.innerHTML = '';
+  v.append(h('h2', 'text-xl font-bold text-slate-800 mb-4', sup ? '본원 로고 설정' : '학원 설정'));
+  const box = h('div', 'bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xl space-y-4');
+  if (!sup) {
+    const inp = h('input', 'w-full p-3 bg-white border border-slate-300 rounded-xl font-bold text-slate-800'); inp.value = S.me.academyName || ''; inp.maxLength = 40;
+    box.append(h('label', 'block text-xs font-bold text-slate-600', '학원명'), inp, btn('학원명 저장하기', 'w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition', async () => {
+      const n = inp.value.trim(); if (!n) return alert('학원명을 입력하세요.');
+      const b = db.batch(); b.update(db.collection('branches').doc(S.me.uid), { academyName: n }); b.update(db.collection('users').doc(S.me.uid), { academyName: n, name: n }); await b.commit();
+      S.me.academyName = n; $('hd-name').textContent = n; $('badge').textContent = '🏛️ ' + n + ' 원장님'; alert('학원명이 저장되었습니다.');
+    }));
+  }
+  box.append(h('label', 'block text-xs font-bold text-slate-600', sup ? '본원 로고 (로고가 없는 지점의 기본 로고로도 쓰입니다)' : '학원 로고 (PNG·JPG·WEBP·GIF 1MB 이하, 또는 PDF 첫 페이지)'));
+  const cur = sup ? S.hqLogo : S.me.logoUrl;
+  const pv = h('div', 'w-20 h-20 rounded-2xl bg-indigo-700 text-white font-bold text-xl flex items-center justify-center overflow-hidden');
+  if (cur) { const i = h('img', 'w-full h-full object-contain'); i.src = cur; i.alt = '로고'; pv.append(i); } else pv.textContent = 'CM';
+  const fi = h('input', 'text-xs'); fi.type = 'file'; fi.accept = 'image/png,image/jpeg,image/webp,image/gif,application/pdf';
+  fi.onchange = () => { const f = fi.files[0]; fi.value = ''; if (f) safe(() => setLogo(f)); };
+  box.append(pv, fi);
+  if (cur) box.append(btn('로고 삭제', B2, () => setLogo(null)));
+  v.append(box);
+}
+ 
+/* ===== 지점 삭제 / 전체 백업 ===== */
+async function delQuery(q) {
+  const docs = (await q.get()).docs;
+  for (let i = 0; i < docs.length; i += 400) { const b = db.batch(); docs.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit(); }
+  return docs.map(d => d.data());
+}
+async function delBranch(b) {
+  if (!confirm('"' + b.academyName + '" 지점을 삭제할까요?\n이 지점의 학생 계정, 지점 전용(A) 자료, 학습 이력이 모두 삭제되며 되돌릴 수 없습니다.\n(삭제 전에 백업을 받아 두세요)')) return;
+  if (prompt('확인을 위해 지점 아이디를 입력하세요: ' + b.loginId) !== b.loginId) return alert('아이디가 일치하지 않아 취소했습니다.');
+  toast('삭제 중...'); if (b.logoPath) st.ref(b.logoPath).delete().catch(() => {});
+  const items = await delQuery(db.collection('items').where('folder', '==', 'A').where('branchId', '==', b.id));
+  for (const t of items) if (t.pdfPath) st.ref(t.pdfPath).delete().catch(() => {});
+  await delQuery(db.collection('users').where('branchId', '==', b.id).where('role', '==', 'student'));
+  await delQuery(db.collection('history').where('branchId', '==', b.id));
+  const bt = db.batch(); bt.delete(db.collection('users').doc(b.id)); bt.delete(db.collection('branches').doc(b.id)); await bt.commit();
+  toast(''); S.stuBranch = 'main'; S.viewBranch = 'main'; await renderBranches();
+}
+async function exportData() {
+  toast('백업 생성 중...');
+  const out = { exportedAt: new Date().toISOString(), tabs: TABS.map(([id, name]) => ({ id, name })) };
+  for (const c of ['items', 'branches', 'users', 'history']) out[c] = (await db.collection(c).get()).docs.map(d => ({ id: d.id, ...d.data() }));
+  const a = h('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
+  a.download = 'academy_backup_' + new Date().toISOString().slice(0, 10) + '.json'; document.body.append(a); a.click(); a.remove(); toast('');
+}
+ 
+if (!configured) setErr('index.html 상단의 Firebase 설정값(FB)을 먼저 입력하세요.');
+</script>
 </body>
 </html>
+ 
