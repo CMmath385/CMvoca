@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -116,14 +115,13 @@ body{font-family:'Pretendard',sans-serif}
  
 <script>
 /* ===== 설정: Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)의 값을 붙여넣으세요 ===== */
-
 const FB = {
-apiKey: "AIzaSyDtXLBEPEA89bst8lJWJ8ayCUJgyaf7PS4",
-  authDomain: "cm-academy-8387b.firebaseapp.com",
-  projectId: "cm-academy-8387b",
-  storageBucket: "cm-academy-8387b.appspot.com",
-  messagingSenderId: "371199594988",
-  appId: "1:371199594988:web:a74f2bd1cc853d15d4f0c9"
+  apiKey: 'AIzaSyDtXLBEPEa89bst8lJWJ8ayCUJgyaf7PS4',
+  authDomain: 'cm-academy-8387b.firebaseapp.com',
+  projectId: 'cm-academy-8387b',
+  storageBucket: 'cm-academy-8387b.firebasestorage.app',
+  messagingSenderId: '371199594988',
+  appId: '1:371199594988:web:a74f2bd1cc853d15d4f0c9'
 };
 const DOMAIN = '@cmacademy.com', ADMIN_ID = 'admin', MAX_STUDENTS = 10;
 const FOLDERS = [
@@ -176,14 +174,25 @@ async function createAuth(id, pw) {
  
 /* ===== 로그인 ===== */
 const setErr = m => { $('login-error').textContent = m; };
+const AUTH_MSG = {
+  'auth/invalid-api-key': 'Firebase apiKey가 올바르지 않습니다. index.html 상단의 FB.apiKey를 확인하세요.',
+  'auth/operation-not-allowed': 'Firebase Authentication에서 이메일/비밀번호 로그인이 꺼져 있습니다.',
+  'auth/network-request-failed': '네트워크 연결을 확인하세요.',
+  'auth/too-many-requests': '시도가 너무 많아 잠시 차단되었습니다. 잠시 후 다시 시도하세요.',
+  'auth/user-disabled': '사용이 중지된 계정입니다.',
+  'auth/unauthorized-domain': '승인되지 않은 도메인입니다. Authentication 설정의 승인된 도메인을 확인하세요.',
+  'auth/invalid-credential': '아이디 또는 비밀번호가 올바르지 않습니다.',
+  'auth/wrong-password': '아이디 또는 비밀번호가 올바르지 않습니다.',
+  'auth/user-not-found': '아이디 또는 비밀번호가 올바르지 않습니다.',
+  'auth/invalid-email': '아이디 형식이 올바르지 않습니다.'
+};
 async function handleLogin(e) {
   e.preventDefault();
   if (!configured) return setErr('index.html 상단의 Firebase 설정값(FB)을 먼저 입력하세요.');
   setErr('');
   const id = $('login-id').value.trim().toLowerCase(), pw = $('login-pw').value;
-try { const loginEmail = id.includes('@') ? id : (id + DOMAIN);
-    await auth.signInWithEmailAndPassword(loginEmail, pw); }
-  catch (x) { setErr('아이디 또는 비밀번호가 올바르지 않습니다.'); }
+  try { await auth.signInWithEmailAndPassword(id.includes('@') ? id : id + DOMAIN, pw); }
+  catch (x) { setErr((AUTH_MSG[x.code] || '로그인 오류') + ' [' + (x.code || x.message) + ']'); }
 }
 if (configured) auth.onAuthStateChanged(async u => {
   if (!u) { S.me = null; $('login-screen').classList.remove('hidden'); $('app').classList.add('hidden'); return; }
