@@ -82,8 +82,8 @@ body{font-family:'Pretendard',sans-serif}
         <h2 class="text-xl font-bold text-slate-800 mb-4">백업 · 가져오기</h2>
         <button onclick="safe(exportData)" class="mb-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-md transition">📥 전체 데이터 JSON 백업 다운로드</button>
         <h3 class="text-sm font-bold text-slate-700 mb-2">백업 파일 가져오기</h3>
-        <p class="text-xs text-slate-600 mb-4 max-w-xl">이 화면에서 받은 새 백업 JSON을 올리면 자료(폴더·링크·PDF 정보)와 메뉴가 복원됩니다. 이전 버전의 백업 JSON(academy_platform_backup.json)을 올리면, 기존 카테고리가 B 폴더(본원 공용)의 최상위 폴더로 옮겨집니다. 같은 파일을 다시 올려도 중복되지 않고 덮어씁니다.</p>
-        <input type="file" id="import-file" accept="application/json" class="text-xs">
+        <p class="text-xs text-slate-600 mb-4 max-w-xl">이 화면에서 받은 새 백업 JSON을 올리면 자료(폴더·링크·PDF 정보)와 메뉴가 복원됩니다. 이전 버전의 백업 JSON(academy_platform_backup.json) 또는 예전 사이트의 index.html 파일을 올리면, 기존 카테고리가 B 폴더(본원 공용)의 최상위 폴더로 옮겨집니다. 같은 파일을 다시 올려도 중복되지 않고 덮어씁니다.</p>
+        <input type="file" id="import-file" accept=".json,.html,application/json,text/html" class="text-xs">
       </section>
  
       <footer class="mt-8 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">© 2026 최강수학메이드영어학원. All rights reserved.</footer>
@@ -116,7 +116,7 @@ body{font-family:'Pretendard',sans-serif}
 <script>
 /* ===== 설정: Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)의 값을 붙여넣으세요 ===== */
 const FB = {
- apiKey: 'AIzaSyDtXLBEPEa89bst8lJWJ8ayCUJgyaf7PS4',
+  apiKey: 'AIzaSyDtXLBEPEa89bst8lJWJ8ayCUJgyaf7PS4',
   authDomain: 'cm-academy-8387b.firebaseapp.com',
   projectId: 'cm-academy-8387b',
   storageBucket: 'cm-academy-8387b.firebasestorage.app',
@@ -143,7 +143,7 @@ const st = configured ? firebase.storage() : null;
 // 관리자 로그인 상태를 유지한 채 새 계정을 만들기 위한 보조 앱
 const auth2 = configured ? firebase.initializeApp(FB, 'sec').auth() : null;
  
-const S = { me: null, view: 'content', folder: 'B', folderId: null, tab: 'video', items: [], branches: [], viewBranch: 'main', stuBranch: 'main', pdfTitle: '', hqLogo: '', hqLogoPath: '', hFilter: '' };
+const S = { me: null, view: 'content', folder: 'B', folderId: null, tab: 'video', items: [], branches: [], viewBranch: 'main', stuBranch: 'main', pdfTitle: '', seeded: false, hqLogo: '', hqLogoPath: '', hFilter: '' };
  
 function h(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 function btn(txt, cls, fn) { const b = h('button', cls, txt); b.onclick = () => safe(fn); return b; }
@@ -212,8 +212,11 @@ if (configured) auth.onAuthStateChanged(async u => {
       S.me.academyName = b.exists ? b.data().academyName : '최강수학메이드영어학원';
       S.me.logoUrl = b.exists ? (b.data().logoUrl || '') : ''; S.me.logoPath = b.exists ? (b.data().logoPath || '') : '';
     }
-    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
-    if (p.role === 'super') await loadBranches();
+    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
+    if (p.role === 'super') {
+      await loadBranches();
+      if (!S.seeded) { try { await seedMaterials(); } catch (e) { toast(''); alert('기존 학습 자료 등록 실패: ' + e.message + '\n(백업·가져오기 탭에서 다시 시도할 수 있습니다.)'); } }
+    }
     enterPortal();
   } catch (e) { await auth.signOut(); setErr('로그인 처리 중 오류: ' + e.message); }
 });
@@ -461,11 +464,60 @@ async function addStudent(bid, count) {
   await renderStudents();
 }
  
+/* SEED-START */
+// 예전 사이트(index.html)에 들어 있던 학습 자료. 처음 어드민 로그인 때 B 폴더로 자동 등록됩니다.
+const GSH = 'https://gemini.google.com/share/';
+const TAB_CODES = ['video', 'voca', 'passage'];
+const SEED = {"cats":[["middle_exam","중등부 내신문제"],["high_exam","고등부 내신문제"],["cat_1792074925468","고등모의고사"],["grammar","문법"],["cat_1792074950120","단어"]],"data":{"middle_exam":{"F":[["f_g1",0,"중1 (개정)"],["f_g2",0,"중2 (개정)"],["f_g3",0,"중3"],["f_mirae","f_g1","중1 미래엔 문영인"],["f_visang","f_g1","중1 비상 황종배"],["f_chun_so","f_g1","중1 천재 소영순"],["f_chun_lee","f_g1","중1 천재 이상기"],["f_l1","f_chun_lee","01과"],["f_l2","f_chun_lee","02과"],["f_l3","f_chun_lee","03과"],["f_l4","f_chun_lee","04과"],["f_l5","f_chun_lee","05과"],["f_l6","f_chun_lee","06과"],["f_l7","f_chun_lee","07과"],["f_l8","f_chun_lee","08과"],["f_m2_mirae","f_g2","중2 미래엔 문영인"],["f_m2_visang","f_g2","중2 비상 황종배"],["f_m2_chun_so","f_g2","중2 천재 소영순"],["f_m2_chun_lee","f_g2","중2 천재 이상기"],["f_m2_so_l7","f_m2_chun_so","07과"],["f_m2_so_l8","f_m2_chun_so","08과"]],"L":[["f_l5","Lesson 5 단어 한글+영어 학습",1,"bbe4cd395f01?social_preview=false&skid=8f8896bd-2837-4f29-9c27-f5a857e7e46f"],["f_l5","Lesson 5 단어 스펠링 테스트",1,"a2fb6f3527e0?social_preview=false&skid=f041a675-4c9f-4bda-985a-0ccbef4251cf"],["f_l6","Lesson 6 단어 한글+영어 학습",0,"07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac"],["f_l6","Lesson 6 단어 스펠링 테스트",0,"8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc"],["f_l6","Lesson 6 본문 동사형 찾기",0,"0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2"],["f_l6","Lesson 6 본문 어법 선택",0,"012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032"],["f_l7","Lesson 7 단어 한글+영어 학습",0,"58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1"],["f_l7","Lesson 7 단어 스펠링 테스트",0,"0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd"],["f_l7","Lesson 7 본문 동사형 찾기",0,"ea014e0adb32?skid=f472cd07-cf96-407a-ad3a-7e209dada6b6"],["f_l7","Lesson 7 본문 어법 선택",0,"0206674fda6a?skid=24c491df-8acb-41df-a6a7-82e677f638e8"],["f_l8","Lesson 8 단어 한글+영어 학습",0,"a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb"],["f_l8","Lesson 8 단어 스펠링 테스트",0,"37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168"],["f_m2_so_l7","Lesson 7 단어 한글+영어 학습",0,"70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0"],["f_m2_so_l7","Lesson 7 단어 스펠링 테스트",0,"586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b"],["f_m2_so_l7","Lesson 7 본문 동사형 찾기",0,"f155aa1e557a?skid=f44d0553-2d09-468a-94a2-0cfa0b14e51b"],["f_m2_so_l7","Lesson 7 본문 어법 선택",0,"dc505389312e?skid=a9720e9c-2b6b-44d5-821b-cfa5c8d79a5b"],["f_m2_so_l7","Lesson 7 본문문법개념 1",0,"a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7"],["f_m2_so_l7","Lesson 7 본문문법개념 2",0,"e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e"],["f_m2_so_l7","Lesson 7 본문문법개념 3",0,"3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37"],["f_m2_so_l7","Lesson 7 본문문법개념 4",0,"242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d"],["f_m2_so_l7","Lesson 7 본문문법개념 5",0,"4ee754fa6845?skid=d02946a5-b269-4ab7-9fac-a97e97ff09da"],["f_m2_so_l8","Lesson 8 단어 한글+영어 학습",0,"26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f"],["f_m2_so_l8","Lesson 8 본문 동사형 찾기",0,"b73c89f87c48?social_preview=false&skid=e8ec5f44-0739-42d4-bc7e-0fcadbb9e8bd"],["f_m2_so_l8","Lesson 8 본문 어법 선택",0,"2416be03d7e6?social_preview=false&skid=b72e8674-405f-4e88-a2a6-dd6d998bb1b3"],["f_l5","본문개념1",2,"29d9e9624352?skid=04832d42-72c2-4d7d-ac44-b419d302651a"],["f_l5","본문개념2",2,"1d14e1c12a9c?skid=896f5392-c827-4386-94e7-55f00d795db5"],["f_l5","본문개념3",2,"6b78c6afd5a8?skid=ce89d952-8d19-48c5-9f3c-105c4c2c2c03"],["f_l5","본문개념4",2,"04c82439ff95?skid=6d4bc09b-3ce2-41d9-9719-5952bde5d584"],["f_l5","빈칸 한글/영어",2,"337c2f429de9?skid=e063f428-9e21-47f6-9a4f-787dcc70d942"],["f_l5","Lesson 5 본문 동사형 찾기",2,"81ee631ddfe4?skid=c0478af9-a1bb-4d50-bd65-2fd8e81d16b2"],["f_l5","Lesson 5 본문 어법 선택",2,"b0c48cfcd008?skid=1b3a3121-1285-4e38-8002-4db10efb2be5"],["f_l6","단어 한글/영어",1,"07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac"],["f_l6","단어 스펠링",1,"8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc"],["f_l6","본문개념1",1,"cc75935b3e06?skid=f3ef47ce-1e69-4a71-ad1f-4d5c75ace824"],["f_l6","본문개념2",1,"5a1eb78efe51?skid=26968259-9eae-4803-9e1b-c04fcf2a8574"],["f_l6","빈칸 한글/영어",1,"9e9091e2641f?skid=dfc5f8f4-8412-452b-aba9-4cf4dd2a1fc8"],["f_l6","동사형찾기",1,"0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2"],["f_l6","어법선택",1,"012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032"],["f_l7","단어 한글/영어",1,"58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1"],["f_l7","단어스펠링",1,"0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd"],["f_l7","본문개념1",1,"7326eeefd9dc?skid=b3511b45-3e67-4b46-bc94-150e590b4f7e"],["f_l7","본문개념2",1,"d1ef587864b4?skid=a30e711d-3c80-414f-be5b-02491362f1e5"],["f_l7","본문개념3",1,"ed04f42e23bb?skid=4630bd55-4186-46e6-a0a2-084eaeb00b25"],["f_l7","빈칸 한글/영어",1,"7da83d0ca891?social_preview=false&skid=4bd5ea4e-0bab-4a7f-aca6-65a7da304ace"],["f_l7","동사형찾기",1,"ea014e0adb32?social_preview=false&skid=f472cd07-cf96-407a-ad3a-7e209dada6b6"],["f_l7","어법선택",1,"0206674fda6a?skid=24c491df-8acb-41df-a6a7-82e677f638e8"],["f_l8","단어 한글/영어",1,"a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb"],["f_l8","단어 스펠링",1,"37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168"],["f_l8","본문개념",1,"4c75b5a3b955?skid=0217f95b-eb7c-45af-b85a-1631d9acd2d9"],["f_m2_so_l7","단어 영어/한글",1,"70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0"],["f_m2_so_l7","단어 스펠링",1,"586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b"],["f_m2_so_l7","본문개념1",1,"a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7"],["f_m2_so_l7","본문개념2",1,"e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e"],["f_m2_so_l7","본문개념3",1,"3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37"],["f_m2_so_l7","본문개념4",1,"242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d"],["f_m2_so_l7","본문개념5",1,"4ee754fa6845?skid=d02946a5-b269-4ab7-9fac-a97e97ff09da"],["f_m2_so_l7","빈칸 영어/한글",1,"ef7b03596f6d?skid=fcce6465-efc0-4ab6-af67-b1b49b3cf8bc"],["f_m2_so_l7","동사형찾기",1,"f155aa1e557a?skid=f44d0553-2d09-468a-94a2-0cfa0b14e51b"],["f_m2_so_l7","어법선택",1,"dc505389312e?skid=a9720e9c-2b6b-44d5-821b-cfa5c8d79a5b"],["f_m2_so_l8","단어 한글/영어",1,"26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f"],["f_m2_so_l8","빈칸 영어/한글",1,"82c99b5aa04e?social_preview=false&skid=4bd8af62-ee1c-4d7f-8654-5249c11eab29"],["f_m2_so_l8","동사형찾기",1,"b73c89f87c48?social_preview=false&skid=e8ec5f44-0739-42d4-bc7e-0fcadbb9e8bd"],["f_m2_so_l8","어법선택",1,"2416be03d7e6?social_preview=false&skid=b72e8674-405f-4e88-a2a6-dd6d998bb1b3"]]},"high_exam":{"F":[["f_1792074970787",0,"고1"],["f_1792074974500",0,"고2"],["f_1792074988487","f_1792074970787","공통영어1"],["f_1792074996174","f_1792074970787","공통영어2"],["f_1792075048638",0,"고3"],["f_1792075065224","f_1792074988487","공통영어1"],["f_1792075059953","f_1792074988487","공통영어2"],["f_1792075127813","f_1792075065224","진건고"],["f_1792075131932","f_1792075065224","오남고"],["f_1792075143795","f_1792075059953","진건고"],["f_1792075147645","f_1792075059953","오남고"],["f_1792075218788","f_1792074996174","진건고"],["f_1792075222513","f_1792074996174","오남고"],["f_1792075252087","f_1792075222513","1과"],["f_1792075255505","f_1792075222513","2과"],["f_1792075258642","f_1792075222513","3과"],["f_1792075261718","f_1792075222513","4과"],["f_1792075271920","f_1792075218788","1과"],["f_1792075275084","f_1792075218788","2과"],["f_1792075277911","f_1792075218788","3과"],["f_1792075281010","f_1792075218788","4과"]],"L":[["f_1792075258642","단어 한글/영어",1,"6515c6f6e298?social_preview=false&skid=d33bda66-120b-471c-8a6e-077fdfd99c5d"],["f_1792075258642","본문개념1",2,"11209f23b9ef?skid=9e9522a2-ccfe-4f93-8e94-5a7799b53fde"],["f_1792075258642","본문개념2",2,"724d2a575861?skid=bd9ba269-8afc-418d-89a8-df38f69dce68"],["f_1792075258642","본문개념3",2,"4a6cd7d3651a?skid=0503495e-0778-41b8-ad94-462efe974fba"],["f_1792075258642","본문개념4",2,"4a86e93669fe?skid=550e3eea-1fa7-4e31-977e-8df032fe3828"],["f_1792075258642","본문개념5",2,"087637886f3f?skid=3d8a4d96-b3ab-47bf-8c65-4e0651030a2f"],["f_1792075258642","빈칸 한글/영어",2,"0bfc8f8a53e2?skid=5f0b8f65-75a7-44e6-855d-5a84e73d5b3e"],["f_1792075258642","동사형찾기",2,"42b1e22af65f?skid=e96d8c0e-206d-48ea-a613-ad3d7e1e4b4e"],["f_1792075258642","어법선택",2,"782e1e5fb558?skid=80fd2f71-73a8-461d-b752-1bdb8f7b0a26"],["f_1792075261718","단어 한글/영어",1,"b855a6f78198?social_preview=false&skid=04de87be-d4b7-4939-bada-846800095f0a"],["f_1792075261718","본문개념1",2,"8eb7a16ece0c?skid=d46cf0b4-4e3d-4428-bf17-96bcdd24f7cb"],["f_1792075261718","본문개념2",2,"1ca030aa4792?skid=a233daac-1500-4171-9fc6-52413ed561e0"],["f_1792075261718","본문개념3",2,"ece5fd958726?skid=989916d5-38eb-498b-b4f6-1a6c35cb4b47"],["f_1792075261718","본문개념4",2,"153b060edd0b?skid=345dee89-85c0-4d2e-9553-f495646cdef9"],["f_1792075261718","본문개념5",2,"6416685220f8?skid=1fe367a6-85d3-44a7-99bb-010be533febb"],["f_1792075261718","빈칸 한글/영어",2,"115ff452d793?skid=5bc30834-4eb9-401c-9dd0-d329f3670812"],["f_1792075261718","동사형찾기",2,"4ed486a1f7e0?skid=c92ae778-6b29-49c0-ab8b-7fbe376c6a89"],["f_1792075261718","어법선택",2,"e9e77da110ab?skid=5de32ab4-f5d0-4a2a-ab38-c29c5bad5d58"]]},"grammar":{"F":[["f_1792075362334",0,"중등문법"],["f_1792075366127",0,"고등문법"]],"L":[]},"cat_1792074925468":{"F":[["f_1792075308265",0,"26년3월"],["f_1792075314708",0,"26년6월"],["f_1792075320309",0,"26년9월"],["f_1792075327197",0,"26년10월"],["f_1792075333592","f_1792075308265","고1"],["f_1792075343045","f_1792075320309","고1"],["f_1792075349066","f_1792075327197","고1"]],"L":[]},"cat_1792074950120":{"F":[["f_1792075374212",0,"워드마스터"],["f_1792075380552","f_1792075374212","기본"],["f_1792075383916","f_1792075374212","실력"],["f_1792075387352","f_1792075374212","고난이도"],["f_1792075390204","f_1792075374212","수능"]],"L":[]}}};
+function seedData() {
+  const md = {}, cats = SEED.cats.map(([id, name]) => ({ id, name }));
+  Object.keys(SEED.data).forEach(cid => {
+    const { F, L } = SEED.data[cid];
+    md[cid] = F.map(([id, parent, name]) => ({ id, type: 'folder', name, parentId: parent || null }))
+      .concat(L.map(([parent, name, tab, tail], i) => ({ id: 'l' + i, type: 'file', name, parentId: parent, tabId: TAB_CODES[tab], linkUrl: GSH + tail })));
+  });
+  return { md, cats };
+}
+function buildOps(md, cats) {
+  const ops = [];
+  Object.keys(md).forEach(cid => {
+    const root = 'cat_' + cid;
+    ops.push([root, { folder: 'B', type: 'folder', name: (cats.find(c => c.id === cid) || {}).name || cid, parentId: null, tabId: 'video', visible: true }]);
+    md[cid].forEach(i => ops.push([cid + '__' + i.id, { folder: 'B', type: i.type, name: i.name, parentId: i.parentId ? cid + '__' + i.parentId : root, tabId: i.tabId || 'video', visible: true, ...(i.linkUrl && safeUrl(i.linkUrl) ? { linkUrl: i.linkUrl } : {}) }]));
+  });
+  return ops;
+}
+async function commitOps(ops) {
+  for (let i = 0; i < ops.length; i += 400) { const b = db.batch(); ops.slice(i, i + 400).forEach(([id, d]) => b.set(db.collection('items').doc(id), d)); await b.commit(); }
+}
+async function seedMaterials() {
+  toast('기존 학습 자료를 등록하는 중...');
+  const { md, cats } = seedData(), ops = buildOps(md, cats);
+  await commitOps(ops);
+  await db.collection('config').doc('main').set({ seeded: true }, { merge: true });
+  S.seeded = true; toast('');
+  alert('예전 사이트의 학습 자료 ' + ops.length + '개가 B 폴더에 등록되었습니다.');
+}
+/* SEED-END */
+ 
 /* ===== 기존 데이터 가져오기 ===== */
+function grabJs(txt, key, open, close) {
+  const i = txt.indexOf(key + ':'); if (i < 0) return null;
+  const s0 = txt.indexOf(open, i); let d = 0, inStr = false;
+  for (let k = s0; k < txt.length; k++) {
+    const c = txt[k];
+    if (inStr) { if (c === '\\') k++; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true; else if (c === open) d++; else if (c === close && --d === 0) return JSON.parse(txt.slice(s0, k + 1));
+  }
+  return null;
+}
 $('import-file').onchange = e => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
   safe(async () => {
-    const j = JSON.parse(await file.text()), md = j.masterDatabase, cats = j.sidebarCats || [];
+    const txt = await file.text(); let j;
+    try { j = JSON.parse(txt); }
+    catch (_) { j = { masterDatabase: grabJs(txt, 'masterDatabase', '{', '}'), sidebarCats: grabJs(txt, 'sidebarCats', '[', ']') }; } // 예전 index.html 파일에서 자료 추출
+    const md = j.masterDatabase, cats = j.sidebarCats || [];
     if (j.items) {
       if (!confirm('백업의 자료 ' + j.items.length + '개를 복원할까요? (같은 ID의 자료는 덮어씁니다)')) return;
       toast('복원 중...');
@@ -474,15 +526,10 @@ $('import-file').onchange = e => {
       toast(''); return alert('자료를 복원했습니다. (계정은 Firebase Auth에서 관리되어 복원 대상이 아닙니다.)');
     }
     if (!md) throw new Error('지원하지 않는 백업 파일입니다.');
-    const ops = [];
-    Object.keys(md).forEach(cid => {
-      const root = 'cat_' + cid;
-      ops.push([root, { folder: 'B', type: 'folder', name: (cats.find(c => c.id === cid) || {}).name || cid, parentId: null, tabId: 'video', visible: true }]);
-      md[cid].forEach(i => ops.push([cid + '__' + i.id, { folder: 'B', type: i.type, name: i.name, parentId: i.parentId ? cid + '__' + i.parentId : root, tabId: i.tabId || 'video', visible: true, ...(i.linkUrl && safeUrl(i.linkUrl) ? { linkUrl: i.linkUrl } : {}) }]));
-    });
+    const ops = buildOps(md, cats);
     if (!confirm(ops.length + '개 항목을 B 폴더로 가져올까요?')) return;
     toast('가져오는 중...');
-    for (let i = 0; i < ops.length; i += 400) { const b = db.batch(); ops.slice(i, i + 400).forEach(([id, d]) => b.set(db.collection('items').doc(id), d)); await b.commit(); }
+    await commitOps(ops);
     toast(''); alert(ops.length + '개 항목을 가져왔습니다.');
   });
 };
