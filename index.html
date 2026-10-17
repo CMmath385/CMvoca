@@ -116,66 +116,7 @@ body{font-family:'Pretendard',sans-serif}
  
 <script>
 /* ===== 설정: Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)의 값을 붙여넣으세요 ===== */
-const FB = {rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
 
-    function signedIn() { return request.auth != null; }
-    function isSuper() { return signedIn() && request.auth.token.email == 'admin@cmacademy.app'; }
-    function userPath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
-    function registered() { return signedIn() && exists(userPath()); }
-    function me() { return get(userPath()).data; }
-    function isBranch() { return registered() && me().role == 'branch'; }
-    function active() { return isSuper() || registered(); }
-
-    // 계정 정보 (비밀번호는 저장하지 않음)
-    match /users/{uid} {
-      allow get: if isSuper()
-                 || (signedIn() && request.auth.uid == uid)
-                 || (registered() && me().branchId == uid);
-      allow list: if isSuper()
-                  || (isBranch() && resource.data.branchId == request.auth.uid);
-      allow create: if isSuper()
-                    || (isBranch() && request.resource.data.role == 'student'
-                        && request.resource.data.branchId == request.auth.uid);
-      allow update: if isSuper()
-                    || (isBranch() && request.auth.uid == uid
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['academyName']))
-                    || (isBranch() && resource.data.role == 'student'
-                        && resource.data.branchId == request.auth.uid);
-      allow delete: if isSuper()
-                    || (isBranch() && resource.data.role == 'student'
-                        && resource.data.branchId == request.auth.uid);
-    }
-
-    // 상단 메뉴·카테고리 설정
-    match /config/{docId} {
-      allow read: if active();
-      allow write: if isSuper();
-    }
-
-    // 본원 공통 자료
-    match /master/{catId} {
-      allow read: if active();
-      allow write: if isSuper();
-    }
-
-    // 지점 자체 자료 (문서 ID = 지점 uid)
-    match /branchContent/{branchId} {
-      allow read: if isSuper() || (registered() && me().branchId == branchId);
-      allow write: if isSuper() || (isBranch() && request.auth.uid == branchId);
-    }
-
-    // 학습 이력
-    match /records/{recId} {
-      allow create: if registered() && me().role == 'student'
-                    && request.resource.data.studentUid == request.auth.uid
-                    && request.resource.data.branchId == me().branchId;
-      allow read: if isSuper() || (isBranch() && resource.data.branchId == request.auth.uid);
-      allow update, delete: if isSuper();
-    }
-  }
-}
 
   apiKey: 'YOUR_API_KEY',
   authDomain: 'YOUR_PROJECT.firebaseapp.com',
