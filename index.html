@@ -1,1662 +1,841 @@
 <!DOCTYPE html>
-
 <html lang="ko">
-
 <head>
-
     <meta charset="UTF-8">
-
    <!-- Firebase SDK (Modular v10.8.0) & 초기화 -->
-
     <script type="module">
-
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
         import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-
-
         const firebaseConfig = {
-
             apiKey: "AIzaSyDtXLBEPEa89bst8lJWJ8ayCUJgyaf7PS4",
-
             authDomain: "cm-academy-8387b.firebaseapp.com",
-
             projectId: "cm-academy-8387b",
-
             storageBucket: "cm-academy-8387b.firebasestorage.app",
-
             messagingSenderId: "371199594988",
-
             appId: "1:371199594988:web:a74f2bd1cc853d15d4f0c9"
-
         };
-
-
 
         const app = initializeApp(firebaseConfig);
-
         const auth = getAuth(app);
-
         const db = getFirestore(app);
 
-
-
         window.firebaseApp = { auth, db, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs };
-
     </script> <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>최강수학메이드영어학원 - 스마트 학습 플랫폼</title>
-
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-
     <style>
-
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
-
         body { font-family: 'Pretendard', sans-serif; }
-
         .draggable-item { cursor: grab; }
-
         .draggable-item:active { cursor: grabbing; }
-
         @media (max-width: 767px) {
-
             #sidebar-container { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
-
             #sidebar-container div { flex: none; width: auto; white-space: nowrap; }
-
             #super-admin-tabs, #sub-admin-tabs { overflow-x: auto; }
-
             #super-admin-tabs button, #sub-admin-tabs button { flex: none !important; white-space: nowrap; }
-
             #content-container > div { flex-wrap: wrap; }
-
             main { padding: 14px !important; }
-
         }
-
     </style>
-
 </head>
-
 <body class="bg-slate-100 min-h-screen flex flex-col">
 
-
-
     <!-- 1. LOGIN SCREEN -->
-
     <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
-
         <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative border border-slate-100">
-
             <div class="text-center mb-8">
-
                 <div class="w-16 h-16 bg-indigo-700 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-4 shadow-lg overflow-hidden">
-
                     CM
-
                 </div>
-
                 <h1 class="text-2xl font-bold text-slate-800">최강수학메이드영어학원</h1>
-
                 <p class="text-xs text-slate-400 mt-1">스마트 영어 학습 포털</p>
-
             </div>
-
-
 
             <form onsubmit="handleLogin(event)" class="space-y-4">
-
                 <div>
-
                     <label class="block text-xs font-bold text-slate-600 mb-1.5">아이디</label>
-
                     <input type="text" id="login-id" required placeholder="아이디 입력" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
-
                 </div>
-
                 <div>
-
                     <label class="block text-xs font-bold text-slate-600 mb-1.5">비밀번호</label>
-
                     <input type="password" id="login-pw" required placeholder="비밀번호 입력" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-indigo-600">
-
                 </div>
-
                 <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-md transition">
-
                     로그인
-
                 </button>
-
             </form>
 
-
-
             <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500 h-4"></div>
-
         </div>
-
     </div>
-
-
 
     <!-- 2. MAIN APP PORTAL -->
-
     <div id="app-portal" class="hidden flex-grow flex flex-col">
-
         <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
-
             <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
-
                 <div class="flex items-center space-x-3 cursor-pointer" onclick="resetToHome()">
-
                     <div id="header-logo" class="w-10 h-10 bg-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm overflow-hidden">
-
                         CM
-
                     </div>
-
                     <div>
-
                         <h1 id="header-academy-name" class="font-bold text-slate-800 text-lg leading-tight">최강수학메이드영어학원</h1>
-
                         <p id="header-academy-sub" class="text-xs text-slate-400">스마트 영어 학습 포털</p>
-
                     </div>
-
                 </div>
-
-
 
                 <div class="flex items-center gap-2">
-
                     <nav id="top-nav-container" class="flex flex-wrap gap-2 text-sm font-bold items-center">
-
                         <!-- Dynamic Top Tabs -->
-
                     </nav>
-
                     <button onclick="addTopTabPrompt()" id="btn-add-tab" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2.5 py-2 rounded-xl font-bold hover:bg-indigo-100 transition">+ 메뉴추가</button>
-
                 </div>
-
-
 
                 <div class="flex items-center gap-3">
-
                     <span id="user-badge" class="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1.5 rounded-xl border border-indigo-100">
-
                         사용자 모드
-
                     </span>
-
                     <button onclick="logout()" class="text-xs text-slate-500 hover:text-slate-800 font-bold border border-slate-200 px-3 py-1.5 rounded-xl transition">
-
                         로그아웃
-
                     </button>
-
                 </div>
-
             </div>
-
         </header>
 
-
-
         <div class="max-w-[1600px] mx-auto w-full flex-grow flex flex-col md:flex-row p-4 gap-4">
-
             <aside class="w-full md:w-64 flex-shrink-0 flex flex-col gap-2">
-
                 <div class="flex justify-between items-center px-1 mb-1">
-
                     <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">학습 카테고리</span>
-
                     <button onclick="addSidebarCategoryPrompt()" id="sidebar-add-btn" class="hidden text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-100">+ 추가</button>
-
                 </div>
-
                 <div id="sidebar-container" class="flex flex-col gap-1.5">
-
                     <!-- Dynamic Sidebar -->
-
                 </div>
-
             </aside>
 
-
-
             <main class="flex-grow bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
-
                 <div>
-
                     <div id="super-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200">
-
                         <button onclick="switchAdminView('content')" id="sup-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">👑 본원 콘텐츠 마스터</button>
-
                         <button onclick="switchAdminView('branches')" id="sup-v-branches" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">🏛️ 지점장 관리</button>
-
                         <button onclick="switchAdminView('storage')" id="sup-v-storage" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">💾 저장소 및 내보내기</button>
-
                     </div>
-
-
 
                     <div id="sub-admin-tabs" class="hidden mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200">
-
                         <button onclick="switchSubView('content')" id="sub-v-content" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-indigo-600 shadow-sm">📂 학원 학습 자료실</button>
-
                         <button onclick="switchSubView('students')" id="sub-v-students" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">👨‍🎓 학생 관리</button>
-
                         <button onclick="switchSubView('history')" id="sub-v-history" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">📊 학습 이력</button>
-
                         <button onclick="switchSubView('settings')" id="sub-v-settings" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">⚙️ 학원 설정</button>
-
                     </div>
-
-
 
                     <!-- VIEW 1: CONTENT -->
-
                     <div id="view-content">
-
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
-
                             <div>
-
                                 <div id="breadcrumb" class="text-xs font-bold text-indigo-600 mb-1 flex items-center gap-1">
-
                                     📁 폴더
-
                                 </div>
-
                                 <h2 id="current-title" class="text-xl font-bold text-slate-800">폴더 및 학습 목록</h2>
-
                             </div>
-
                             
-
                             <div class="flex items-center gap-2 w-full sm:w-auto">
-
                                 <button onclick="addFolderPrompt()" id="btn-add-folder" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">+ 새 폴더 추가</button>
-
                                 <button onclick="addLinkFilePrompt()" id="btn-add-link" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition">🔗 웹/링크 등록</button>
-
                             </div>
-
                         </div>
-
-
 
                         <div id="tab-info-banner" class="mb-6 p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-
                             <span id="tab-info-text" class="text-xs font-bold text-indigo-900">💡 본원 공통 자료와 우리 학원 자체 자료가 함께 제공됩니다.</span>
-
                         </div>
-
-
 
                         <div id="content-container" class="space-y-3"></div>
-
                     </div>
-
-
 
                     <!-- VIEW 2: BRANCHES -->
-
                     <div id="view-branches" class="hidden">
-
                         <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-
                             <div>
-
                                 <span class="text-xs font-bold text-indigo-600">프랜차이즈 관리</span>
-
                                 <h2 class="text-xl font-bold text-slate-800">지점장 계정 등록 및 수정</h2>
-
                             </div>
-
                             <button onclick="addBranchPrompt()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold shadow-sm transition">+ 신규 지점 등록</button>
-
                         </div>
-
                         <div id="branch-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-
                     </div>
-
-
 
                     <!-- VIEW 3: STORAGE / BACKUP -->
-
                     <div id="view-storage" class="hidden">
-
                         <div class="mb-6 pb-4 border-b border-slate-100">
-
                             <span class="text-xs font-bold text-indigo-600">데이터 관리</span>
-
                             <h2 class="text-xl font-bold text-slate-800">저장소 및 백업 / 내보내기</h2>
-
                         </div>
-
                         <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xl space-y-4">
-
                             <p class="text-xs text-slate-600">현재 플랫폼의 모든 학습 데이터와 설정을 백업하거나 JSON 파일로 다운로드할 수 있습니다.</p>
-
                             <button onclick="exportDataJson()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition">
-
                                 📥 현재 데이터 JSON 백업 파일 다운로드
-
                             </button>
-
                         </div>
-
                     </div>
-
-
 
                     <!-- VIEW 4: STUDENTS -->
-
                     <div id="view-sub-students" class="hidden">
-
                         <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-
                             <div>
-
                                 <span class="text-xs font-bold text-indigo-600">원생 관리</span>
-
                                 <h2 class="text-xl font-bold text-slate-800">소속 학생 관리</h2>
-
                             </div>
-
                             <button onclick="addSubStudentPrompt()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold shadow-sm transition">+ 소속 학생 등록</button>
-
                         </div>
-
                         <div id="sub-student-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-
                     </div>
-
-
 
                     <!-- VIEW 5: HISTORY -->
-
                     <div id="view-sub-history" class="hidden">
-
                         <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-
                             <div>
-
                                 <span class="text-xs font-bold text-indigo-600">학습 리포트</span>
-
                                 <h2 class="text-xl font-bold text-slate-800">학생 테스트 점수 및 학습 이력</h2>
-
                             </div>
-
                         </div>
-
                         <div id="sub-history-container" class="space-y-3"></div>
-
                     </div>
-
-
 
                     <!-- VIEW 6: SETTINGS -->
-
                     <div id="view-sub-settings" class="hidden">
-
                         <div class="mb-6 pb-4 border-b border-slate-100">
-
                             <span class="text-xs font-bold text-indigo-600">학원 설정</span>
-
                             <h2 class="text-xl font-bold text-slate-800">학원명 및 로고 변경</h2>
-
                         </div>
-
                         <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xl space-y-4">
-
                             <div>
-
                                 <label class="block text-xs font-bold text-slate-600 mb-1">학원명</label>
-
                                 <input type="text" id="setting-academy-name" class="w-full p-3 bg-white border border-slate-300 rounded-xl font-bold text-slate-800">
-
                             </div>
-
                             <button onclick="saveAcademySettings()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition">
-
                                 설정 저장하기
-
                             </button>
-
                         </div>
-
                     </div>
-
                 </div>
 
-
-
                 <footer class="mt-8 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
-
                     © 2026 최강수학메이드영어학원. All rights reserved.
-
                 </footer>
-
             </main>
-
         </div>
-
     </div>
-
-
 
     <!-- Video Modal -->
-
     <div id="video-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-
         <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-6 relative">
-
             <button onclick="closeVideo()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
-
             <h3 id="video-title" class="text-lg font-bold text-slate-800 mb-4">영상 학습</h3>
-
             <div class="aspect-video w-full rounded-xl overflow-hidden bg-black">
-
                 <iframe id="video-iframe" class="w-full h-full" src="" frameborder="0" allowfullscreen></iframe>
-
             </div>
-
         </div>
-
     </div>
 
-
-
     <script>
-
         const CLOUD_BIN_ID = '6ad1ab17ac6210605a360e45'; 
-
         const CLOUD_API_KEY = '$2a$10$xfybF8YznlSFs90Jp2N2EeJt/RMxJZSYc2FJpPM080Dh1/quk0XLa';
 
-
-
-        // 최신 데이터 내장
-
         let state = {
-
             currentUser: null,
-
             superAdminPw: '1234',
-
             branches: [{"id":"branch_1","username":"onam","password":"123","academyName":"최강수학메이드영어학원","logoImage":""}],
-
             students: [{"id":"s1","branchId":"branch_1","username":"student1","password":"123","name":"김철수","grade":"중1"}],
-
             historyRecords: [],
-
             topTabs: [{"id":"video","name":"영상학습훈련"},{"id":"voca","name":"단어"},{"id":"passage","name":"본문"}],
-
             sidebarCats: [{"id":"middle_exam","name":"중등부 내신문제"},{"id":"high_exam","name":"고등부 내신문제"},{"id":"cat_1792074925468","name":"고등모의고사"},{"id":"grammar","name":"문법"},{"id":"cat_1792074950120","name":"단어"}],
-
             masterDatabase: {
-
                 "middle_exam": [
-
                     {"id":"f_g1","type":"folder","name":"중1 (개정)","parentId":null},
-
                     {"id":"f_g2","type":"folder","name":"중2 (개정)","parentId":null},
-
                     {"id":"f_g3","type":"folder","name":"중3","parentId":null},
-
                     {"id":"f_mirae","type":"folder","name":"중1 미래엔 문영인","parentId":"f_g1"},
-
                     {"id":"f_visang","type":"folder","name":"중1 비상 황종배","parentId":"f_g1"},
-
                     {"id":"f_chun_so","type":"folder","name":"중1 천재 소영순","parentId":"f_g1"},
-
                     {"id":"f_chun_lee","type":"folder","name":"중1 천재 이상기","parentId":"f_g1"},
-
                     {"id":"f_l1","type":"folder","name":"01과","parentId":"f_chun_lee"},
-
                     {"id":"f_l2","type":"folder","name":"02과","parentId":"f_chun_lee"},
-
                     {"id":"f_l3","type":"folder","name":"03과","parentId":"f_chun_lee"},
-
                     {"id":"f_l4","type":"folder","name":"04과","parentId":"f_chun_lee"},
-
                     {"id":"f_l5","type":"folder","name":"05과","parentId":"f_chun_lee"},
-
                     {"id":"f_l6","type":"folder","name":"06과","parentId":"f_chun_lee"},
-
                     {"id":"f_l7","type":"folder","name":"07과","parentId":"f_chun_lee"},
-
                     {"id":"f_l8","type":"folder","name":"08과","parentId":"f_chun_lee"},
-
                     {"id":"file_m1_5_1","type":"file","name":"Lesson 5 단어 한글+영어 학습","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/bbe4cd395f01?social_preview=false&skid=8f8896bd-2837-4f29-9c27-f5a857e7e46f","tabId":"voca"},
-
                     {"id":"file_m1_5_2","type":"file","name":"Lesson 5 단어 스펠링 테스트","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/a2fb6f3527e0?social_preview=false&skid=f041a675-4c9f-4bda-985a-0ccbef4251cf","tabId":"voca"},
-
                     {"id":"file_m1_6_1","type":"file","name":"Lesson 6 단어 한글+영어 학습","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac"},
-
                     {"id":"file_m1_6_2","type":"file","name":"Lesson 6 단어 스펠링 테스트","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc"},
-
                     {"id":"file_m1_6_3","type":"file","name":"Lesson 6 본문 동사형 찾기","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2"},
-
                     {"id":"file_m1_6_4","type":"file","name":"Lesson 6 본문 어법 선택","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032"},
-
                     {"id":"file_m1_7_1","type":"file","name":"Lesson 7 단어 한글+영어 학습","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1"},
-
                     {"id":"file_m1_7_2","type":"file","name":"Lesson 7 단어 스펠링 테스트","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd"},
-
                     {"id":"file_m1_7_3","type":"file","name":"Lesson 7 본문 동사형 찾기","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/ea014e0adb32?skid=f472cd07-cf96-407a-ad3a-7e209dada6b6"},
-
                     {"id":"file_m1_7_4","type":"file","name":"Lesson 7 본문 어법 선택","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0206674fda6a?skid=24c491df-8acb-41df-a6a7-82e677f638e8"},
-
                     {"id":"file_m1_8_1","type":"file","name":"Lesson 8 단어 한글+영어 학습","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb"},
-
                     {"id":"file_m1_8_2","type":"file","name":"Lesson 8 단어 스펠링 테스트","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168"},
-
                     {"id":"f_m2_mirae","type":"folder","name":"중2 미래엔 문영인","parentId":"f_g2"},
-
                     {"id":"f_m2_visang","type":"folder","name":"중2 비상 황종배","parentId":"f_g2"},
-
                     {"id":"f_m2_chun_so","type":"folder","name":"중2 천재 소영순","parentId":"f_g2"},
-
                     {"id":"f_m2_chun_lee","type":"folder","name":"중2 천재 이상기","parentId":"f_g2"},
-
                     {"id":"f_m2_so_l7","type":"folder","name":"07과","parentId":"f_m2_chun_so"},
-
                     {"id":"f_m2_so_l8","type":"folder","name":"08과","parentId":"f_m2_chun_so"},
-
                     {"id":"file_m2_7_1","type":"file","name":"Lesson 7 단어 한글+영어 학습","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0"},
-
                     {"id":"file_m2_7_2","type":"file","name":"Lesson 7 단어 스펠링 테스트","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b"},
-
                     {"id":"file_m2_7_3","type":"file","name":"Lesson 7 본문 동사형 찾기","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/f155aa1e557a?skid=f44d0553-2d09-468a-94a2-0cfa0b14e51b"},
-
                     {"id":"file_m2_7_4","type":"file","name":"Lesson 7 본문 어법 선택","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/dc505389312e?skid=a9720e9c-2b6b-44d5-821b-cfa5c8d79a5b"},
-
                     {"id":"file_m2_7_g1","type":"file","name":"Lesson 7 본문문법개념 1","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7"},
-
                     {"id":"file_m2_7_g2","type":"file","name":"Lesson 7 본문문법개념 2","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e"},
-
                     {"id":"file_m2_7_g3","type":"file","name":"Lesson 7 본문문법개념 3","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37"},
-
                     {"id":"file_m2_7_g4","type":"file","name":"Lesson 7 본문문법개념 4","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d"},
-
                     {"id":"file_m2_7_g5","type":"file","name":"Lesson 7 본문문법개념 5","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/4ee754fa6845?skid=d02946a5-b269-4ab7-9fac-a97e97ff09da"},
-
                     {"id":"file_m2_8_1","type":"file","name":"Lesson 8 단어 한글+영어 학습","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f"},
-
                     {"id":"file_m2_8_2","type":"file","name":"Lesson 8 본문 동사형 찾기","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/b73c89f87c48?social_preview=false&skid=e8ec5f44-0739-42d4-bc7e-0fcadbb9e8bd"},
-
                     {"id":"file_m2_8_3","type":"file","name":"Lesson 8 본문 어법 선택","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/2416be03d7e6?social_preview=false&skid=b72e8674-405f-4e88-a2a6-dd6d998bb1b3"},
-
                     {"id":"link_1792075495216","type":"file","name":"본문개념1","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/29d9e9624352?skid=04832d42-72c2-4d7d-ac44-b419d302651a","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792075514469","type":"file","name":"본문개념2","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/1d14e1c12a9c?skid=896f5392-c827-4386-94e7-55f00d795db5","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792075531630","type":"file","name":"본문개념3","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/6b78c6afd5a8?skid=ce89d952-8d19-48c5-9f3c-105c4c2c2c03","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792075550982","type":"file","name":"본문개념4","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/04c82439ff95?skid=6d4bc09b-3ce2-41d9-9719-5952bde5d584","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792075577148","type":"file","name":"빈칸 한글/영어","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/337c2f429de9?skid=e063f428-9e21-47f6-9a4f-787dcc70d942","tabId":"passage","authorRole":"super"},
-
                     {"id":"file_m1_5_3","type":"file","name":"Lesson 5 본문 동사형 찾기","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/81ee631ddfe4?skid=c0478af9-a1bb-4d50-bd65-2fd8e81d16b2","tabId":"passage"},
-
                     {"id":"file_m1_5_4","type":"file","name":"Lesson 5 본문 어법 선택","parentId":"f_l5","linkUrl":"https://gemini.google.com/share/b0c48cfcd008?skid=1b3a3121-1285-4e38-8002-4db10efb2be5","tabId":"passage"},
-
                     {"id":"link_1792075880805","type":"file","name":"단어 한글/영어","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/07b4f6d45b65?social_preview=false&skid=c26ebada-ec78-4afc-8715-e48807f400ac","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792075899542","type":"file","name":"단어 스펠링","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/8535e0d1432b?social_preview=false&skid=4f72f583-2d54-493f-8cbe-6f98058f47fc","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792075917096","type":"file","name":"본문개념1","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/cc75935b3e06?skid=f3ef47ce-1e69-4a71-ad1f-4d5c75ace824","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792075932677","type":"file","name":"본문개념2","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/5a1eb78efe51?skid=26968259-9eae-4803-9e1b-c04fcf2a8574","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792075955457","type":"file","name":"빈칸 한글/영어","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/9e9091e2641f?skid=dfc5f8f4-8412-452b-aba9-4cf4dd2a1fc8","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792075969208","type":"file","name":"동사형찾기","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/0de18ddda72f?skid=5ef0a368-6be5-4ed1-bc87-392e44e741a2","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792075986364","type":"file","name":"어법선택","parentId":"f_l6","linkUrl":"https://gemini.google.com/share/012a83fc888d?skid=3426a80b-ce2e-4c3b-b12d-37321c7f4032","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076030547","type":"file","name":"단어 한글/영어","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/58f696545006?social_preview=false&skid=72b7a4d3-fcd7-42d4-9c1b-04ed5033a4a1","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076049196","type":"file","name":"단어스펠링","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0a731b613764?social_preview=false&skid=b28e99b4-a4af-4907-9832-58546f54bbdd","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076063695","type":"file","name":"본문개념1","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/7326eeefd9dc?skid=b3511b45-3e67-4b46-bc94-150e590b4f7e","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076078409","type":"file","name":"본문개념2","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/d1ef587864b4?skid=a30e711d-3c80-414f-be5b-02491362f1e5","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076095774","type":"file","name":"본문개념3","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/ed04f42e23bb?skid=4630bd55-4186-46e6-a0a2-084eaeb00b25","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076114028","type":"file","name":"빈칸 한글/영어","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/7da83d0ca891?social_preview=false&skid=4bd5ea4e-0bab-4a7f-aca6-65a7da304ace","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076129340","type":"file","name":"동사형찾기","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/ea014e0adb32?social_preview=false&skid=f472cd07-cf96-407a-ad3a-7e209dada6b6","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076144801","type":"file","name":"어법선택","parentId":"f_l7","linkUrl":"https://gemini.google.com/share/0206674fda6a?skid=24c491df-8acb-41df-a6a7-82e677f638e8","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076175755","type":"file","name":"단어 한글/영어","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/a0f71ea7e03f?social_preview=false&skid=b1f5a479-b6c6-4234-b037-a23794468eeb","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076194955","type":"file","name":"단어 스펠링","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/37eb8b0aa780?social_preview=false&skid=9f6bb521-f64a-4def-aa25-9ccb92f74168","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076210474","type":"file","name":"본문개념","parentId":"f_l8","linkUrl":"https://gemini.google.com/share/4c75b5a3b955?skid=0217f95b-eb7c-45af-b85a-1631d9acd2d9","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076263071","type":"file","name":"단어 영어/한글","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/70bfd13ff058?skid=db712c0a-2cb6-4748-b6d7-c4a858d15da0","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076279861","type":"file","name":"단어 스펠링","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/586e67b59654?social_preview=false&skid=a3689c4e-4b92-48bc-b0f5-f49ec07a3d5b","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076297252","type":"file","name":"본문개념1","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/a4e14e89e722?skid=b0764cf9-1c11-4d22-a160-93452f82d1c7","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076312349","type":"file","name":"본문개념2","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/e2caaf3b80c7?skid=d897bdfc-e2ff-4a7d-bd94-400a68be243e","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076332161","type":"file","name":"본문개념3","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/3929cbd0e5dd?skid=f7c2ee54-5fd3-4545-9590-f843fd696a37","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076346563","type":"file","name":"본문개념4","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/242bc2c3ceab?skid=509747ae-a04b-42f5-9390-575a018d499d","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076364519","type":"file","name":"본문개념5","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/4ee754fa6845?skid=d02946a5-b269-4ab7-9fac-a97e97ff09da","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076381136","type":"file","name":"빈칸 영어/한글","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/ef7b03596f6d?skid=fcce6465-efc0-4ab6-af67-b1b49b3cf8bc","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076397884","type":"file","name":"동사형찾기","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/f155aa1e557a?skid=f44d0553-2d09-468a-94a2-0cfa0b14e51b","tabId":"voca","authorRole":"super"},
-
-                    {"id":"link_1792076415052","type":"file","name":"어법선택","parentId":"f_m2_so_l7","linkUr 
-                         {"id":"link_1792076472626","type":"file","name":"단어 한글/영어","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f","tabId":"voca","authorRole":"super"},
-
+                    {"id":"link_1792076415052","type":"file","name":"어법선택","parentId":"f_m2_so_l7","linkUrl":"https://gemini.google.com/share/dc505389312e?skid=a9720e9c-2b6b-44d5-821b-cfa5c8d79a5b","tabId":"voca","authorRole":"super"},
+                    {"id":"link_1792076472626","type":"file","name":"단어 한글/영어","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/26351642bdad?skid=cbaf31d6-137c-47fa-ad3e-45473e92e58f","tabId":"voca","authorRole":"super"},
                     {"id":"link_1792076490526","type":"file","name":"빈칸 영어/한글","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/82c99b5aa04e?social_preview=false&skid=4bd8af62-ee1c-4d7f-8654-5249c11eab29","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076504784","type":"file","name":"동사형찾기","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/b73c89f87c48?social_preview=false&skid=e8ec5f44-0739-42d4-bc7e-0fcadbb9e8bd","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792076518696","type":"file","name":"어법선택","parentId":"f_m2_so_l8","linkUrl":"https://gemini.google.com/share/2416be03d7e6?social_preview=false&skid=b72e8674-405f-4e88-a2a6-dd6d998bb1b3","tabId":"voca","authorRole":"super"}
-
                 ],
-
                 "high_exam": [
-
                     {"id":"f_1792074970787","type":"folder","name":"고1","parentId":null,"tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792074974500","type":"folder","name":"고2","parentId":null,"tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792074988487","type":"folder","name":"공통영어1","parentId":"f_1792074970787","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792074996174","type":"folder","name":"공통영어2","parentId":"f_1792074970787","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075048638","type":"folder","name":"고3","parentId":null,"tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075065224","type":"folder","name":"공통영어1","parentId":"f_1792074988487","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075059953","type":"folder","name":"공통영어2","parentId":"f_1792074988487","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075127813","type":"folder","name":"진건고","parentId":"f_1792075065224","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075131932","type":"folder","name":"오남고","parentId":"f_1792075065224","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075143795","type":"folder","name":"진건고","parentId":"f_1792075059953","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075147645","type":"folder","name":"오남고","parentId":"f_1792075059953","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075218788","type":"folder","name":"진건고","parentId":"f_1792074996174","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075222513","type":"folder","name":"오남고","parentId":"f_1792074996174","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075252087","type":"folder","name":"1과","parentId":"f_1792075222513","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075255505","type":"folder","name":"2과","parentId":"f_1792075222513","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075258642","type":"folder","name":"3과","parentId":"f_1792075222513","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075261718","type":"folder","name":"4과","parentId":"f_1792075222513","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075271920","type":"folder","name":"1과","parentId":"f_1792075218788","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075275084","type":"folder","name":"2과","parentId":"f_1792075218788","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075277911","type":"folder","name":"3과","parentId":"f_1792075218788","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075281010","type":"folder","name":"4과","parentId":"f_1792075218788","tabId":"video","authorRole":"super"},
-
                     {"id":"link_1792079647385","type":"file","name":"단어 한글/영어","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/6515c6f6e298?social_preview=false&skid=d33bda66-120b-471c-8a6e-077fdfd99c5d","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792079661536","type":"file","name":"본문개념1","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/11209f23b9ef?skid=9e9522a2-ccfe-4f93-8e94-5a7799b53fde","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079677807","type":"file","name":"본문개념2","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/724d2a575861?skid=bd9ba269-8afc-418d-89a8-df38f69dce68","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079695222","type":"file","name":"본문개념3","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/4a6cd7d3651a?skid=0503495e-0778-41b8-ad94-462efe974fba","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079712527","type":"file","name":"본문개념4","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/4a86e93669fe?skid=550e3eea-1fa7-4e31-977e-8df032fe3828","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079727151","type":"file","name":"본문개념5","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/087637886f3f?skid=3d8a4d96-b3ab-47bf-8c65-4e0651030a2f","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079742345","type":"file","name":"빈칸 한글/영어","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/0bfc8f8a53e2?skid=5f0b8f65-75a7-44e6-855d-5a84e73d5b3e","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079759477","type":"file","name":"동사형찾기","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/42b1e22af65f?skid=e96d8c0e-206d-48ea-a613-ad3d7e1e4b4e","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079773962","type":"file","name":"어법선택","parentId":"f_1792075258642","linkUrl":"https://gemini.google.com/share/782e1e5fb558?skid=80fd2f71-73a8-461d-b752-1bdb8f7b0a26","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079799001","type":"file","name":"단어 한글/영어","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/b855a6f78198?social_preview=false&skid=04de87be-d4b7-4939-bada-846800095f0a","tabId":"voca","authorRole":"super"},
-
                     {"id":"link_1792079821389","type":"file","name":"본문개념1","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/8eb7a16ece0c?skid=d46cf0b4-4e3d-4428-bf17-96bcdd24f7cb","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079837455","type":"file","name":"본문개념2","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/1ca030aa4792?skid=a233daac-1500-4171-9fc6-52413ed561e0","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079853766","type":"file","name":"본문개념3","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/ece5fd958726?skid=989916d5-38eb-498b-b4f6-1a6c35cb4b47","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079869565","type":"file","name":"본문개념4","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/153b060edd0b?skid=345dee89-85c0-4d2e-9553-f495646cdef9","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079890855","type":"file","name":"본문개념5","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/6416685220f8?skid=1fe367a6-85d3-44a7-99bb-010be533febb","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079907105","type":"file","name":"빈칸 한글/영어","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/115ff452d793?skid=5bc30834-4eb9-401c-9dd0-d329f3670812","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079927723","type":"file","name":"동사형찾기","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/4ed486a1f7e0?skid=c92ae778-6b29-49c0-ab8b-7fbe376c6a89","tabId":"passage","authorRole":"super"},
-
                     {"id":"link_1792079941169","type":"file","name":"어법선택","parentId":"f_1792075261718","linkUrl":"https://gemini.google.com/share/e9e77da110ab?skid=5de32ab4-f5d0-4a2a-ab38-c29c5bad5d58","tabId":"passage","authorRole":"super"}
-
                 ],
-
                 "grammar": [
-
                     {"id":"f_1792075362334","type":"folder","name":"중등문법","parentId":null,"tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075366127","type":"folder","name":"고등문법","parentId":null,"tabId":"video","authorRole":"super"}
-
                 ],
-
                 "cat_1792074925468": [
-
                     {"id":"f_1792075308265","type":"folder","name":"26년3월","parentId":null,"tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075314708","type":"folder","name":"26년6월","parentId":null,"tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075320309","type":"folder","name":"26년9월","parentId":null,"tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075327197","type":"folder","name":"26년10월","parentId":null,"tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075333592","type":"folder","name":"고1","parentId":"f_1792075308265","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075343045","type":"folder","name":"고1","parentId":"f_1792075320309","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075349066","type":"folder","name":"고1","parentId":"f_1792075327197","tabId":"video","authorRole":"super"}
-
                 ],
-
                 "cat_1792074950120": [
-
                     {"id":"f_1792075374212","type":"folder","name":"워드마스터","parentId":null,"tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075380552","type":"folder","name":"기본","parentId":"f_1792075374212","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075383916","type":"folder","name":"실력","parentId":"f_1792075374212","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075387352","type":"folder","name":"고난이도","parentId":"f_1792075374212","tabId":"video","authorRole":"super"},
-
                     {"id":"f_1792075390204","type":"folder","name":"수능","parentId":"f_1792075374212","tabId":"video","authorRole":"super"}
-
                 ]
-
             },
-
             branchDatabases: {},
-
             currentSuperView: 'content',
-
             currentSubView: 'content',
-
             currentTopTab: 'video',
-
             currentSidebarCat: 'middle_exam',
-
             currentFolderId: null
-
         };
 
-
-
-        // 비동기 통신 에러가 로그인에 영향을 주지 않도록 안전 분리
-
         async function loadShared() {
-
             try {
-
                 const r = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`, {
-
                     headers: { 'X-Master-Key': CLOUD_API_KEY },
-
                     cache: 'no-store'
-
                 });
-
                 if (r.ok) {
-
                     const res = await r.json();
-
                     const d = res.record;
-
                     if (d.masterDatabase && Object.keys(d.masterDatabase).length > 0) state.masterDatabase = d.masterDatabase;
-
                     if (d.branchDatabases) state.branchDatabases = d.branchDatabases;
-
                     if (d.branches && d.branches.length > 0) state.branches = d.branches;
-
                     if (d.students && d.students.length > 0) state.students = d.students;
-
                     if (d.topTabs && d.topTabs.length > 0) state.topTabs = d.topTabs;
-
                     if (d.sidebarCats && d.sidebarCats.length > 0) state.sidebarCats = d.sidebarCats;
-
                     if (d.historyRecords) state.historyRecords = d.historyRecords;
-
                 }
-
             } catch (e) {
-
                 console.warn('백그라운드 동기화 대기중, 내장 데이터로 구동', e);
-
             }
-
         }
-
-
 
         async function saveState() {
-
             const payload = {
-
                 branches: state.branches,
-
                 students: state.students,
-
                 historyRecords: state.historyRecords,
-
                 masterDatabase: state.masterDatabase,
-
                 branchDatabases: state.branchDatabases,
-
                 topTabs: state.topTabs,
-
                 sidebarCats: state.sidebarCats
-
             };
 
+            try {
+                await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': CLOUD_API_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) {
+                console.error('클라우드 저장 실패', e);
+            }
+        }
 
+        // 로그인 검증 함수 (Firebase 인증 연동)
+        async function handleLogin(e) {
+            e.preventDefault();
+            const rawId = document.getElementById('login-id').value.trim();
+            const pw = document.getElementById('login-pw').value.trim();
+            const err = document.getElementById('login-error');
+            err.textContent = "로그인 중...";
+
+            const email = rawId.includes('@') ? rawId : `${rawId}@cmacademy.com`;
 
             try {
-
-                await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}`, {
-
-                    method: 'PUT',
-
-                    headers: {
-
-                        'Content-Type': 'application/json',
-
-                        'X-Master-Key': CLOUD_API_KEY
-
-                    },
-
-                    body: JSON.stringify(payload)
-
-                });
-
-            } catch (e) {
-
-                console.error('클라우드 저장 실패', e);
-
-            }
-
-        }
-
-// 로그인 검증 함수 (Firebase 인증 연동)
-
-    async function handleLogin(e) {
-
-        e.preventDefault();
-
-        const rawId = document.getElementById('login-id').value.trim();
-
-        const pw = document.getElementById('login-pw').value.trim();
-
-        const err = document.getElementById('login-error');
-
-        err.textContent = "로그인 중...";
-
-
-
-        const email = rawId.includes('@') ? rawId : `${rawId}@cmacademy.com`;
-
-
-
-        try {
-
-            if (!window.firebaseApp) {
-
-                err.textContent = "Firebase 초기화 중입니다. 잠시 후 다시 시도해주세요.";
-
-                return;
-
-            }
-
-            const { auth, signInWithEmailAndPassword } = window.firebaseApp;
-
-            await signInWithEmailAndPassword(auth, email, pw);
-
-            
-
-            err.textContent = "";
-
-            
-
-            // 계정 종류에 따른 기존 세션 역할 설정
-
-            if (rawId === 'admin') {
-
-                state.currentUser = { role: 'super', username: 'admin' };
-
-            } else {
-
-                const branch = state.branches.find(b => b.username.toLowerCase() === rawId.toLowerCase());
-
-                if (branch) {
-
-                    state.currentUser = { role: 'sub', branchId: branch.id, academyName: branch.academyName, logoImage: branch.logoImage };
-
+                if (!window.firebaseApp) {
+                    err.textContent = "Firebase 초기화 중입니다. 잠시 후 다시 시도해주세요.";
+                    return;
+                }
+                const { auth, signInWithEmailAndPassword } = window.firebaseApp;
+                await signInWithEmailAndPassword(auth, email, pw);
+                
+                err.textContent = "";
+                
+                if (rawId === 'admin') {
+                    state.currentUser = { role: 'super', username: 'admin' };
                 } else {
-
-                    const student = state.students.find(s => s.username.toLowerCase() === rawId.toLowerCase());
-
-                    if (student) {
-
-                        const b = state.branches.find(x => x.id === student.branchId);
-
-                        state.currentUser = { role: 'student', branchId: student.branchId, name: student.name, academyName: b ? b.academyName : '최강수학메이드영어학원' };
-
+                    const branch = state.branches.find(b => b.username.toLowerCase() === rawId.toLowerCase());
+                    if (branch) {
+                        state.currentUser = { role: 'sub', branchId: branch.id, academyName: branch.academyName, logoImage: branch.logoImage };
                     } else {
-
-                        state.currentUser = { role: 'sub', username: rawId };
-
+                        const student = state.students.find(s => s.username.toLowerCase() === rawId.toLowerCase());
+                        if (student) {
+                            const b = state.branches.find(x => x.id === student.branchId);
+                            state.currentUser = { role: 'student', branchId: student.branchId, name: student.name, academyName: b ? b.academyName : '최강수학메이드영어학원' };
+                        } else {
+                            state.currentUser = { role: 'sub', username: rawId };
+                        }
                     }
-
                 }
 
+                if (typeof enterPortal === 'function') {
+                    enterPortal();
+                }
+            } catch (error) {
+                console.error(error);
+                err.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
             }
-
-
-
-            if (typeof enterPortal === 'function') {
-
-                enterPortal();
-
-            }
-
-        } catch (error) {
-
-            console.error(error);
-
-            err.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
-
         }
-
-    }
-
-     
-
-
 
         function enterPortal() {
-
             document.getElementById('login-screen').classList.add('hidden');
-
             document.getElementById('app-portal').classList.remove('hidden');
 
-
-
             const badge = document.getElementById('user-badge');
-
             const nameEl = document.getElementById('header-academy-name');
-
             const subEl = document.getElementById('header-academy-sub');
 
-
-
             if (state.currentUser.role === 'super') {
-
                 badge.innerText = '👑 최고 관리자 (본원)';
-
                 nameEl.innerText = '최강수학메이드영어학원 본원 관리센터';
-
                 subEl.innerText = '실시간 클라우드 전체 관리';
-
                 document.getElementById('super-admin-tabs').classList.remove('hidden');
-
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
-
                 document.getElementById('sidebar-add-btn').classList.remove('hidden');
-
                 document.getElementById('btn-add-tab').classList.remove('hidden');
-
             } else if (state.currentUser.role === 'sub') {
-
                 badge.innerText = `🏛️ ${state.currentUser.academyName} 원장님`;
-
                 nameEl.innerText = state.currentUser.academyName;
-
                 subEl.innerText = '지점 관리자 모드';
-
                 document.getElementById('super-admin-tabs').classList.add('hidden');
-
                 document.getElementById('sub-admin-tabs').classList.remove('hidden');
-
                 document.getElementById('sidebar-add-btn').classList.add('hidden');
-
                 document.getElementById('btn-add-tab').classList.add('hidden');
-
             } else {
-
                 badge.innerText = `👨‍🎓 ${state.currentUser.name} 학생`;
-
                 nameEl.innerText = state.currentUser.academyName || '최강수학메이드영어학원';
-
                 subEl.innerText = '학생 학습관';
-
                 document.getElementById('super-admin-tabs').classList.add('hidden');
-
                 document.getElementById('sub-admin-tabs').classList.add('hidden');
-
                 document.getElementById('sidebar-add-btn').classList.add('hidden');
-
                 document.getElementById('btn-add-tab').classList.add('hidden');
-
             }
-
-
 
             if (!state.topTabs.some(t => t.id === state.currentTopTab) && state.topTabs.length > 0) {
-
                 state.currentTopTab = state.topTabs[0].id;
-
             }
-
-
 
             renderTopNav();
-
             renderSidebar();
-
             renderContent();
-
         }
-
-
 
         function logout() {
-
             state.currentUser = null;
-
             document.getElementById('login-screen').classList.remove('hidden');
-
             document.getElementById('app-portal').classList.add('hidden');
-
             document.getElementById('login-id').value = '';
-
             document.getElementById('login-pw').value = '';
-
         }
-
-
 
         function renderTopNav() {
-
             const container = document.getElementById('top-nav-container');
-
             container.innerHTML = '';
-
-
 
             state.topTabs.forEach((tab, index) => {
-
                 const isActive = state.currentTopTab === tab.id;
-
                 const btn = document.createElement('button');
-
                 btn.className = isActive
-
                     ? 'bg-amber-500 text-slate-900 font-bold px-4 py-2 rounded-xl shadow-sm transition'
-
                     : 'bg-slate-100 text-slate-700 font-bold px-4 py-2 rounded-xl hover:bg-slate-200 transition';
-
                 btn.innerText = tab.name;
-
                 btn.onclick = () => {
-
                     state.currentTopTab = tab.id;
-
                     renderTopNav();
-
                     renderContent();
-
                 };
 
-
-
                 if (state.currentUser && state.currentUser.role === 'super') {
-
                     btn.oncontextmenu = (e) => {
-
                         e.preventDefault();
-
                         const cmd = prompt(`[${tab.name}] 메뉴 설정:\n1. 이름 변경\n2. 삭제`, '1');
-
                         if (cmd === '1') {
-
                             const newName = prompt('새 메뉴 이름:', tab.name);
-
                             if (newName) { tab.name = newName.trim(); renderTopNav(); saveState(); }
-
                         } else if (cmd === '2') {
-
                             if (state.topTabs.length <= 1) return alert('최소 1개 메뉴는 필요합니다.');
-
                             state.topTabs.splice(index, 1);
-
                             if (state.currentTopTab === tab.id) state.currentTopTab = state.topTabs[0].id;
-
                             renderTopNav(); renderContent(); saveState();
-
                         }
-
                     };
-
                 }
-
                 container.appendChild(btn);
-
             });
-
         }
-
-
 
         function addTopTabPrompt() {
-
             if (state.currentUser.role !== 'super') return;
-
             const name = prompt('새 상단 메뉴(탭) 이름을 입력하세요:');
-
             if (name) {
-
                 state.topTabs.push({ id: 'tab_' + Date.now(), name: name.trim() });
-
                 renderTopNav();
-
                 saveState();
-
             }
-
         }
-
-
 
         function renderSidebar() {
-
             const container = document.getElementById('sidebar-container');
-
             container.innerHTML = '';
-
-
 
             state.sidebarCats.forEach((cat, index) => {
-
                 const isActive = state.currentSidebarCat === cat.id;
-
                 const div = document.createElement('div');
-
                 div.className = isActive
-
                     ? 'w-full text-left bg-indigo-900 text-white font-bold p-3 rounded-xl shadow-sm text-sm flex justify-between items-center draggable-item'
-
                     : 'w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold p-3 rounded-xl text-sm flex justify-between items-center border border-slate-200 transition draggable-item';
-
                 div.innerHTML = `<span>${cat.name}</span> ${isActive ? '<span class="text-[10px] bg-indigo-600 px-2 py-0.5 rounded-full text-white">선택됨</span>' : ''}`;
-
                 
-
                 div.onclick = () => {
-
                     state.currentSidebarCat = cat.id;
-
                     state.currentFolderId = null;
-
                     renderSidebar();
-
                     renderContent();
-
                 };
 
-
-
                 if (state.currentUser && state.currentUser.role === 'super') {
-
                     div.oncontextmenu = (e) => {
-
                         e.preventDefault();
-
                         const cmd = prompt(`[${cat.name}] 카테고리 설정:\n1. 이름 변경\n2. 삭제`, '1');
-
                         if (cmd === '1') {
-
                             const newName = prompt('새 카테고리 이름:', cat.name);
-
                             if (newName) { cat.name = newName.trim(); renderSidebar(); saveState(); }
-
                         } else if (cmd === '2') {
-
                             if (state.sidebarCats.length <= 1) return alert('최소 1개 카테고리는 필요합니다.');
-
                             state.sidebarCats.splice(index, 1);
-
                             delete state.masterDatabase[cat.id];
-
                             if (state.currentSidebarCat === cat.id) state.currentSidebarCat = state.sidebarCats[0].id;
-
                             renderSidebar(); renderContent(); saveState();
-
                         }
-
                     };
-
                 }
-
                 container.appendChild(div);
-
             });
-
         }
-
-
 
         function addSidebarCategoryPrompt() {
-
             if (state.currentUser.role !== 'super') return;
-
             const name = prompt('새 카테고리 이름을 입력하세요:');
-
             if (name) {
-
                 const id = 'cat_' + Date.now();
-
                 state.sidebarCats.push({ id, name: name.trim() });
-
                 state.masterDatabase[id] = [];
-
                 renderSidebar();
-
                 saveState();
-
             }
-
         }
-
-
 
         function getCurrentActiveItems() {
-
             const catId = state.currentSidebarCat;
-
             const masterItems = state.masterDatabase[catId] || [];
 
-
-
             if (state.currentUser.role === 'super') {
-
                 return masterItems;
-
             }
-
-
 
             const branchId = state.currentUser.branchId;
-
             if (!state.branchDatabases[branchId]) {
-
                 state.branchDatabases[branchId] = {};
-
             }
-
             const branchItems = state.branchDatabases[branchId][catId] || [];
 
-
-
             return [...masterItems, ...branchItems];
-
         }
-
-
 
         function getBreadcrumbPath(folderId) {
-
             const path = [];
-
             let currId = folderId;
-
             const items = getCurrentActiveItems();
 
-
-
             while (currId) {
-
                 const found = items.find(i => i.id === currId);
-
                 if (found) {
-
                     path.unshift(found);
-
                     currId = found.parentId;
-
                 } else break;
-
             }
-
             return path;
-
         }
 
-
-
         function renderContent() {
-
             const container = document.getElementById('content-container');
-
             const breadcrumb = document.getElementById('breadcrumb');
-
             const title = document.getElementById('current-title');
-
             container.innerHTML = '';
 
-
-
             const currentCatObj = state.sidebarCats.find(c => c.id === state.currentSidebarCat);
-
             const catName = currentCatObj ? currentCatObj.name : '자료실';
 
-
-
             const path = getBreadcrumbPath(state.currentFolderId);
-
             let trailHtml = `<span class="cursor-pointer text-indigo-600 font-bold hover:underline" onclick="state.currentFolderId=null; renderContent();">📁 ${catName}</span>`;
-
             path.forEach((p) => {
-
                 trailHtml += ` <span class="text-slate-400">＞</span> <span class="cursor-pointer text-indigo-600 font-bold hover:underline" onclick="state.currentFolderId='${p.id}'; renderContent();">${p.name}</span>`;
-
             });
-
             breadcrumb.innerHTML = trailHtml;
 
-
-
             let items = getCurrentActiveItems();
-
             let currentChildren = items.filter(item => {
-
                 const matchesParent = item.parentId === state.currentFolderId;
-
                 if (!matchesParent) return false;
-
                 if (item.type === 'folder') return true;
-
                 return (item.tabId || 'video') === state.currentTopTab;
-
             });
-
-
 
             title.innerText = state.currentFolderId ? (path[path.length - 1]?.name || '폴더') : catName;
 
-
-
             if (state.currentFolderId) {
-
                 const parentFolder = path[path.length - 2];
-
                 const backBtn = document.createElement('div');
-
                 backBtn.className = "p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer text-sm flex items-center gap-2 border border-slate-200 transition mb-2";
-
                 backBtn.innerHTML = `<span>⬆️ 상위 폴더로 이동</span>`;
-
                 backBtn.onclick = () => { state.currentFolderId = parentFolder ? parentFolder.id : null; renderContent(); };
-
                 container.appendChild(backBtn);
-
             }
-
-
 
             if (currentChildren.length === 0) {
-
                 container.innerHTML += `<div class="text-center py-12 text-slate-400 font-medium text-sm">등록된 학습 자료가 없습니다.</div>`;
-
                 return;
-
             }
 
-
-
             currentChildren.forEach((item, index) => {
-
                 const row = document.createElement('div');
-
                 row.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center gap-3 font-bold text-slate-700 text-sm hover:border-slate-300 transition";
-
                 
-
                 const leftDiv = document.createElement('div');
-
                 leftDiv.className = "flex items-center gap-2.5 cursor-pointer flex-grow";
 
-
-
                 const isSuperItem = (item.authorRole === 'super' || !item.authorRole);
-
                 const badgeHtml = isSuperItem ? `<span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">본원공유</span>` : `<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">우리학원</span>`;
 
-
-
                 if (item.type === 'folder') {
-
                     leftDiv.innerHTML = `<span class="text-xl">📂</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
-
                     leftDiv.onclick = () => { state.currentFolderId = item.id; renderContent(); };
-
                 } else {
-
                     const isYt = /youtube\.com|youtu\.be/.test(item.linkUrl);
-
                     if (isYt) {
-
                         leftDiv.innerHTML = `<span class="text-xl">🔗</span> <span class="text-base">${item.name}</span> ${badgeHtml}`;
-
                         leftDiv.onclick = () => openLinkOrVideo(item);
-
                     } else {
-
                         leftDiv.innerHTML = `<a href="${item.linkUrl}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 w-full"><span class="text-xl">🔗</span><span class="text-base">${item.name}</span> ${badgeHtml}</a>`;
-
                     }
-
                 }
-
-
 
                 row.appendChild(leftDiv);
 
-
-
                 const isSuperUser = (state.currentUser && state.currentUser.role === 'super');
-
                 const isSubUser = (state.currentUser && state.currentUser.role === 'sub');
-
                 const canModifyThisItem = isSuperUser || (isSubUser && !isSuperItem);
 
-
-
                 if (canModifyThisItem && state.currentUser && state.currentUser.role !== 'student') {
-
                     row.oncontextmenu = (e) => {
-
                         e.preventDefault();
-
                         const cmd = prompt(`[${item.name}] 항목 설정:\n1. 이름 변경\n2. 삭제`, '1');
-
                         if (cmd === '1') {
-
                             const newName = prompt('새 이름:', item.name);
-
                             if (newName) {
-
                                 item.name = newName.trim();
-
                                 if (item.linkUrl !== undefined) {
-
                                     const newLink = prompt('웹/링크 주소:', item.linkUrl);
-
                                     if (newLink !== null) item.linkUrl = newLink.trim();
-
                                 }
-
                                 renderContent(); saveState();
-
                             }
-
                         } else if (cmd === '2') {
-
                             deleteItem(item.id, isSuperItem);
-
                         }
-
                     };
-
                 }
-
-
 
                 const rightBox = document.createElement('div');
-
                 rightBox.className = 'flex items-center gap-1.5 flex-shrink-0';
 
-
-
                 const isOpenLink = item.type !== 'folder' && item.linkUrl && !/youtube\.com|youtu\.be/.test(item.linkUrl);
-
                 const actionBtn = document.createElement(isOpenLink ? 'a' : 'button');
-
                 if (isOpenLink) {
-
                     actionBtn.href = item.linkUrl;
-
                     actionBtn.target = '_blank';
-
                     actionBtn.rel = 'noopener noreferrer';
-
                 }
-
                 actionBtn.className = "bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2 rounded-xl font-bold shadow-sm ml-2 transition inline-flex items-center justify-center";
-
                 actionBtn.innerText = item.type === 'folder' ? '열기 ➔' : '학습하기 ➔';
-
                 
-
                 if (!isOpenLink) {
-
                     actionBtn.onclick = () => {
-
                         if (item.type === 'folder') {
-
                             state.currentFolderId = item.id;
-
                             renderContent();
-
                         } else {
-
                             openLinkOrVideo(item);
-
                         }
-
                     };
-
                 }
-
                 rightBox.appendChild(actionBtn);
 
-
-
                 row.appendChild(rightBox);
-
                 container.appendChild(row);
-
             });
-
         }
-
-
 
         function openLinkOrVideo(item) {
-
             const url = item.linkUrl;
-
             if (url.includes('youtube.com') || url.includes('youtu.be')) {
-
                 let embedUrl = url;
-
                 if (url.includes('watch?v=')) embedUrl = url.replace('watch?v=', 'embed/');
-
                 else if (url.includes('youtu.be/')) embedUrl = url.replace('youtu.be/', 'youtube.com/embed/');
-
                 document.getElementById('video-title').innerText = item.name;
-
                 document.getElementById('video-iframe').src = embedUrl;
-
                 document.getElementById('video-modal').classList.remove('hidden');
-
             } else {
-
                 window.open(url, '_blank');
-
             }
-
         }
-
-
 
         function closeVideo() {
-
             document.getElementById('video-modal').classList.add('hidden');
-
             document.getElementById('video-iframe').src = '';
-
         }
 
-
-
         function deleteItem(id, isSuperItem) {
-
             if (state.currentUser.role === 'sub' && isSuperItem) {
-
                 return alert('본원에서 공유해 준 공통 자료는 삭제할 수 없습니다.');
-
             }
-
             if (confirm('해당 폴더/자료를 삭제하시겠습니까?')) {
-
                 if (state.currentUser.role === 'super') {
-
                     state.masterDatabase[state.currentSidebarCat] = state.masterDatabase[state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
-
                 } else {
-
                     const bId = state.currentUser.branchId;
+                    state.branchDatabases[bId][state.currentSidebarCat] = state.branchDatabases[bId][state.currentSidebarCat].filter(i => i.id !== id && i.parentId !== id);
+                }
+                saveState();
+                renderContent();
+            }
+        }
 
-                    state.branchDatabases[bId][state.currentSidebarCat] = state.branchDatabases[bId][state.currentSidebarCat].filter(i => i.id !== id && i.paren
+        window.onload = () => {
+            loadShared();
+        };
+    </script>
+</body>
+</html>
