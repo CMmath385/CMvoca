@@ -181,7 +181,7 @@ async function handleLogin(e) {
   if (!configured) return setErr('index.html 상단의 Firebase 설정값(FB)을 먼저 입력하세요.');
   setErr('');
   const id = $('login-id').value.trim().toLowerCase(), pw = $('login-pw').value;
-  try { await auth.signInWithEmailAndPassword(id + DOMAIN, pw); }
+try { await auth.signInWithEmailAndPassword(id + DOMAIN, pw); }
   catch (x) { setErr('아이디 또는 비밀번호가 올바르지 않습니다.'); }
 }
 if (configured) auth.onAuthStateChanged(async u => {
