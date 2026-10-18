@@ -319,6 +319,7 @@ function drawContent() {
   if (S.folder === 'F') tools.append(btn('← 강사·학원·학생 관리로', B2, async () => { S.fFiles = false; setView('manage'); }));
   if (edit) {
     tools.append(btn('+ 새 폴더', B1, () => addItem('folder')), btn('🔗 링크 등록', 'bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('link')), btn(S.folder === 'F' ? '📎 파일 등록' : '📄 PDF 등록', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('pdf')));
+    if (S.folder !== 'F') tools.append(btn('🧩 HTML 코드 등록', 'bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs px-3 py-2 rounded-xl font-bold', addHtml));
   }
 
   if (S.me.role === 'super' && sharedScoped()) tools.append(btn('🔗 선택 지점에 전체 공유 추가', 'bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-2 rounded-xl font-bold', shareAll));
@@ -348,7 +349,7 @@ function drawContent() {
   kids.forEach(it => {
     const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap justify-between items-center gap-3 font-bold text-slate-700 text-sm');
     const l = h('div', 'flex items-center gap-2.5 flex-grow min-w-0');
-    l.append(h('span', 'text-xl', it.type === 'folder' ? '📂' : it.pdfUrl ? '📄' : '🔗'), h('span', 'text-base break-all', it.name));
+    l.append(h('span', 'text-xl', it.type === 'folder' ? '📂' : it.htmlPage ? '🧩' : it.pdfUrl ? '📄' : '🔗'), h('span', 'text-base break-all', it.name));
     if (S.folder === 'A' && edit) l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (it.visible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'), it.visible ? '학생공개' : '비공개'));
     if (sharedScoped() && S.me.role === 'super') { const n = (it.shared || []).length; l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (n ? 'bg-violet-100 text-violet-700' : 'bg-slate-200 text-slate-500'), n ? '공유 ' + n + '개 지점' : '미공유')); }
     if (it.type === 'folder') { l.classList.add('cursor-pointer'); l.onclick = () => { S.folderId = it.id; drawContent(); }; }
@@ -356,10 +357,12 @@ function drawContent() {
     const r = h('div', 'flex flex-wrap items-center gap-1.5');
     if (it.type === 'folder') r.append(btn('열기', B1, () => { S.folderId = it.id; drawContent(); }));
     if (it.linkUrl) r.append(btn('학습하기', B1, () => openLink(it)));
+    if (it.htmlPage) r.append(btn('학습하기', B1, () => openHtml(it)));
     if (it.pdfUrl) r.append(btn(isPdf(it) ? '📄 PDF 열기·인쇄' : '📎 파일 열기', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => { startStudy(it); window.open(it.pdfUrl, '_blank', 'noopener'); }));
     if (edit) {
       if (S.folder === 'A') r.append(btn(it.visible ? '🔒 비공개로' : '🔓 학생 공개', B2, async () => { await db.collection('items').doc(it.id).update({ visible: !it.visible }); it.visible = !it.visible; drawContent(); }));
       if (sharedScoped()) r.append(btn('🔗 공유', 'bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs px-2.5 py-2 rounded-xl font-bold', () => shareItem(it)));
+      if (it.htmlPage) r.append(btn('🔄 코드 교체', B2, () => replaceHtml(it)));
       r.append(btn('✏️', B2, () => renameItem(it)), btn('🗑', B2, () => deleteItem(it)));
     }
     row.append(r); if (edit) wireDrag(row, it); list.append(row);
@@ -1089,6 +1092,56 @@ $('pdf-input').onchange = e => {
     toast(''); await renderContent();
   });
 };
+/* ===== HTML 학습 자료 (Gemini 등에서 만든 페이지를 우리 사이트에 직접 보관) ===== */
+const HTML_MAX = 900000;
+function htmlForm(title, withTitle, initTitle) {
+  return new Promise(res => {
+    const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4 overflow-y-auto'), card = h('div', 'bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-2 max-h-full overflow-y-auto');
+    card.append(h('h3', 'text-lg font-bold text-slate-800', title), h('p', 'text-xs text-slate-500', 'Gemini 등에서 만든 학습 페이지의 HTML 코드 전체를 붙여넣거나, .html 파일을 선택하세요. (900KB 이하)'));
+    let ti = null; if (withTitle) { ti = h('input', 'w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold'); ti.placeholder = '학습 자료 제목'; ti.value = initTitle || ''; card.append(h('label', 'block text-xs font-bold text-slate-600 mt-2', '제목'), ti); }
+    const fi = h('input', 'block w-full text-xs mt-2'); fi.type = 'file'; fi.accept = '.html,.htm,text/html';
+    const ta = h('textarea', 'w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono'); ta.rows = 9; ta.placeholder = '<!DOCTYPE html> ... 코드를 여기에 붙여넣기';
+    fi.onchange = async () => { const f = fi.files[0]; if (f) { ta.value = await f.text(); if (ti && !ti.value.trim()) ti.value = f.name.replace(/\.(html?|HTML?)$/, ''); } };
+    card.append(h('label', 'block text-xs font-bold text-slate-600 mt-2', 'HTML 파일 선택'), fi, h('label', 'block text-xs font-bold text-slate-600 mt-2', '또는 코드 붙여넣기'), ta);
+    const done = v => { ov.remove(); res(v); }, row = h('div', 'flex gap-2 pt-3');
+    row.append(btn('저장', 'flex-1 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-3 rounded-xl', async () => {
+      const html = ta.value.trim(), name = ti ? ti.value.trim() : '';
+      if (ti && !name) return alert('제목을 입력하세요.');
+      if (!/<\s*(html|body|div|script|head)/i.test(html)) return alert('HTML 코드가 아닌 것 같습니다. 코드 전체를 붙여넣었는지 확인하세요.');
+      if (new TextEncoder().encode(html).length > HTML_MAX) return alert('코드가 너무 큽니다(900KB 초과). 이미지가 코드에 직접 들어 있다면 줄여 주세요.');
+      done({ name, html });
+    }), btn('취소', 'flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl', async () => done(null)));
+    card.append(row); ov.append(card); document.body.append(ov);
+  });
+}
+async function addHtml() {
+  const o = await htmlForm('HTML 학습 자료 등록', true, ''); if (!o) return;
+  const ref = db.collection('items').doc(), bid = branchScoped() ? curBranch() : 'main';
+  toast('저장 중...');
+  await db.collection('pages').doc(ref.id).set({ html: o.html, name: o.name, folder: S.folder, branchId: bid, createdAt: Date.now() });
+  await ref.set({ ...baseItem(), name: o.name, type: 'file', htmlPage: true });
+  toast(''); await renderContent();
+}
+async function replaceHtml(it) {
+  const o = await htmlForm('"' + it.name + '" 코드 교체', false); if (!o) return;
+  toast('저장 중...'); await db.collection('pages').doc(it.id).set({ html: o.html, name: it.name, folder: it.folder, branchId: it.branchId || (branchScoped() ? curBranch() : 'main'), updatedAt: Date.now() }, { merge: true });
+  toast(''); alert('코드가 교체되었습니다.');
+}
+const HTML_FIX = '<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content"><style>html{scroll-padding-bottom:45vh}input,textarea,select{font-size:16px!important}</style><script>addEventListener("focusin",function(e){var t=e.target&&e.target.tagName;if(/^(INPUT|TEXTAREA|SELECT)$/.test(t)){document.body.style.paddingBottom="45vh";setTimeout(function(){try{e.target.scrollIntoView({block:"center",behavior:"smooth"})}catch(_){}},300)}});addEventListener("focusout",function(){setTimeout(function(){if(!/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement||{}).tagName||"")){document.body.style.paddingBottom=""}},200)});<\/script>';
+async function openHtml(it) {
+  toast('불러오는 중...');
+  const d = await db.collection('pages').doc(it.id).get(); toast('');
+  if (!d.exists || !d.data().html) return alert('학습 자료를 불러오지 못했습니다. 관리자에게 문의하세요.');
+  startStudy(it);
+  let html = d.data().html; html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, m => m + HTML_FIX) : HTML_FIX + html;
+  const ov = h('div', 'fixed inset-0 bg-white flex flex-col'); ov.style.zIndex = '60'; ov.style.height = '100dvh';
+  const bar = h('div', 'flex items-center justify-between gap-2 px-3 py-2 bg-slate-900 text-white flex-shrink-0'), prev = document.body.style.overflow;
+  const close = () => { ov.remove(); document.body.style.overflow = prev; showStudyModal(); };
+  bar.append(btn('← 돌아가기', 'bg-white/15 hover:bg-white/25 text-white font-bold text-sm px-4 py-2.5 rounded-xl', async () => close()), h('div', 'flex-grow min-w-0 text-xs font-bold truncate text-center', it.name), btn('✅ 학습 완료', 'bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm px-4 py-2.5 rounded-xl', async () => close()));
+  const fr = h('iframe', 'flex-grow w-full border-0 bg-white'); fr.setAttribute('sandbox', 'allow-scripts allow-forms allow-modals allow-popups'); fr.setAttribute('title', it.name); fr.srcdoc = html;
+  ov.append(bar, fr); document.body.append(ov); document.body.style.overflow = 'hidden';
+}
+
 async function renameItem(it) {
   const n = prompt('새 이름:', it.name); if (!n || !n.trim()) return;
   const upd = { name: n.trim() };
@@ -1101,6 +1154,7 @@ async function deleteItem(it) {
   const targets = S.items.filter(i => ids.has(i.id));
   for (let i = 0; i < targets.length; i += 400) { const b = db.batch(); targets.slice(i, i + 400).forEach(t => b.delete(db.collection('items').doc(t.id))); await b.commit(); }
   for (const t of targets) if (t.pdfPath) st.ref(t.pdfPath).delete().catch(() => {});
+  for (const t of targets) if (t.htmlPage) await db.collection('pages').doc(t.id).delete().catch(() => {});
   await renderContent();
 }
 
@@ -1450,13 +1504,14 @@ async function delBranch(b) {
   await delQuery(db.collection('users').where('branchId', '==', b.id).where('role', '==', 'student'));
   await delQuery(db.collection('history').where('branchId', '==', b.id));
   await delQuery(db.collection('mg').where('branchId', '==', b.id));
+  await delQuery(db.collection('pages').where('branchId', '==', b.id));
   const bt = db.batch(); bt.delete(db.collection('users').doc(b.id)); bt.delete(db.collection('branches').doc(b.id)); await bt.commit();
   toast(''); S.stuBranch = 'main'; S.viewBranch = 'main'; await renderBranches();
 }
 async function exportData() {
   toast('백업 생성 중...');
   const out = { exportedAt: new Date().toISOString(), tabs: TABS.map(([id, name]) => ({ id, name })) };
-  for (const c of ['items', 'branches', 'users', 'history', 'mg']) out[c] = (await db.collection(c).get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !(c === 'mg' && x.kind === 'att'));
+  for (const c of ['items', 'branches', 'users', 'history', 'mg', 'pages']) out[c] = (await db.collection(c).get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !(c === 'mg' && x.kind === 'att'));
   const a = h('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
   a.download = 'academy_backup_' + new Date().toISOString().slice(0, 10) + '.json'; document.body.append(a); a.click(); a.remove(); toast('');
 }
