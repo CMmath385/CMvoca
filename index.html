@@ -17,7 +17,7 @@ body{font-family:'Pretendard',sans-serif}
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col">
- 
+
 <!-- 로그인 -->
 <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
   <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
@@ -36,7 +36,7 @@ body{font-family:'Pretendard',sans-serif}
     <div id="login-error" class="mt-4 text-center text-xs font-bold text-rose-500 min-h-4"></div>
   </div>
 </div>
- 
+
 <!-- 포털 -->
 <div id="app" class="hidden flex-grow flex flex-col">
   <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
@@ -51,16 +51,16 @@ body{font-family:'Pretendard',sans-serif}
       </div>
     </div>
   </header>
- 
+
   <div class="max-w-[1600px] mx-auto w-full flex-grow flex flex-col md:flex-row p-4 gap-4">
     <aside class="w-full md:w-64 flex-shrink-0 flex flex-col gap-2">
       <span class="text-xs font-bold text-slate-400 px-1">학습 폴더</span>
       <div id="side" class="flex flex-col gap-1.5"></div>
     </aside>
- 
+
     <main class="flex-grow bg-white rounded-2xl shadow-sm border border-slate-200 p-6 min-w-0">
       <div id="view-nav" class="mb-6 bg-slate-100 p-1.5 rounded-xl flex gap-2 border border-slate-200"></div>
- 
+
       <section id="view-content">
         <div class="flex flex-wrap justify-between items-center gap-3 mb-4 pb-4 border-b border-slate-100">
           <div><div id="crumb" class="text-xs font-bold text-indigo-600 mb-1 flex flex-wrap items-center gap-1"></div>
@@ -72,12 +72,13 @@ body{font-family:'Pretendard',sans-serif}
         <div id="tabs" class="flex flex-wrap gap-2 mb-4"></div>
         <div id="list" class="space-y-3"></div>
       </section>
- 
+
       <section id="view-students" class="hidden"></section>
       <section id="view-history" class="hidden"></section>
+      <section id="view-manage" class="hidden"></section>
       <section id="view-settings" class="hidden"></section>
       <section id="view-branches" class="hidden"></section>
- 
+
       <section id="view-import" class="hidden">
         <h2 class="text-xl font-bold text-slate-800 mb-4">백업 · 가져오기</h2>
         <button onclick="safe(exportData)" class="mb-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-md transition">📥 전체 데이터 JSON 백업 다운로드</button>
@@ -85,12 +86,12 @@ body{font-family:'Pretendard',sans-serif}
         <p class="text-xs text-slate-600 mb-4 max-w-xl">이 화면에서 받은 새 백업 JSON을 올리면 자료(폴더·링크·PDF 정보)와 메뉴가 복원됩니다. 이전 버전의 백업 JSON(academy_platform_backup.json) 또는 예전 사이트의 index.html 파일을 올리면, 기존 카테고리가 B 폴더(본원 공용)의 최상위 폴더로 옮겨집니다. 같은 파일을 다시 올려도 중복되지 않고 덮어씁니다.</p>
         <input type="file" id="import-file" accept=".json,.html,application/json,text/html" class="text-xs">
       </section>
- 
+
       <footer class="mt-8 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">© 2026 최강수학메이드영어학원. All rights reserved.</footer>
     </main>
   </div>
 </div>
- 
+
 <div id="study-modal" class="hidden fixed inset-0 bg-slate-900/70 z-50 items-center justify-center p-4">
   <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
     <h3 class="text-lg font-bold text-slate-800 mb-1">학습을 마쳤나요?</h3>
@@ -112,7 +113,7 @@ body{font-family:'Pretendard',sans-serif}
 </div>
 <input type="file" id="pdf-input" accept="application/pdf" class="hidden">
 <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl z-50"></div>
- 
+
 <script>
 /* ===== 설정: Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)의 값을 붙여넣으세요 ===== */
 const FB = {
@@ -129,11 +130,12 @@ const FOLDERS = [
   { id: 'B', name: 'B · 본원 공용 자료' },
   { id: 'C', name: 'C · 수학' },
   { id: 'D', name: 'D · 국어' },
-  { id: 'E', name: 'E · 전과목 통합' }
+  { id: 'E', name: 'E · 전과목 통합' },
+  { id: 'F', name: 'F · 학원관리' }
 ];
 let TABS = [['video', '영상학습훈련'], ['voca', '단어'], ['passage', '본문']];
 const tabOf = i => { const t = i.tabId || 'video'; return TABS.some(x => x[0] === t) ? t : TABS[0][0]; };
- 
+
 const $ = id => document.getElementById(id);
 const configured = !FB.apiKey.startsWith('YOUR');
 if (configured) firebase.initializeApp(FB);
@@ -143,9 +145,9 @@ const st = configured ? firebase.storage() : null;
 if (st) { st.setMaxUploadRetryTime(30000); st.setMaxOperationRetryTime(30000); } // 업로드가 무한 대기하지 않고 오류를 보여주도록
 // 관리자 로그인 상태를 유지한 채 새 계정을 만들기 위한 보조 앱
 const auth2 = configured ? firebase.initializeApp(FB, 'sec').auth() : null;
- 
-const S = { me: null, view: 'content', folder: 'B', folderId: null, tab: 'video', items: [], branches: [], viewBranch: 'main', stuBranch: 'main', pdfTitle: '', seeded: false, hqLogo: '', hqLogoPath: '', hFilter: '' };
- 
+
+const S = { me: null, view: 'content', folder: 'B', folderId: null, tab: 'video', items: [], branches: [], viewBranch: 'main', stuBranch: 'main', pdfTitle: '', seeded: false, fSeededMain: false, hqLogo: '', hqLogoPath: '', hFilter: '' };
+
 function h(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 function btn(txt, cls, fn) { const b = h('button', cls, txt); b.onclick = () => safe(fn); return b; }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -156,7 +158,7 @@ const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.pro
 const B1 = 'bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition';
 const B2 = 'bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-2 rounded-xl font-bold transition';
 const branchName = id => id === 'main' ? '본원' : ((S.branches.find(b => b.id === id) || {}).academyName || id);
- 
+
 /* ===== 계정 생성 (Firebase Auth) ===== */
 async function createAuth(id, pw) {
   if (!/^[a-z0-9._-]{3,30}$/.test(id)) throw new Error('아이디는 영문 소문자·숫자·._- 조합 3~30자로 입력하세요.');
@@ -172,7 +174,7 @@ async function createAuth(id, pw) {
   await auth2.signOut();
   return uid;
 }
- 
+
 /* ===== 로그인 ===== */
 const setErr = m => { $('login-error').textContent = m; };
 const AUTH_MSG = {
@@ -211,9 +213,9 @@ if (configured) auth.onAuthStateChanged(async u => {
     if (p.role !== 'super') {
       const b = await db.collection('branches').doc(p.branchId).get();
       S.me.academyName = b.exists ? b.data().academyName : '최강수학메이드영어학원';
-      S.me.logoUrl = b.exists ? (b.data().logoUrl || '') : ''; S.me.logoPath = b.exists ? (b.data().logoPath || '') : '';
+      S.me.logoUrl = b.exists ? (b.data().logoUrl || '') : ''; S.me.logoPath = b.exists ? (b.data().logoPath || '') : ''; S.me.fSeeded = b.exists ? !!b.data().fSeeded : true;
     }
-    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
+    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.fSeededMain = !!c.data().fSeeded; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
     if (p.role === 'super') {
       await loadBranches();
       if (!S.seeded) { try { await seedMaterials(); } catch (e) { toast(''); alert('기존 학습 자료 등록 실패: ' + e.message + '\n(백업·가져오기 탭에서 다시 시도할 수 있습니다.)'); } }
@@ -221,7 +223,7 @@ if (configured) auth.onAuthStateChanged(async u => {
     enterPortal();
   } catch (e) { await auth.signOut(); setErr('로그인 처리 중 오류: ' + e.message); }
 });
- 
+
 function enterPortal() {
   const m = S.me;
   $('login-screen').classList.add('hidden'); $('app').classList.remove('hidden');
@@ -231,51 +233,53 @@ function enterPortal() {
   S.folder = 'B'; S.folderId = null; S.viewBranch = 'main'; S.stuBranch = 'main'; S.tab = TABS[0][0]; drawLogo(); setTimeout(showStudyModal, 600);
   buildSide(); setView('content');
 }
- 
+
 async function loadBranches() {
   const s = await db.collection('branches').get();
   S.branches = s.docs.map(d => ({ id: d.id, ...d.data() })).sort(byName.bind(null));
   S.branches.sort((a, b) => (a.academyName || '').localeCompare(b.academyName || '', 'ko'));
 }
- 
+
 /* ===== 내비게이션 ===== */
 function buildSide() {
   const c = $('side'); c.innerHTML = '';
-  FOLDERS.forEach(f => {
+  FOLDERS.filter(f => f.id !== 'F' || S.me.role !== 'student').forEach(f => {
     const on = S.folder === f.id;
     c.append(btn(f.name, 'w-full text-left font-bold p-3 rounded-xl text-sm border transition ' + (on ? 'bg-indigo-900 text-white border-indigo-900' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'), async () => {
-      S.folder = f.id; S.folderId = null; buildSide(); setView('content');
+      S.folder = f.id; S.folderId = null; S.fFiles = false; buildSide(); setView('content');
     }));
   });
 }
 function setView(v) {
+  if (v === 'content' && S.folder === 'F' && !S.fFiles && S.me.role !== 'student') v = 'manage';
   S.view = v;
-  ['content', 'students', 'history', 'settings', 'branches', 'import'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== v));
-  $('side').parentElement.classList.toggle('hidden', v !== 'content');
+  ['content', 'students', 'history', 'manage', 'settings', 'branches', 'import'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== v));
+  $('side').parentElement.classList.toggle('hidden', v !== 'content' && v !== 'manage');
   const views = [['content', '📂 학습 자료실']];
   if (S.me.role !== 'student') views.push(['students', '👨‍🎓 학생 관리'], ['history', '📊 학습 이력']);
   if (S.me.role !== 'student') views.push(['settings', S.me.role === 'sub' ? '⚙️ 학원 설정' : '⚙️ 본원 로고']);
   if (S.me.role === 'super') views.push(['branches', '🏛️ 지점 관리'], ['import', '💾 백업·가져오기']);
   const nav = $('view-nav'); nav.innerHTML = '';
   nav.classList.toggle('hidden', views.length < 2);
-  views.forEach(([id, label]) => nav.append(btn(label, 'flex-1 py-2 rounded-lg text-xs font-bold ' + (v === id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'), () => setView(id))));
-  safe(async () => { if (v === 'content') await renderContent(); else if (v === 'students') await renderStudents(); else if (v === 'branches') await renderBranches(); else if (v === 'history') await renderHistory(); else if (v === 'settings') renderSettings(); });
+  views.forEach(([id, label]) => nav.append(btn(label, 'flex-1 py-2 rounded-lg text-xs font-bold ' + ((v === id || (v === 'manage' && id === 'content')) ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'), () => setView(id))));
+  safe(async () => { if (v === 'content') await renderContent(); else if (v === 'students') await renderStudents(); else if (v === 'branches') await renderBranches(); else if (v === 'history') await renderHistory(); else if (v === 'manage') await renderManage(); else if (v === 'settings') renderSettings(); });
 }
- 
+
 /* ===== 학습 자료 ===== */
-const isEdit = () => S.me.role === 'super' || (S.me.role === 'sub' && S.folder === 'A');
+const branchScoped = () => S.folder === 'A' || S.folder === 'F';
+const isEdit = () => S.me.role === 'super' || (S.me.role === 'sub' && branchScoped());
 const curBranch = () => S.me.role === 'super' ? S.viewBranch : S.me.branchId;
- 
+
 async function loadItems() {
   let q = db.collection('items').where('folder', '==', S.folder);
-  if (S.folder === 'A') {
+  if (branchScoped()) {
     q = q.where('branchId', '==', curBranch());
-    if (S.me.role === 'student') q = q.where('visible', '==', true);
+    if (S.folder === 'A' && S.me.role === 'student') q = q.where('visible', '==', true);
   }
   S.items = (await q.get()).docs.map(d => ({ id: d.id, ...d.data() }));
 }
-async function renderContent() { toast('불러오는 중...'); await loadItems(); toast(''); drawContent(); }
- 
+async function renderContent() { toast('불러오는 중...'); if (S.folder === 'F') await ensureFFolders(); await loadItems(); toast(''); drawContent(); }
+
 function drawContent() {
   const f = FOLDERS.find(x => x.id === S.folder), edit = isEdit();
   // 경로
@@ -285,19 +289,20 @@ function drawContent() {
   const root = h('span', 'cursor-pointer hover:underline', '📁 ' + f.name); root.onclick = () => { S.folderId = null; drawContent(); }; crumb.append(root); if (edit) wireDropTarget(root, null);
   path.forEach(p => { crumb.append(h('span', 'text-slate-400', '＞')); const s = h('span', 'cursor-pointer hover:underline', p.name); s.onclick = () => { S.folderId = p.id; drawContent(); }; crumb.append(s); if (edit) wireDropTarget(s, p.id); });
   $('title').textContent = path.length ? path[path.length - 1].name : f.name;
- 
+
   // 안내문
   const notes = {
     B: '본원 공용 자료입니다. 모든 지점과 학생에게 공유되며 PDF 자료는 열어서 인쇄할 수 있습니다.',
     A: S.me.role === 'student' ? '우리 지점에서 공개한 자료입니다.' : '우리 지점 전용 폴더입니다. 자료마다 학생 공개/비공개를 정할 수 있고, 새 자료는 비공개로 시작합니다.',
-    C: '수학 전용 폴더입니다.', D: '국어 전용 폴더입니다.', E: '전과목 통합 폴더입니다.'
+    C: '수학 전용 폴더입니다.', D: '국어 전용 폴더입니다.', E: '전과목 통합 폴더입니다.',
+    F: '학원 관리 자료 파일입니다. 우리 지점 관리자와 본원 관리자만 볼 수 있고 학생에게는 보이지 않습니다. 링크나 파일(PDF·엑셀·워드·한글 등)을 올려 보관하세요.'
   };
   $('note').textContent = '💡 ' + notes[S.folder];
- 
+
   // 슈퍼관리자: A 폴더에서 지점 선택
   const bp = $('branch-pick'); bp.innerHTML = '';
-  bp.classList.toggle('hidden', !(S.me.role === 'super' && S.folder === 'A'));
-  if (S.me.role === 'super' && S.folder === 'A') {
+  bp.classList.toggle('hidden', !(S.me.role === 'super' && branchScoped()));
+  if (S.me.role === 'super' && branchScoped()) {
     bp.append(h('span', 'text-xs font-bold text-slate-600 mr-2', '지점 선택'));
     const sel = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold');
     [{ id: 'main', academyName: '본원' }, ...S.branches].forEach(b => { const o = h('option', '', b.academyName); o.value = b.id; sel.append(o); });
@@ -305,15 +310,16 @@ function drawContent() {
     sel.onchange = () => { S.viewBranch = sel.value; S.folderId = null; safe(renderContent); };
     bp.append(sel);
   }
- 
+
   // 도구
   const tools = $('tools'); tools.innerHTML = '';
+  if (S.folder === 'F') tools.append(btn('← 강사·학원·학생 관리로', B2, async () => { S.fFiles = false; setView('manage'); }));
   if (edit) {
-    tools.append(btn('+ 새 폴더', B1, () => addItem('folder')), btn('🔗 링크 등록', 'bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('link')), btn('📄 PDF 등록', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('pdf')));
+    tools.append(btn('+ 새 폴더', B1, () => addItem('folder')), btn('🔗 링크 등록', 'bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('link')), btn(S.folder === 'F' ? '📎 파일 등록' : '📄 PDF 등록', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('pdf')));
   }
- 
+
   // 탭
-  const tabs = $('tabs'); tabs.innerHTML = '';
+  const tabs = $('tabs'); tabs.innerHTML = ''; tabs.classList.toggle('hidden', S.folder === 'F');
   if (!TABS.some(t => t[0] === S.tab)) S.tab = TABS[0][0];
   TABS.forEach(([id, name]) => {
     const w = h('div', 'flex items-center gap-1');
@@ -322,7 +328,7 @@ function drawContent() {
     tabs.append(w);
   });
   if (S.me.role === 'super') tabs.append(btn('+ 메뉴 추가', B2, addTab));
- 
+
   // 목록
   const list = $('list'); list.innerHTML = '';
   if (S.folderId) {
@@ -344,7 +350,7 @@ function drawContent() {
     const r = h('div', 'flex flex-wrap items-center gap-1.5');
     if (it.type === 'folder') r.append(btn('열기', B1, () => { S.folderId = it.id; drawContent(); }));
     if (it.linkUrl) r.append(btn('학습하기', B1, () => openLink(it)));
-    if (it.pdfUrl) r.append(btn('📄 PDF 열기·인쇄', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => { startStudy(it); window.open(it.pdfUrl, '_blank', 'noopener'); }));
+    if (it.pdfUrl) r.append(btn(isPdf(it) ? '📄 PDF 열기·인쇄' : '📎 파일 열기', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => { startStudy(it); window.open(it.pdfUrl, '_blank', 'noopener'); }));
     if (edit) {
       if (S.folder === 'A') r.append(btn(it.visible ? '🔒 비공개로' : '🔓 학생 공개', B2, async () => { await db.collection('items').doc(it.id).update({ visible: !it.visible }); it.visible = !it.visible; drawContent(); }));
       r.append(btn('✏️', B2, () => renameItem(it)), btn('🗑', B2, () => deleteItem(it)));
@@ -352,11 +358,487 @@ function drawContent() {
     row.append(r); if (edit) wireDrag(row, it); list.append(row);
   });
 }
- 
+
+/* MG-START */
+const GROUPS = [
+  ['teacher', '🧑‍🏫 강사관리', [['teacher', '강사 등록·수정·삭제'], ['pay', '급여관리'], ['tclk', '출퇴근관리']]],
+  ['academy', '🏫 학원관리', [['fee', '회비관리'], ['ledger', '수입·지출관리'], ['plan', '학원 연간일정'], ['school', '학교별 일정']]],
+  ['student', '👨‍🎓 학생관리', [['att', '학생 출결관리'], ['stu', '원생 명단'], ['grade', '성적관리'], ['counsel', '상담관리'], ['progress', '진도관리']]]
+];
+const DEF_GRADES = ['초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3'];
+const MG = { group: 'teacher', tab: 'teacher', date: null, month: null, year: new Date().getFullYear(), pid: null, school: '', cfg: null, kGrade: null, attGrade: '' };
+const won = n => (Number(n) || 0).toLocaleString('ko-KR') + '원';
+const today = () => dayOf(Date.now());
+const hm = ts => ts ? new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '-';
+const dur = (a, b) => { if (!a || !b) return '-'; let m = Math.floor((b - a) / 60000); const hh = Math.floor(m / 60); m %= 60; return hh ? hh + '시간 ' + m + '분' : m + '분'; };
+const tsOf = (date, t) => /^\d{1,2}:\d{2}$/.test(t) ? new Date(date + 'T' + t.padStart(5, '0') + ':00').getTime() : null;
+const mgRef = id => db.collection('mg').doc(id);
+const newId = k => k + '_' + Date.now() + Math.random().toString(36).slice(2, 6);
+const prevMonth = m => { const [y, mo] = m.split('-').map(Number), d = new Date(y, mo - 2, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+const acadName = () => S.me.role === 'super' ? (curBranch() === 'main' ? '최강수학메이드영어학원 본원' : branchName(curBranch())) : S.me.academyName;
+function estPay(t, hrs, month) {
+  const pay = Number(t.pay) || 0, [y, m] = month.split('-').map(Number);
+  return t.payType === '시급' ? Math.round(pay * hrs) : t.payType === '주급' ? Math.round(pay * new Date(y, m, 0).getDate() / 7) : pay;
+}
+async function mgGet(kind, extra) {
+  let q = db.collection('mg').where('branchId', '==', curBranch()).where('kind', '==', kind);
+  if (extra) q = q.where(extra[0], '==', extra[1]);
+  return (await q.get()).docs.map(d => ({ id: d.id, ...d.data() }));
+}
+const mgSave = (id, data) => mgRef(id).set({ branchId: curBranch(), ...data }, { merge: true });
+async function loadRoster() {
+  const u = await db.collection('users').where('branchId', '==', curBranch()).where('role', '==', 'student').get();
+  return u.docs.map(d => ({ id: d.id, name: d.data().name, grade: d.data().grade || '', acct: true }))
+    .concat((await mgGet('stu')).map(r => ({ ...r, acct: false }))).sort(byName);
+}
+async function loadCfg() {
+  const bid = curBranch(); if (MG.cfg && MG.cfg.bid === bid) return MG.cfg;
+  const r = (await mgGet('cfg'))[0];
+  return (MG.cfg = { bid, grades: r && r.grades ? r.grades : DEF_GRADES.slice(), pin: r ? r.pin || '' : '', banner: r ? r.banner || '' : '' });
+}
+const saveCfg = () => mgSave('cfg_' + MG.cfg.bid, { kind: 'cfg', grades: MG.cfg.grades, pin: MG.cfg.pin, banner: MG.cfg.banner });
+const inp = (type, cls) => { const e = h('input', 'p-2 border border-slate-300 rounded-xl text-sm font-bold ' + (cls || '')); e.type = type; return e; };
+
+/* 인쇄 · CSV 저장 (모든 화면 공용) */
+function printTable(title, headers, rows, sub) {
+  const w = window.open('', '_blank'); if (!w) return alert('팝업 차단을 해제해 주세요.');
+  w.document.write('<html><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>body{font-family:sans-serif;padding:28px;color:#1e293b}h1{font-size:20px;margin:0 0 4px}p{margin:0 0 10px;color:#64748b;font-size:12px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #cbd5e1;padding:6px 8px;font-size:12px;text-align:left}th{background:#f1f5f9}</style></head><body><h1>' + esc(acadName()) + ' · ' + esc(title) + '</h1><p>' + esc(sub || '') + ' (출력일 ' + today() + ')</p><table><tr>' + headers.map(x => '<th>' + esc(x) + '</th>').join('') + '</tr>' + rows.map(r => '<tr>' + r.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('') + '</table></body></html>');
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+}
+function csvSave(name, headers, rows) {
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const txt = '\ufeff' + [headers].concat(rows).map(r => r.map(q).join(',')).join('\r\n');
+  const a = h('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/csv;charset=utf-8' })); a.download = name + '_' + today() + '.csv'; document.body.append(a); a.click(); a.remove();
+}
+function exportBar(title, headers, rows, sub, pre) {
+  const d = h('div', 'flex gap-2');
+  d.append(btn('🖨 ' + (pre || '') + '인쇄', B2, async () => printTable(title, headers, rows, sub)), btn('💾 ' + (pre || '') + 'CSV 저장', B2, async () => csvSave(title, headers, rows)));
+  return d;
+}
+
+/* 입력 창 (모든 관리 화면 공용) */
+function openForm(title, fields, vals, roster) {
+  return new Promise(res => {
+    const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4 overflow-y-auto');
+    const card = h('div', 'bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-2 max-h-full overflow-y-auto');
+    card.append(h('h3', 'text-lg font-bold text-slate-800 mb-2', title));
+    const ctl = {};
+    fields.forEach(([k, label, type, opts0]) => {
+      const opts = typeof opts0 === 'function' ? opts0() : opts0; let el;
+      if (type === 'area') { el = h('textarea'); el.rows = 3; }
+      else if (type === 'select' || type === 'stu') {
+        el = h('select');
+        (type === 'stu' ? [['', '(원생 선택)']].concat(roster.map(r => [r.id, r.name + (r.grade ? ' (' + r.grade + ')' : '')])) : opts.map(o => [o, o])).forEach(([v, t]) => { const o = h('option', '', t); o.value = v; el.append(o); });
+      } else { el = h('input'); el.type = type; }
+      el.className = 'w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800';
+      const cur = vals ? vals[k] : null;
+      el.value = cur != null ? cur : (type === 'date' && k === 'date') ? today() : type === 'select' ? opts[0] : '';
+      ctl[k] = el; card.append(h('label', 'block text-xs font-bold text-slate-600 mt-2', label), el);
+    });
+    const done = v => { ov.remove(); res(v); };
+    const row = h('div', 'flex gap-2 pt-3');
+    row.append(btn('저장', 'flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl', async () => {
+      const out = {}; fields.forEach(([k, , type]) => { const v = ctl[k].value.trim(); out[k] = type === 'number' ? Number(v) || 0 : v; });
+      if (!out[fields[0][0]]) return alert('첫 번째 항목은 꼭 입력해 주세요.');
+      if (fields.some(f => f[0] === 'date') && !out.date) return alert('날짜를 입력해 주세요.');
+      done(out);
+    }), btn('취소', 'flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl', async () => done(null)));
+    card.append(row); ov.append(card); document.body.append(ov);
+  });
+}
+
+/* 목록형 화면: 강사 · 원생 명단 · 상담 · 진도 · 수입지출 · 연간일정 · 학교별 일정 */
+const byDateDesc = (a, b) => (b.date || '').localeCompare(a.date || '');
+const byDateAsc = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.school || '').localeCompare(b.school || '', 'ko');
+const range2 = r => (r.date || '') + (r.end ? ' ~ ' + r.end : '');
+const MG_CRUD = {
+  teacher: { name: '강사목록', add: '+ 강사 등록', empty: '등록된 강사가 없습니다.', sort: byName,
+    f: [['name', '강사 이름', 'text'], ['phone', '연락처', 'text'], ['payType', '급여 방식', 'select', ['시급', '주급', '월급']], ['pay', '금액(원) — 선택한 급여 방식의 금액', 'number'], ['payDay', '급여일 (매월 며칠)', 'number'], ['memo', '메모', 'text']],
+    title: r => r.name, sub: r => [r.payType + ' ' + won(r.pay) + (r.payDay ? ' · 급여일 매월 ' + r.payDay + '일' : ''), r.phone, r.memo],
+    cols: [['이름', r => r.name], ['연락처', r => r.phone], ['급여 방식', r => r.payType], ['금액', r => won(r.pay)], ['급여일', r => r.payDay ? '매월 ' + r.payDay + '일' : ''], ['메모', r => r.memo]] },
+  stu: { name: '원생명단', add: '+ 원생 추가', empty: '계정 없는 원생이 없습니다.', sort: byName, note: '학습 계정이 있는 학생은 자동으로 포함됩니다. 계정이 없는 원생만 여기에 추가하세요.',
+    f: [['name', '이름', 'text'], ['grade', '학년 (학년은 "학생 출결관리"에서 등록)', 'select', () => MG.cfg.grades], ['phone', '학부모 연락처', 'text'], ['memo', '메모', 'text']],
+    title: r => r.name + (r.grade ? ' (' + r.grade + ')' : ''), sub: r => [r.phone, r.memo],
+    cols: [['이름', r => r.name], ['학년', r => r.grade], ['학부모 연락처', r => r.phone], ['메모', r => r.memo]] },
+  counsel: { name: '상담관리', add: '+ 상담 기록', empty: '상담 기록이 없습니다.', sort: byDateDesc,
+    f: [['date', '상담일', 'date'], ['pid', '원생', 'stu'], ['who', '상담 대상', 'select', ['학부모', '학생']], ['content', '상담 내용', 'area'], ['follow', '후속 조치', 'area']],
+    title: r => r.date + ' · ' + r.name + ' (' + r.who + ')', sub: r => [r.content, r.follow ? '후속 조치: ' + r.follow : ''],
+    cols: [['상담일', r => r.date], ['원생', r => r.name], ['대상', r => r.who], ['상담 내용', r => r.content], ['후속 조치', r => r.follow]] },
+  progress: { name: '진도관리', add: '+ 진도 기록', empty: '진도 기록이 없습니다.', sort: byDateDesc,
+    f: [['date', '날짜', 'date'], ['pid', '원생', 'stu'], ['book', '교재 / 단원', 'text'], ['content', '진도 내용', 'area'], ['hw', '과제', 'text']],
+    title: r => r.date + ' · ' + r.name + (r.book ? ' — ' + r.book : ''), sub: r => [r.content, r.hw ? '과제: ' + r.hw : ''],
+    cols: [['날짜', r => r.date], ['원생', r => r.name], ['교재/단원', r => r.book], ['진도 내용', r => r.content], ['과제', r => r.hw]] },
+  ledger: { name: '수입지출', add: '+ 수입·지출 기록', empty: '이 달의 기록이 없습니다.', sort: byDateDesc, monthly: true,
+    f: [['date', '날짜', 'date'], ['type', '구분', 'select', ['수입', '지출']], ['category', '항목 (예: 수강료, 임대료, 교재비)', 'text'], ['amount', '금액(원)', 'number'], ['memo', '메모', 'text']],
+    title: r => r.date + ' · ' + r.type + ' ' + won(r.amount) + (r.category ? ' · ' + r.category : ''), sub: r => [r.memo],
+    summary: rows => { const i = rows.filter(r => r.type === '수입').reduce((a, r) => a + (r.amount || 0), 0), e = rows.filter(r => r.type === '지출').reduce((a, r) => a + (r.amount || 0), 0); return '수입 ' + won(i) + ' · 지출 ' + won(e) + ' · 잔액 ' + won(i - e); },
+    cols: [['날짜', r => r.date], ['구분', r => r.type], ['항목', r => r.category], ['금액', r => won(r.amount)], ['메모', r => r.memo]] },
+  plan: { name: '학원연간일정', add: '+ 일정 추가', empty: '이 해의 일정이 없습니다.', sort: byDateAsc, year: true, group: r => (r.date || '').slice(0, 7),
+    f: [['date', '시작일', 'date'], ['end', '종료일 (하루면 비워 두세요)', 'date'], ['title', '일정 내용', 'text'], ['memo', '메모', 'text']],
+    title: r => range2(r).slice(5) + ' · ' + r.title, sub: r => [r.memo],
+    cols: [['시작일', r => r.date], ['종료일', r => r.end], ['일정', r => r.title], ['메모', r => r.memo]] },
+  school: { name: '학교별일정', add: '+ 학교 일정 추가', empty: '등록된 학교 일정이 없습니다.', sort: byDateAsc, year: true, schoolFilter: true, group: r => (r.date || '').slice(0, 7),
+    f: [['school', '학교 이름', 'text'], ['date', '시작일', 'date'], ['end', '종료일 (하루면 비워 두세요)', 'date'], ['title', '일정 내용 (예: 중간고사, 기말고사)', 'text'], ['memo', '메모', 'text']],
+    title: r => '[' + r.school + '] ' + range2(r).slice(5) + ' · ' + r.title, sub: r => [r.memo],
+    cols: [['학교', r => r.school], ['시작일', r => r.date], ['종료일', r => r.end], ['일정', r => r.title], ['메모', r => r.memo]] }
+};
+async function editRow(kind, row, roster) {
+  const c = MG_CRUD[kind], out = await openForm(row ? '수정' : c.add.replace('+ ', ''), c.f, row, roster); if (!out) return;
+  if (c.f.some(f => f[2] === 'stu')) { const r = roster.find(x => x.id === out.pid); if (!r) return alert('원생을 선택해 주세요.'); out.name = r.name; }
+  await mgSave(row ? row.id : newId(kind), { kind, ...out }); await renderCrud(kind);
+}
+async function renderCrud(kind) {
+  const c = MG_CRUD[kind]; if (kind === 'stu') await loadCfg();
+  const roster = c.f.some(f => f[2] === 'stu') ? await loadRoster() : null;
+  const all = (await mgGet(kind)).sort(c.sort); let rows = all;
+  const box = $('mg-body'); box.innerHTML = '';
+  const top = h('div', 'flex flex-wrap items-center gap-2 mb-3');
+  if (c.monthly) { const mi = inp('month'); mi.value = MG.month || (MG.month = today().slice(0, 7)); mi.onchange = () => { if (mi.value) { MG.month = mi.value; safe(() => renderCrud(kind)); } }; top.append(mi); rows = rows.filter(r => (r.date || '').startsWith(MG.month)); }
+  if (c.year) { const yi = inp('number', 'w-24'); yi.value = MG.year; yi.onchange = () => { if (yi.value) { MG.year = Number(yi.value); safe(() => renderCrud(kind)); } }; top.append(yi, h('span', 'text-xs font-bold text-slate-500', '년')); rows = rows.filter(r => (r.date || '').startsWith(String(MG.year))); }
+  if (c.schoolFilter) {
+    const sel = h('select', 'p-2 border border-slate-300 rounded-xl text-sm font-bold');
+    [''].concat([...new Set(all.map(r => r.school).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'))).forEach(n => { const o = h('option', '', n || '전체 학교'); o.value = n; sel.append(o); });
+    sel.value = [...sel.options].some(o => o.value === MG.school) ? MG.school : ''; MG.school = sel.value; sel.onchange = () => { MG.school = sel.value; safe(() => renderCrud(kind)); };
+    top.append(sel); if (MG.school) rows = rows.filter(r => r.school === MG.school);
+  }
+  top.append(h('span', 'flex-grow text-xs text-slate-400 font-bold', c.note || ''), exportBar(c.name, c.cols.map(x => x[0]), rows.map(r => c.cols.map(x => x[1](r)))), btn(c.add, B1, () => editRow(kind, null, roster)));
+  box.append(top);
+  if (c.summary) box.append(h('div', 'text-xs font-bold bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-xl px-3 py-2 mb-3', c.summary(rows)));
+  if (!rows.length) box.append(h('div', 'text-center py-10 text-slate-400 text-sm', c.empty));
+  let last = null;
+  rows.forEach(r => {
+    if (c.group) { const g = c.group(r); if (g !== last) { last = g; box.append(h('h3', 'text-sm font-bold text-indigo-700 mt-4 mb-2', g ? g.replace('-', '년 ') + '월' : '날짜 없음')); } }
+    const card = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl mb-2 flex flex-wrap items-start justify-between gap-3'), l = h('div', 'min-w-0 flex-grow');
+    l.append(h('div', 'font-bold text-slate-800 text-sm break-all', c.title(r)));
+    c.sub(r).filter(Boolean).forEach(t => l.append(h('div', 'text-xs text-slate-500 mt-1 whitespace-pre-wrap break-all', t)));
+    const bt = h('div', 'flex gap-1.5');
+    bt.append(btn('✏️', B2, () => editRow(kind, r, roster)), btn('🗑', B2, async () => { if (!confirm('삭제할까요?')) return; await mgRef(r.id).delete(); await renderCrud(kind); }));
+    card.append(l, bt); box.append(card);
+  });
+}
+
+/* 강사 출퇴근관리 (버튼 한 번 = 출근 시간, 다시 한 번 = 퇴근 시간) */
+async function renderTclk() {
+  const teachers = (await mgGet('teacher')).sort(byName), date = MG.date || (MG.date = today()), month = date.slice(0, 7), bid = curBranch(), box = $('mg-body');
+  let docs = await mgGet('tclk', ['month', month]);
+  const put = async (t, patch) => {
+    const id = 'tclk_' + bid + '_' + date + '_' + t.id, rec = docs.find(d => d.id === id);
+    const data = { kind: 'tclk', month, date, pid: t.id, name: t.name, arrival: rec ? rec.arrival : null, end: rec ? rec.end : null, ...patch };
+    await mgSave(id, data); docs = docs.filter(d => d.id !== id).concat([{ id, branchId: bid, ...data }]); draw();
+  };
+  const hrsOf = d => d.arrival && d.end ? (d.end - d.arrival) / 3600000 : 0;
+  const draw = () => {
+    box.innerHTML = '';
+    const bar = h('div', 'flex flex-wrap items-center gap-3 mb-3'), di = inp('date'); di.value = date;
+    di.onchange = () => { if (di.value) { MG.date = di.value; safe(renderTclk); } };
+    const mrows = docs.slice().sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, 'ko')).map(d => [d.date, d.name, hm(d.arrival), hm(d.end), d.end ? Math.round(hrsOf(d) * 10) / 10 + '시간' : '-']);
+    bar.append(di, h('span', 'flex-grow text-xs text-slate-400 font-bold', '출근 버튼 → 퇴근 버튼 순서로 누르면 시간이 자동 기록·계산됩니다.'), exportBar('강사출퇴근_' + month, ['날짜', '강사', '출근', '퇴근', '근무시간'], mrows, month + ' 출퇴근', '월간 '));
+    box.append(bar);
+    if (!teachers.length) box.append(h('div', 'text-center py-10 text-slate-400 text-sm', '먼저 "강사 등록·수정·삭제"에서 강사를 등록해 주세요.'));
+    teachers.forEach(t => {
+      const rec = docs.find(d => d.date === date && d.pid === t.id) || {}, row = h('div', 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-2 mb-2'), r = h('div', 'flex flex-wrap items-center gap-2');
+      row.append(h('span', 'font-bold text-slate-800 text-sm', t.name));
+      r.append(h('span', 'text-xs text-slate-600 font-bold', '출근 ' + hm(rec.arrival) + ' · 퇴근 ' + hm(rec.end) + (rec.end ? ' · ' + dur(rec.arrival, rec.end) : '')));
+      if (!rec.arrival) r.append(btn('출근', 'text-xs px-4 py-2 rounded-xl font-bold bg-emerald-500 text-white', async () => put(t, { arrival: Date.now() })));
+      else if (!rec.end) r.append(btn('퇴근', 'text-xs px-4 py-2 rounded-xl font-bold bg-slate-700 text-white', async () => put(t, { end: Date.now() })));
+      r.append(btn('✏️', B2, async () => {
+        const a = prompt('출근 시간 (예: 09:30)', rec.arrival ? hm(rec.arrival) : ''); if (a === null) return;
+        const e = prompt('퇴근 시간 (예: 18:00, 비우면 퇴근 전)', rec.end ? hm(rec.end) : ''); if (e === null) return;
+        const A = tsOf(date, a.trim()), E = e.trim() ? tsOf(date, e.trim()) : null;
+        if (!A || (e.trim() && !E) || (E && E <= A)) return alert('시간을 HH:MM 형식으로, 퇴근이 출근보다 늦게 입력하세요.');
+        await put(t, { arrival: A, end: E });
+      }));
+      if (rec.arrival) r.append(btn('🗑', B2, async () => { if (!confirm('이 날의 출퇴근 기록을 지울까요?')) return; await mgRef('tclk_' + bid + '_' + date + '_' + t.id).delete(); docs = docs.filter(d => !(d.date === date && d.pid === t.id)); draw(); }));
+      row.append(r); box.append(row);
+    });
+    if (teachers.length) {
+      box.append(h('h3', 'text-sm font-bold text-indigo-700 mt-5 mb-2', month + ' 월 요약'));
+      teachers.forEach(t => { const mine = docs.filter(d => d.pid === t.id && d.end), hrs = mine.reduce((a, d) => a + hrsOf(d), 0); box.append(h('div', 'text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2 mb-1.5', t.name + '  ·  출근 ' + mine.length + '일 · 총 ' + (Math.round(hrs * 10) / 10) + '시간')); });
+    }
+  };
+  draw();
+}
+
+/* 강사 급여관리 */
+async function renderPay() {
+  const month = MG.month || (MG.month = today().slice(0, 7)), bid = curBranch(), box = $('mg-body');
+  const teachers = (await mgGet('teacher')).sort(byName), clk = await mgGet('tclk', ['month', month]);
+  let pays = await mgGet('pay', ['month', month]);
+  const calc = t => { const mine = clk.filter(d => d.pid === t.id && d.arrival && d.end), hrs = mine.reduce((a, d) => a + (d.end - d.arrival) / 3600000, 0); return { days: mine.length, hrs: Math.round(hrs * 10) / 10, base: estPay(t, hrs, month) }; };
+  const save = async (t, patch) => {
+    const id = 'pay_' + bid + '_' + month + '_' + t.id, rec = pays.find(d => d.id === id), c = calc(t);
+    const data = { kind: 'pay', month, pid: t.id, name: t.name, amount: rec && rec.amount != null ? rec.amount : c.base, paid: rec ? !!rec.paid : false, paidDate: rec ? rec.paidDate || '' : '', ...patch };
+    await mgSave(id, data); pays = pays.filter(d => d.id !== id).concat([{ id, branchId: bid, ...data }]);
+  };
+  const draw = () => {
+    box.innerHTML = '';
+    const bar = h('div', 'flex flex-wrap items-center gap-3 mb-3'), mi = inp('month'); mi.value = month;
+    mi.onchange = () => { if (mi.value) { MG.month = mi.value; safe(renderPay); } };
+    const info = teachers.map(t => { const c = calc(t), rec = pays.find(d => d.pid === t.id), amt = rec && rec.amount != null ? rec.amount : c.base; return { t, c, rec, amt }; });
+    bar.append(mi, h('span', 'flex-grow text-xs text-slate-400 font-bold', '계산 급여는 출퇴근 기록 기준 참고값입니다. 최종 금액은 직접 고칠 수 있습니다.'),
+      exportBar('급여관리_' + month, ['강사', '급여 방식', '근무일수', '근무시간', '계산 급여', '최종 금액', '지급', '지급일'], info.map(x => [x.t.name, x.t.payType + ' ' + won(x.t.pay), x.c.days, x.c.hrs, won(x.c.base), won(x.amt), x.rec && x.rec.paid ? '지급 완료' : '미지급', x.rec ? x.rec.paidDate || '' : '']), month + ' 급여'));
+    box.append(bar);
+    const tot = info.reduce((a, x) => a + x.amt, 0), got = info.filter(x => x.rec && x.rec.paid).reduce((a, x) => a + x.amt, 0);
+    box.append(h('div', 'text-xs font-bold bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-xl px-3 py-2 mb-3', '급여 합계 ' + won(tot) + ' · 지급 완료 ' + won(got) + ' · 미지급 ' + won(tot - got)));
+    if (!teachers.length) box.append(h('div', 'text-center py-10 text-slate-400 text-sm', '먼저 "강사 등록·수정·삭제"에서 강사를 등록해 주세요.'));
+    info.forEach(({ t, c, rec, amt }) => {
+      const row = h('div', 'p-3 bg-slate-50 border border-slate-200 rounded-xl mb-2'), r = h('div', 'flex flex-wrap items-center justify-between gap-2 mt-2');
+      row.append(h('div', 'font-bold text-slate-800 text-sm', t.name + ' · ' + t.payType + ' ' + won(t.pay) + (t.payDay ? ' · 급여일 매월 ' + t.payDay + '일' : '')), h('div', 'text-xs text-slate-500 mt-1', '근무 ' + c.days + '일 · ' + c.hrs + '시간 · 계산 급여 ' + won(c.base)));
+      const ai = inp('number', 'w-32'); ai.value = amt; ai.onchange = () => safe(async () => { await save(t, { amount: Number(ai.value) || 0 }); draw(); });
+      const paid = rec && rec.paid;
+      r.append(h('span', 'text-xs font-bold text-slate-600', '최종 금액(원)'), ai, btn(paid ? '✔ 지급 완료 ' + (rec.paidDate || '').slice(5) : '미지급', 'text-xs px-3 py-2 rounded-xl font-bold border ' + (paid ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-rose-500 border-rose-200'), async () => { await save(t, { paid: !paid, paidDate: paid ? '' : today() }); draw(); }));
+      row.append(r); box.append(row);
+    });
+  };
+  draw();
+}
+
+async function renderFee() {
+  const roster = await loadRoster(), month = MG.month || (MG.month = today().slice(0, 7)), bid = curBranch(), box = $('mg-body');
+  let docs = await mgGet('fee', ['month', month]);
+  const idOf = (m, p) => 'fee_' + bid + '_' + m + '_' + p.id;
+  const save = async (p, patch) => {
+    const rec = docs.find(d => d.pid === p.id), id = idOf(month, p), data = { kind: 'fee', month, pid: p.id, name: p.name, amount: rec ? rec.amount : 0, paid: rec ? !!rec.paid : false, paidDate: rec ? rec.paidDate || '' : '', ...patch };
+    await mgSave(id, data); docs = docs.filter(d => d.id !== id).concat([{ id, branchId: bid, ...data }]);
+  };
+  const draw = () => {
+    box.innerHTML = '';
+    const bar = h('div', 'flex flex-wrap items-center gap-2 mb-3'), mi = inp('month'); mi.value = month;
+    mi.onchange = () => { if (mi.value) { MG.month = mi.value; safe(renderFee); } };
+    bar.append(mi, btn('지난달 금액 불러오기', B2, async () => {
+      for (const d of await mgGet('fee', ['month', prevMonth(month)])) { const p = roster.find(x => x.id === d.pid); if (p && d.amount > 0 && !docs.some(x => x.pid === p.id && x.amount > 0)) await save(p, { amount: d.amount, paid: false, paidDate: '' }); }
+      draw();
+    }), btn('전체 금액 한 번에 입력', B2, async () => {
+      const a = Number(prompt('모든 원생에게 적용할 월 회비(원)를 입력하세요. 이미 금액이 있는 원생은 그대로 둡니다.')); if (!(a > 0)) return;
+      for (const p of roster) if (!docs.some(x => x.pid === p.id && x.amount > 0)) await save(p, { amount: a });
+      draw();
+    }));
+    bar.append(exportBar('회비관리_' + month, ['원생', '월', '금액', '납부', '납부일'], roster.map(p => { const d = docs.find(x => x.pid === p.id) || {}; return [p.name, month, d.amount || 0, d.paid ? '납부' : '미납', d.paidDate || '']; }), month + ' 회비'));
+    box.append(bar);
+    const bill = docs.reduce((a, d) => a + (Number(d.amount) || 0), 0), got = docs.filter(d => d.paid).reduce((a, d) => a + (Number(d.amount) || 0), 0), un = docs.filter(d => !d.paid && d.amount > 0).length;
+    box.append(h('div', 'text-xs font-bold bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-xl px-3 py-2 mb-3', '청구 ' + won(bill) + ' · 수납 ' + won(got) + ' · 미납 ' + un + '명 (' + won(bill - got) + ')'));
+    if (!roster.length) box.append(h('div', 'text-center py-10 text-slate-400 text-sm', '등록된 원생이 없습니다.'));
+    roster.forEach(p => {
+      const rec = docs.find(d => d.pid === p.id), row = h('div', 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-2 mb-2'), r = h('div', 'flex items-center gap-2');
+      row.append(h('span', 'font-bold text-slate-800 text-sm', p.name + (p.grade ? ' (' + p.grade + ')' : '')));
+      const ai = inp('number', 'w-28'); ai.placeholder = '회비(원)'; ai.value = rec && rec.amount ? rec.amount : '';
+      ai.onchange = () => safe(async () => { await save(p, { amount: Number(ai.value) || 0 }); draw(); });
+      const paid = rec && rec.paid;
+      r.append(ai, btn(paid ? '✔ 납부 완료' + (rec.paidDate ? ' ' + rec.paidDate.slice(5) : '') : '미납', 'text-xs px-3 py-2 rounded-xl font-bold border ' + (paid ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-rose-500 border-rose-200'), async () => { await save(p, { paid: !paid, paidDate: paid ? '' : today() }); draw(); }));
+      row.append(r); box.append(row);
+    });
+  };
+  draw();
+}
+
+/* 학생 출결관리: 관리자 화면 + 학생 터치 화면 (30일 후 자동 삭제) */
+async function loadAtt() {
+  const all = await mgGet('att'), cut = dayOf(Date.now() - 30 * 864e5), old = all.filter(d => d.date < cut);
+  for (let i = 0; i < old.length; i += 400) { const b = db.batch(); old.slice(i, i + 400).forEach(d => b.delete(mgRef(d.id))); await b.commit().catch(() => {}); }
+  return all.filter(d => d.date >= cut);
+}
+function resizeToDataUrl(file, maxW, q) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { const k = Math.min(1, maxW / img.width), cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height); x.drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url); res(cv.toDataURL('image/jpeg', q)); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('이미지를 읽을 수 없습니다.')); };
+    img.src = url;
+  });
+}
+async function renderAtt() {
+  const cfg = await loadCfg(), roster = await loadRoster(), bid = curBranch(), date = MG.date || (MG.date = today()), month = date.slice(0, 7), box = $('mg-body');
+  let docs = await loadAtt();
+  const put = async (st, patch) => {
+    const id = 'att_' + bid + '_' + date + '_' + st.id, rec = docs.find(d => d.id === id);
+    const data = rec ? patch : { kind: 'att', month, date, pid: st.id, name: st.name, grade: st.grade || '', arrival: null, end: null, expireAt: firebase.firestore.Timestamp.fromMillis(Date.now() + KEEP), ...patch };
+    await mgSave(id, data); docs = docs.filter(d => d.id !== id).concat([{ ...(rec || {}), id, branchId: bid, ...data }]); draw();
+  };
+  const draw = () => {
+    box.innerHTML = '';
+    const grades = cfg.grades.concat([...new Set(roster.map(r => r.grade).filter(g => g && !cfg.grades.includes(g)))]), flt = grades.includes(MG.attGrade) ? MG.attGrade : '';
+    const list = roster.filter(r => !flt || r.grade === flt);
+    const top = h('div', 'flex flex-wrap items-center gap-2 mb-3');
+    top.append(btn('📱 학생 터치 화면 열기', 'bg-rose-600 hover:bg-rose-700 text-white font-bold px-5 py-3 rounded-xl text-sm', async () => openKiosk(cfg, roster)));
+    const di = inp('date'); di.value = date; di.onchange = () => { if (di.value) { MG.date = di.value; safe(renderAtt); } };
+    const sel = h('select', 'p-2 border border-slate-300 rounded-xl text-sm font-bold'); [''].concat(grades).forEach(g => { const o = h('option', '', g || '전체 학년'); o.value = g; sel.append(o); }); sel.value = flt; sel.onchange = () => { MG.attGrade = sel.value; draw(); };
+    top.append(di, sel); box.append(top);
+    const dayRows = list.map(st => { const r = docs.find(d => d.date === date && d.pid === st.id) || {}; return [st.grade || '', st.name, hm(r.arrival), hm(r.end), dur(r.arrival, r.end)]; });
+    const monRows = docs.filter(d => d.month === month && (!flt || d.grade === flt)).sort((a, b) => a.date.localeCompare(b.date) || (a.grade || '').localeCompare(b.grade || '', 'ko') || a.name.localeCompare(b.name, 'ko')).map(d => [d.date, d.grade || '', d.name, hm(d.arrival), hm(d.end), dur(d.arrival, d.end)]);
+    const ex = h('div', 'flex flex-wrap gap-3 mb-4');
+    ex.append(exportBar('학생출결_' + date, ['학년', '이름', '등원', '종료', '수업 시간'], dayRows, date + ' 출결', '일별 '), exportBar('학생출결_' + month, ['날짜', '학년', '이름', '등원', '종료', '수업 시간'], monRows, month + ' 출결', '월간 '));
+    box.append(ex);
+    // 학년 관리
+    const gm = h('div', 'mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl'), tags = h('div', 'flex flex-wrap gap-2 mb-2');
+    gm.append(h('div', 'text-xs font-bold text-slate-600 mb-2', '학년 관리 (터치 화면의 학년 탭이 됩니다)'));
+    cfg.grades.forEach((g, i) => { const t = h('span', 'inline-flex items-center gap-1 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 text-xs font-bold', g); t.append(btn('✕', 'w-5 h-5 rounded-full bg-rose-600 text-white text-[10px]', async () => { if (!confirm('"' + g + '" 학년을 목록에서 뺄까요? (학생 정보는 지워지지 않습니다)')) return; cfg.grades.splice(i, 1); await saveCfg(); draw(); })); tags.append(t); });
+    const gi = inp('text', 'w-40'); gi.placeholder = '학년 이름 (예: 고3)';
+    const gr = h('div', 'flex flex-wrap items-center gap-2'); gr.append(gi, btn('+ 학년 추가', B1, async () => { const g = gi.value.trim(); if (!g) return; if (cfg.grades.includes(g)) return alert('이미 있는 학년입니다.'); cfg.grades.push(g); await saveCfg(); draw(); }));
+    gm.append(tags, gr); box.append(gm);
+    // 로고 · 배너 · 비밀번호 · 학생 등록
+    const tool = h('div', 'flex flex-wrap gap-2 mb-4');
+    if (S.me.role === 'sub') { const lf = h('input'); lf.type = 'file'; lf.accept = 'image/png,image/jpeg,image/webp,image/gif,application/pdf'; lf.className = 'hidden'; lf.onchange = () => { const f = lf.files[0]; lf.value = ''; if (f) safe(() => setLogo(f)); }; tool.append(lf, btn('🖼 학원 로고 올리기', B2, async () => lf.click())); }
+    const bf = h('input'); bf.type = 'file'; bf.accept = 'image/png,image/jpeg,image/webp'; bf.className = 'hidden';
+    bf.onchange = () => { const f = bf.files[0]; bf.value = ''; if (f) safe(async () => { const d = await resizeToDataUrl(f, 1100, 0.82); if (d.length > 800000) throw new Error('배너 이미지가 너무 큽니다. 더 작은 이미지를 사용하세요.'); cfg.banner = d; toast('배너 저장 중...'); await saveCfg(); toast(''); draw(); }); };
+    tool.append(bf, btn('🖼 터치 화면 배너 올리기', B2, async () => bf.click()));
+    if (cfg.banner) tool.append(btn('배너 삭제', B2, async () => { cfg.banner = ''; await saveCfg(); draw(); }));
+    tool.append(btn(cfg.pin ? '🔒 나가기 비밀번호 변경' : '🔒 나가기 비밀번호 설정', B2, async () => { const v = prompt('학생 터치 화면에서 나갈 때 입력할 비밀번호(숫자 4자리 이상)를 입력하세요. 비워 두면 해제됩니다.', cfg.pin); if (v === null) return; if (v.trim() && !/^\d{4,}$/.test(v.trim())) return alert('숫자 4자리 이상으로 입력하세요.'); cfg.pin = v.trim(); await saveCfg(); draw(); }),
+      btn('+ 학생 등록', B1, async () => { const o = await openForm('학생 등록', MG_CRUD.stu.f, null, roster); if (!o) return; await mgSave(newId('stu'), { kind: 'stu', ...o }); roster.splice(0, roster.length, ...(await loadRoster())); draw(); }));
+    box.append(tool);
+    // 선택한 날짜 출결
+    if (!list.length) box.append(h('div', 'text-center py-8 text-slate-400 text-sm', '등록된 학생이 없습니다. "+ 학생 등록"으로 추가하세요.'));
+    list.forEach(st => {
+      const rec = docs.find(d => d.date === date && d.pid === st.id) || {}, row = h('div', 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-2 mb-2'), r = h('div', 'flex flex-wrap items-center gap-2');
+      row.append(h('span', 'font-bold text-slate-800 text-sm', st.name + (st.grade ? ' (' + st.grade + ')' : '')));
+      r.append(h('span', 'text-xs text-slate-600 font-bold', '등원 ' + hm(rec.arrival) + ' · 종료 ' + hm(rec.end) + (rec.end ? ' · 수업 ' + dur(rec.arrival, rec.end) : '')));
+      if (!rec.arrival) r.append(btn('등원', 'text-xs px-3 py-2 rounded-xl font-bold bg-emerald-500 text-white', async () => put(st, { arrival: Date.now() })));
+      else if (!rec.end) r.append(btn('수업 종료', 'text-xs px-3 py-2 rounded-xl font-bold bg-slate-700 text-white', async () => put(st, { end: Date.now() })));
+      r.append(btn('✏️', B2, async () => {
+        const a = prompt('등원 시간 (예: 14:30)', rec.arrival ? hm(rec.arrival) : ''); if (a === null) return;
+        const e = prompt('수업 종료 시간 (예: 16:00, 비우면 종료 전)', rec.end ? hm(rec.end) : ''); if (e === null) return;
+        const A = tsOf(date, a.trim()), E = e.trim() ? tsOf(date, e.trim()) : null;
+        if (!A || (e.trim() && !E) || (E && E <= A)) return alert('시간을 HH:MM 형식으로, 종료가 등원보다 늦게 입력하세요.');
+        await put(st, { arrival: A, end: E });
+      }));
+      if (rec.arrival) r.append(btn('🗑', B2, async () => { if (!confirm('이 날의 출결 기록을 지울까요?')) return; await mgRef('att_' + bid + '_' + date + '_' + st.id).delete(); docs = docs.filter(d => !(d.date === date && d.pid === st.id)); draw(); }));
+      row.append(r); box.append(row);
+    });
+    const got = list.filter(st => docs.some(d => d.date === date && d.pid === st.id && d.arrival)).length, fin = list.filter(st => docs.some(d => d.date === date && d.pid === st.id && d.end)).length;
+    box.append(h('div', 'text-xs font-bold bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-xl px-3 py-2 mt-3', '등록 ' + list.length + '명 · 등원 ' + got + '명 · 수업 종료 ' + fin + '명'), h('p', 'text-[11px] text-slate-400 mt-2', '※ 출결 기록은 30일 뒤 자동 삭제됩니다. 보관이 필요하면 삭제되기 전에 월간 인쇄 또는 CSV 저장을 해 두세요.'));
+  };
+  draw();
+}
+function openKiosk(cfg, roster) {
+  const bid = curBranch(), acad = acadName(), br = S.branches.find(b => b.id === bid);
+  const logo = S.me.role === 'super' ? (bid === 'main' ? S.hqLogo : ((br && br.logoUrl) || S.hqLogo)) : (S.me.logoUrl || S.hqLogo);
+  let kdate = today(), docs = [], iv = null;
+  const ov = h('div', 'fixed inset-0 z-40 bg-slate-100 overflow-y-auto'); document.body.append(ov);
+  const glist = cfg.grades.concat([...new Set(roster.map(r => r.grade || '미분류').filter(g => !cfg.grades.includes(g)))]).filter(g => roster.some(r => (r.grade || '미분류') === g));
+  let kg = glist.includes(MG.kGrade) ? MG.kGrade : glist[0];
+  const load = async () => { kdate = today(); docs = await mgGet('att', ['date', kdate]); draw(); };
+  const tap = async st => {
+    if (today() !== kdate) { await load(); return alert('날짜가 바뀌었습니다. 다시 눌러 주세요.'); }
+    const id = 'att_' + bid + '_' + kdate + '_' + st.id, rec = docs.find(d => d.id === id), now = Date.now();
+    const data = rec && rec.arrival ? { end: now } : { kind: 'att', month: kdate.slice(0, 7), date: kdate, pid: st.id, name: st.name, grade: st.grade || '', arrival: now, end: null, expireAt: firebase.firestore.Timestamp.fromMillis(now + KEEP) };
+    await mgSave(id, data); docs = docs.filter(d => d.id !== id).concat([{ ...(rec || {}), id, branchId: bid, ...data }]); draw();
+  };
+  const ask = (st, rec) => {
+    const ending = !!(rec && rec.arrival), m = h('div', 'fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-5'), bx = h('div', 'bg-white rounded-2xl w-full max-w-sm p-6 text-center'), row = h('div', 'flex gap-2');
+    bx.append(h('h3', 'text-2xl font-bold mb-2', st.name), h('p', 'text-slate-500 text-sm mb-5', ending ? '수업이 끝났나요? 확인을 누르면 현재 시간이 수업 종료 시간으로 기록됩니다.' : '본인 이름이 맞나요? 확인을 누르면 현재 시간이 등원 시간으로 기록됩니다.'));
+    row.append(btn('취소', 'flex-1 py-3 rounded-xl bg-slate-200 font-bold', async () => m.remove()), btn(ending ? '수업 종료' : '등원 확인', 'flex-1 py-3 rounded-xl bg-rose-600 text-white font-bold', async () => { m.remove(); await tap(st); }));
+    bx.append(row); m.append(bx); document.body.append(m);
+  };
+  const exitK = () => { if (cfg.pin && prompt('관리자 비밀번호를 입력하세요.') !== cfg.pin) return alert('비밀번호가 다릅니다.'); clearInterval(iv); ov.remove(); safe(renderManage); };
+  const draw = () => {
+    ov.innerHTML = '';
+    const hd = h('div', 'bg-rose-700 text-white px-5 py-3 flex items-center justify-between gap-3'), lf = h('div', 'flex items-center gap-3');
+    if (logo) { const im = h('img', 'h-11 w-11 rounded-xl bg-white object-contain'); im.src = logo; lf.append(im); }
+    lf.append(h('div', 'font-bold text-lg', acad + ' 출결'), h('div', 'text-xs opacity-80', kdate));
+    hd.append(lf, btn('관리자 화면', 'bg-white text-rose-700 font-bold text-xs px-3 py-2 rounded-lg', async () => exitK())); ov.append(hd);
+    if (cfg.banner) { const bn = h('img', 'w-full max-w-5xl mx-auto block'); bn.src = cfg.banner; ov.append(bn); }
+    const bd = h('div', 'max-w-5xl mx-auto p-4'); ov.append(bd);
+    bd.append(h('h2', 'text-2xl font-bold text-center mt-2', '내 이름을 눌러주세요'), h('p', 'text-center text-slate-500 text-sm mb-4', '등원할 때 한 번, 수업이 끝나면 한 번 더 눌러주세요.'));
+    if (!glist.length) { bd.append(h('div', 'text-center py-10 text-slate-400', '관리자 화면에서 학생을 먼저 등록해 주세요.')); return; }
+    const tabs = h('div', 'flex flex-wrap gap-2 mb-4'); glist.forEach(g => tabs.append(btn(g, 'px-5 py-3 rounded-xl font-bold text-lg ' + (g === kg ? 'bg-rose-700 text-white' : 'bg-slate-200 text-slate-700'), async () => { kg = MG.kGrade = g; draw(); }))); bd.append(tabs);
+    const grid = h('div', 'grid grid-cols-2 sm:grid-cols-3 gap-3');
+    roster.filter(r => (r.grade || '미분류') === kg).forEach(st => {
+      const rec = docs.find(d => d.pid === st.id), state = !rec || !rec.arrival ? 0 : !rec.end ? 1 : 2;
+      const b = h('button', 'min-h-[96px] rounded-2xl border-2 font-bold text-2xl p-3 ' + ['bg-white border-slate-200 text-slate-800', 'bg-amber-50 border-amber-400 text-amber-800', 'bg-emerald-50 border-emerald-400 text-emerald-800'][state]);
+      b.append(document.createTextNode(st.name), h('div', 'text-xs font-semibold mt-1 opacity-80', state === 0 ? '등원하려면 눌러주세요' : state === 1 ? '등원 ' + hm(rec.arrival) + ' · 수업이 끝나면 다시 눌러주세요' : '등원 ' + hm(rec.arrival) + ' → 종료 ' + hm(rec.end) + ' · 수업 ' + dur(rec.arrival, rec.end)));
+      b.disabled = state === 2; if (!b.disabled) b.onclick = () => ask(st, rec);
+      grid.append(b);
+    });
+    bd.append(grid);
+  };
+  iv = setInterval(() => { if (today() !== kdate) load().catch(() => {}); }, 60000);
+  safe(load);
+}
+
+function printReport(p, month, rows, st2, note) {
+  const w = window.open('', '_blank'); if (!w) return alert('팝업 차단을 해제해 주세요.');
+  const acad = S.me.role === 'super' ? branchName(curBranch()) : S.me.academyName;
+  const tr = rows.map(r => '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + (r[2] != null ? esc(r[2]) + '점' : '-') + '</td><td>' + (r[3] ? esc(fmtD(r[3])) : '-') + '</td></tr>').join('');
+  w.document.write('<html><head><meta charset="utf-8"><title>' + esc(p.name) + ' 성적표</title><style>body{font-family:sans-serif;padding:32px;color:#1e293b}h1{font-size:22px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px;text-align:left}th{background:#f1f5f9}.box{border:1px solid #cbd5e1;border-radius:8px;padding:10px;margin:8px 0;white-space:pre-wrap;font-size:13px}</style></head><body><h1>' + esc(acad) + ' 학습 성적표</h1><div>' + esc(p.name) + (p.grade ? ' (' + esc(p.grade) + ')' : '') + ' · ' + esc(month) + '</div><p>학습 ' + st2.n + '건 · 완료 ' + st2.done + '건 · 평균 점수 ' + esc(st2.avg) + ' · 총 학습시간 ' + esc(fmtD(st2.secs)) + '</p><table><tr><th>날짜</th><th>학습 항목</th><th>점수</th><th>소요 시간</th></tr>' + tr + '</table>' + (note.extra ? '<b>추가 학습 내용</b><div class="box">' + esc(note.extra) + '</div>' : '') + (note.comment ? '<b>선생님 코멘트</b><div class="box">' + esc(note.comment) + '</div>' : '') + '</body></html>');
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+}
+async function renderGrade() {
+  const roster = await loadRoster(), month = MG.month || (MG.month = today().slice(0, 7)), box = $('mg-body'); box.innerHTML = '';
+  const bar = h('div', 'flex flex-wrap items-center gap-3 mb-4'), mi = inp('month'), sel = h('select', 'p-2 border border-slate-300 rounded-xl text-sm font-bold'); mi.value = month;
+  mi.onchange = () => { if (mi.value) { MG.month = mi.value; safe(renderGrade); } };
+  [['', '(원생 선택)']].concat(roster.map(r => [r.id, r.name + (r.grade ? ' (' + r.grade + ')' : '')])).forEach(([v, t]) => { const o = h('option', '', t); o.value = v; sel.append(o); });
+  sel.value = roster.some(r => r.id === MG.pid) ? MG.pid : ''; sel.onchange = () => { MG.pid = sel.value; safe(renderGrade); };
+  bar.append(mi, sel); box.append(bar);
+  const p = roster.find(r => r.id === MG.pid);
+  if (!p) return box.append(h('div', 'text-center py-10 text-slate-400 text-sm', '원생을 선택하면 학습 기록 기반 성적표가 나타납니다.'));
+  const hs = await db.collection('history').where('branchId', '==', curBranch()).get();
+  const live = hs.docs.map(d => d.data()).filter(r => (r.day || dayOf(r.ts)).startsWith(month) && (r.studentUid === p.id || r.studentName === p.name)).sort((a, b) => a.ts - b.ts);
+  const note = (await mgGet('gradenote', ['month', month])).find(n => n.pid === p.id) || {};
+  const rows = live.length ? live.map(r => [r.day || dayOf(r.ts), r.title, r.kind === 'study' && r.status !== 'done' ? null : (r.score != null ? r.score : null), r.durationSec || 0, r.kind === 'study' && r.status !== 'done' ? 0 : 1]) : (note.rows || []);
+  const sc = rows.filter(r => r[2] != null), st2 = { n: rows.length, done: rows.filter(r => r[4]).length, avg: sc.length ? Math.round(sc.reduce((a, r) => a + r[2], 0) / sc.length) + '점' : '-', secs: rows.reduce((a, r) => a + (r[3] || 0), 0) };
+  box.append(h('div', 'text-xs font-bold bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-xl px-3 py-2 mb-3', '학습 ' + st2.n + '건 · 완료 ' + st2.done + '건 · 평균 점수 ' + st2.avg + ' · 총 학습시간 ' + fmtD(st2.secs) + (live.length ? '' : (rows.length ? ' (보관된 성적표)' : ''))));
+  if (!rows.length) box.append(h('div', 'text-center py-6 text-slate-400 text-sm', '이 달의 학습 기록이 없습니다.'));
+  rows.forEach(r => box.append(h('div', 'text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 mb-1.5', r[0] + ' · ' + r[1] + ' · ' + (r[2] != null ? r[2] + '점' : '점수 없음') + (r[3] ? ' · ' + fmtD(r[3]) : ''))));
+  const mk = (label, val, ph) => { box.append(h('label', 'block text-xs font-bold text-slate-600 mt-4 mb-1', label)); const t = h('textarea', 'w-full p-3 bg-white border border-slate-300 rounded-xl text-sm font-bold'); t.rows = 3; t.placeholder = ph; t.value = val || ''; box.append(t); return t; };
+  const extra = mk('추가 학습 내용 (학원에서 따로 진행한 학습)', note.extra, '예) 영작 숙제 5회, 문법 보충 수업 2시간'), comment = mk('선생님 코멘트 (성적표에 함께 인쇄됩니다)', note.comment, '예) 단어 암기가 꾸준히 좋아지고 있어요.');
+  const act = h('div', 'flex flex-wrap gap-2 mt-3');
+  const saved = () => ({ kind: 'gradenote', month, pid: p.id, name: p.name, extra: extra.value.trim(), comment: comment.value.trim(), rows: rows.slice(-200) });
+  act.append(btn('💾 저장 (성적표 보관)', B1, async () => { await mgSave('gn_' + curBranch() + '_' + month + '_' + p.id, saved()); toast('저장되었습니다.'); setTimeout(() => toast(''), 1500); }),
+    btn('➕ 점수 직접 추가', B2, async () => {
+      const title = (prompt('시험/학습 제목:') || '').trim(); if (!title) return;
+      const total = parseInt(prompt('전체 문항 수:', '20'), 10), correct = parseInt(prompt('맞힌 문항 수:'), 10);
+      if (!(total > 0) || !(correct >= 0) || correct > total) return alert('문항 수를 올바르게 입력하세요.');
+      const now = Date.now();
+      await db.collection('history').add({ branchId: curBranch(), studentUid: p.acct ? p.id : null, studentName: p.name, title, kind: 'score', correct, total, score: Math.round(correct / total * 100), ts: now, day: dayOf(now), expireAt: firebase.firestore.Timestamp.fromMillis(now + KEEP) });
+      await renderGrade();
+    }), btn('🖨 성적표 인쇄', B2, async () => printReport(p, month, rows, st2, saved())));
+  box.append(act, h('p', 'text-[11px] text-slate-400 mt-3', '※ 학습 기록은 30일 뒤 자동 삭제됩니다. 오래 보관하려면 달이 끝나기 전에 "저장 (성적표 보관)"을 눌러 두세요. 저장한 성적표는 계속 남습니다.'));
+}
+
+/* 학원관리 메인 (F 페이지) */
+async function renderManage() {
+  const v = $('view-manage'); v.innerHTML = '';
+  if (S.me.role === 'super') {
+    const bp = h('div', 'mb-4'), sel = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold');
+    [{ id: 'main', academyName: '본원' }, ...S.branches].forEach(b => { const o = h('option', '', b.academyName); o.value = b.id; sel.append(o); });
+    sel.value = S.viewBranch; sel.onchange = () => { S.viewBranch = sel.value; S.folderId = null; MG.pid = null; MG.cfg = null; safe(renderManage); };
+    bp.append(h('span', 'text-xs font-bold text-slate-600 mr-2', '지점 선택'), sel); v.append(bp);
+  }
+  const g = GROUPS.find(x => x[0] === MG.group) || GROUPS[0]; MG.group = g[0];
+  if (!g[2].some(t => t[0] === MG.tab)) MG.tab = g[2][0][0];
+  const gr = h('div', 'grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3');
+  GROUPS.forEach(x => gr.append(btn(x[1], 'py-4 rounded-2xl text-base font-bold border-2 transition ' + (x[0] === MG.group ? 'bg-indigo-900 text-white border-indigo-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'), () => { MG.group = x[0]; MG.tab = x[2][0][0]; return renderManage(); })));
+  const chips = h('div', 'flex flex-wrap items-center gap-2 mb-5');
+  g[2].forEach(([id, label]) => chips.append(btn(label, 'font-bold text-sm px-4 py-2 rounded-xl transition ' + (MG.tab === id ? 'bg-amber-500 text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'), () => { MG.tab = id; return renderManage(); })));
+  chips.append(btn('📎 자료 파일 올리기', 'font-bold text-sm px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 ml-auto', async () => { S.fFiles = true; setView('content'); }));
+  const body = h('div'); body.id = 'mg-body'; v.append(gr, chips, body);
+  toast('불러오는 중...');
+  try {
+    if (MG_CRUD[MG.tab]) await renderCrud(MG.tab); else if (MG.tab === 'tclk') await renderTclk(); else if (MG.tab === 'pay') await renderPay();
+    else if (MG.tab === 'fee') await renderFee(); else if (MG.tab === 'att') await renderAtt(); else await renderGrade();
+  } finally { toast(''); }
+}
+/* MG-END */
+
+/* F-START */
+const F_DEFAULTS = ['강사관리', '학원관리', '학생관리'];
+const F_EXT = ['pdf', 'xlsx', 'xls', 'csv', 'docx', 'doc', 'hwp', 'hwpx', 'pptx', 'ppt', 'txt', 'png', 'jpg', 'jpeg'];
+const isPdf = it => !it.fileName || /\.pdf$/i.test(it.fileName);
+async function ensureFFolders() {
+  const bid = curBranch(), isMain = bid === 'main';
+  const rec = isMain ? { fSeeded: S.fSeededMain } : (S.me.role === 'super' ? S.branches.find(b => b.id === bid) : S.me);
+  if (!rec || rec.fSeeded) return;
+  const b = db.batch();
+  F_DEFAULTS.forEach((n, i) => b.set(db.collection('items').doc('F_' + bid + '_' + i), { folder: 'F', branchId: bid, type: 'folder', name: n, parentId: null, tabId: 'video', visible: true, order: (i + 1) * 1000, createdAt: Date.now() }));
+  if (isMain) b.set(db.collection('config').doc('main'), { fSeeded: true }, { merge: true });
+  else b.update(db.collection('branches').doc(bid), { fSeeded: true });
+  await b.commit();
+  rec.fSeeded = true; if (isMain) S.fSeededMain = true;
+}
+/* F-END */
+
 /* DND-START */
 const ordOf = x => (typeof x.order === 'number' ? x.order : 1e12);
 function visibleKids() {
-  return S.items.filter(i => (i.parentId || null) === S.folderId && (i.type === 'folder' || tabOf(i) === S.tab))
+  return S.items.filter(i => (i.parentId || null) === S.folderId && (i.type === 'folder' || S.folder === 'F' || tabOf(i) === S.tab))
     .sort((a, b) => a.type !== b.type ? (a.type === 'folder' ? -1 : 1) : (ordOf(a) - ordOf(b) || byName(a, b)));
 }
 function descendants(id) {
@@ -410,9 +892,9 @@ function wireDropTarget(el, parentId) {
   el.ondrop = e => { e.preventDefault(); markDrop(el, null); const id = S.drag; S.drag = null; if (id) safe(() => moveInto(id, parentId)); };
 }
 /* DND-END */
- 
+
 function baseItem() {
-  return { folder: S.folder, parentId: S.folderId, tabId: S.tab, visible: S.folder !== 'A', createdAt: Date.now(), ...(S.folder === 'A' ? { branchId: curBranch() } : {}) };
+  return { folder: S.folder, parentId: S.folderId, tabId: S.tab, visible: S.folder !== 'A', createdAt: Date.now(), ...(branchScoped() ? { branchId: curBranch() } : {}) };
 }
 async function addItem(kind) {
   const name = prompt(kind === 'folder' ? '새 폴더 이름:' : '학습 자료 제목:'); if (!name || !name.trim()) return;
@@ -422,20 +904,21 @@ async function addItem(kind) {
     const u = safeUrl((prompt('웹페이지 주소(https://...):') || '').trim());
     if (!u) return alert('올바른 http(s) 주소를 입력하세요.');
     d.type = 'file'; d.linkUrl = u;
-  } else { S.pdfTitle = d.name; $('pdf-input').click(); return; }
+  } else { S.pdfTitle = d.name; $('pdf-input').accept = S.folder === 'F' ? F_EXT.map(x => '.' + x).join(',') : 'application/pdf'; $('pdf-input').click(); return; }
   await db.collection('items').add(d); await renderContent();
 }
 $('pdf-input').onchange = e => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
   safe(async () => {
-    if (file.type !== 'application/pdf') throw new Error('PDF 파일만 올릴 수 있습니다.');
+    const isF = S.folder === 'F', ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (isF ? !F_EXT.includes(ext) : file.type !== 'application/pdf') throw new Error(isF ? '올릴 수 있는 파일: PDF, 엑셀, 워드, 한글, 파워포인트, CSV, 텍스트, 이미지' : 'PDF 파일만 올릴 수 있습니다.');
     if (file.size > 20 * 1024 * 1024) throw new Error('파일 크기는 20MB 이하여야 합니다.');
-    toast('PDF 업로드 중...');
-    const ref = st.ref('pdf/' + S.folder + '/' + Date.now() + '_' + file.name.replace(/[^\w.-]/g, '_'));
-    await ref.put(file, { contentType: 'application/pdf' });
+    toast('파일 업로드 중...');
+    const ref = st.ref((isF ? 'mgmt/' + curBranch() + '/' : 'pdf/' + S.folder + '/') + Date.now() + '_' + file.name.replace(/[^\w.-]/g, '_'));
+    await ref.put(file, { contentType: isF ? (file.type || 'application/octet-stream') : 'application/pdf' });
     const url = await ref.getDownloadURL();
-    await db.collection('items').add({ ...baseItem(), name: S.pdfTitle, type: 'file', pdfUrl: url, pdfPath: ref.fullPath });
-    await renderContent();
+    await db.collection('items').add({ ...baseItem(), name: S.pdfTitle, type: 'file', pdfUrl: url, pdfPath: ref.fullPath, fileName: file.name });
+    toast(''); await renderContent();
   });
 };
 async function renameItem(it) {
@@ -452,7 +935,7 @@ async function deleteItem(it) {
   for (const t of targets) if (t.pdfPath) st.ref(t.pdfPath).delete().catch(() => {});
   await renderContent();
 }
- 
+
 /* ===== 지점 관리 (어드민) ===== */
 async function renderBranches() {
   await loadBranches();
@@ -481,7 +964,7 @@ async function addBranch() {
   alert('지점이 등록되었습니다. 지금 바로 로그인할 수 있습니다.\n아이디: ' + loginId);
   await renderBranches();
 }
- 
+
 /* ===== 학생 관리 ===== */
 async function renderStudents() {
   const sup = S.me.role === 'super', bid = sup ? S.stuBranch : S.me.uid;
@@ -525,7 +1008,7 @@ async function addStudent(bid, count) {
   toast(''); alert('학생이 등록되었습니다. 지금 바로 로그인할 수 있습니다.');
   await renderStudents();
 }
- 
+
 /* SEED-START */
 // 예전 사이트(index.html)에 들어 있던 학습 자료. 처음 어드민 로그인 때 B 폴더로 자동 등록됩니다.
 const GSH = 'https://gemini.google.com/share/';
@@ -561,7 +1044,7 @@ async function seedMaterials() {
   alert('예전 사이트의 학습 자료 ' + ops.length + '개가 B 폴더에 등록되었습니다.');
 }
 /* SEED-END */
- 
+
 /* ===== 기존 데이터 가져오기 ===== */
 function grabJs(txt, key, open, close) {
   const i = txt.indexOf(key + ':'); if (i < 0) return null;
@@ -595,7 +1078,7 @@ $('import-file').onchange = e => {
     toast(''); alert(ops.length + '개 항목을 가져왔습니다.');
   });
 };
- 
+
 /* ===== 상단 메뉴 관리 ===== */
 const saveTabs = () => db.collection('config').doc('main').set({ tabs: TABS.map(([id, name]) => ({ id, name })) }, { merge: true });
 async function addTab() { const n = (prompt('새 메뉴 이름:') || '').trim(); if (!n) return; TABS.push(['tab_' + Date.now(), n]); await saveTabs(); S.tab = TABS[TABS.length - 1][0]; drawContent(); }
@@ -606,7 +1089,7 @@ async function delTab(id) {
   if (!confirm('"' + t[1] + '" 메뉴를 삭제할까요?\n이 메뉴의 자료는 삭제되지 않고 첫 번째 메뉴에 표시됩니다.')) return;
   TABS = TABS.filter(x => x[0] !== id); await saveTabs(); S.tab = TABS[0][0]; drawContent();
 }
- 
+
 /* ===== 유튜브 팝업 ===== */
 function ytId(u) {
   try {
@@ -624,7 +1107,7 @@ function openLink(it) {
   $('yt-modal').classList.remove('hidden'); $('yt-modal').classList.add('flex');
 }
 function closeYt() { $('yt-frame').src = ''; $('yt-modal').classList.add('hidden'); $('yt-modal').classList.remove('flex'); showStudyModal(); }
- 
+
 /* ===== 학습 이력 ===== */
 /* 학습 시작 → 완료 기록 (학생) */
 const KEEP = 30 * 24 * 3600 * 1000; // 학습 이력 보관 기간: 30일
@@ -656,7 +1139,7 @@ async function saveStudy() {
   toast('학습 기록이 저장되었습니다.'); setTimeout(() => toast(''), 2000);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) showStudyModal(); });
- 
+
 /* 학습 이력 보기 (지점장·어드민) */
 function histRow(r, sup) {
   const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl mb-2');
@@ -709,7 +1192,7 @@ async function addScore() {
   await db.collection('history').add({ branchId: bid, studentName: name, title, kind: 'score', correct, total, score: Math.round(correct / total * 100), ts: now, day: dayOf(now), expireAt: firebase.firestore.Timestamp.fromMillis(now + KEEP) });
   await renderHistory();
 }
- 
+
 /* ===== 학원 설정 (지점장) ===== */
 function drawLogo() {
   const u = S.me.role === 'super' ? S.hqLogo : (S.me.logoUrl || S.hqLogo), box = $('hd-logo'); box.innerHTML = '';
@@ -782,7 +1265,7 @@ function renderSettings() {
   if (cur) box.append(btn('로고 삭제', B2, () => setLogo(null)));
   v.append(box);
 }
- 
+
 /* ===== 지점 삭제 / 전체 백업 ===== */
 async function delQuery(q) {
   const docs = (await q.get()).docs;
@@ -790,24 +1273,26 @@ async function delQuery(q) {
   return docs.map(d => d.data());
 }
 async function delBranch(b) {
-  if (!confirm('"' + b.academyName + '" 지점을 삭제할까요?\n이 지점의 학생 계정, 지점 전용(A) 자료, 학습 이력이 모두 삭제되며 되돌릴 수 없습니다.\n(삭제 전에 백업을 받아 두세요)')) return;
+  if (!confirm('"' + b.academyName + '" 지점을 삭제할까요?\n이 지점의 학생 계정, 지점 전용(A) 자료, 학습 이력, 학원관리(F) 데이터가 모두 삭제되며 되돌릴 수 없습니다.\n(삭제 전에 백업을 받아 두세요)')) return;
   if (prompt('확인을 위해 지점 아이디를 입력하세요: ' + b.loginId) !== b.loginId) return alert('아이디가 일치하지 않아 취소했습니다.');
   toast('삭제 중...'); if (b.logoPath) st.ref(b.logoPath).delete().catch(() => {});
   const items = await delQuery(db.collection('items').where('folder', '==', 'A').where('branchId', '==', b.id));
-  for (const t of items) if (t.pdfPath) st.ref(t.pdfPath).delete().catch(() => {});
+  const itemsF = await delQuery(db.collection('items').where('folder', '==', 'F').where('branchId', '==', b.id));
+  for (const t of items.concat(itemsF)) if (t.pdfPath) st.ref(t.pdfPath).delete().catch(() => {});
   await delQuery(db.collection('users').where('branchId', '==', b.id).where('role', '==', 'student'));
   await delQuery(db.collection('history').where('branchId', '==', b.id));
+  await delQuery(db.collection('mg').where('branchId', '==', b.id));
   const bt = db.batch(); bt.delete(db.collection('users').doc(b.id)); bt.delete(db.collection('branches').doc(b.id)); await bt.commit();
   toast(''); S.stuBranch = 'main'; S.viewBranch = 'main'; await renderBranches();
 }
 async function exportData() {
   toast('백업 생성 중...');
   const out = { exportedAt: new Date().toISOString(), tabs: TABS.map(([id, name]) => ({ id, name })) };
-  for (const c of ['items', 'branches', 'users', 'history']) out[c] = (await db.collection(c).get()).docs.map(d => ({ id: d.id, ...d.data() }));
+  for (const c of ['items', 'branches', 'users', 'history', 'mg']) out[c] = (await db.collection(c).get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !(c === 'mg' && x.kind === 'att'));
   const a = h('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
   a.download = 'academy_backup_' + new Date().toISOString().slice(0, 10) + '.json'; document.body.append(a); a.click(); a.remove(); toast('');
 }
- 
+
 if (!configured) setErr('index.html 상단의 Firebase 설정값(FB)을 먼저 입력하세요.');
 </script>
 </body>
