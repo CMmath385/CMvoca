@@ -146,7 +146,7 @@ if (st) { st.setMaxUploadRetryTime(30000); st.setMaxOperationRetryTime(30000); }
 // 관리자 로그인 상태를 유지한 채 새 계정을 만들기 위한 보조 앱
 const auth2 = configured ? firebase.initializeApp(FB, 'sec').auth() : null;
 
-const S = { me: null, view: 'content', folder: 'B', folderId: null, tab: 'video', items: [], branches: [], viewBranch: 'main', stuBranch: 'main', pdfTitle: '', seeded: false, fSeededMain: false, hqLogo: '', hqLogoPath: '', hFilter: '' };
+const S = { me: null, view: 'content', folder: 'B', folderId: null, tab: 'video', items: [], branches: [], viewBranch: 'main', stuBranch: 'main', pdfTitle: '', seeded: false, fSeededMain: false, fVerMain: 0, hqLogo: '', hqLogoPath: '', hFilter: '' };
 
 function h(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 function btn(txt, cls, fn) { const b = h('button', cls, txt); b.onclick = () => safe(fn); return b; }
@@ -213,9 +213,9 @@ if (configured) auth.onAuthStateChanged(async u => {
     if (p.role !== 'super') {
       const b = await db.collection('branches').doc(p.branchId).get();
       S.me.academyName = b.exists ? b.data().academyName : '최강수학메이드영어학원';
-      S.me.logoUrl = b.exists ? (b.data().logoUrl || '') : ''; S.me.logoPath = b.exists ? (b.data().logoPath || '') : ''; S.me.fSeeded = b.exists ? !!b.data().fSeeded : true;
+      S.me.logoUrl = b.exists ? (b.data().logoUrl || '') : ''; S.me.logoPath = b.exists ? (b.data().logoPath || '') : ''; S.me.fSeeded = b.exists ? !!b.data().fSeeded : true; S.me.fVer = b.exists ? (b.data().fVer || 0) : 2;
     }
-    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.fSeededMain = !!c.data().fSeeded; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
+    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.fSeededMain = !!c.data().fSeeded; S.fVerMain = c.data().fVer || 0; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
     if (p.role === 'super') {
       await loadBranches();
       if (!S.seeded) { try { await seedMaterials(); } catch (e) { toast(''); alert('기존 학습 자료 등록 실패: ' + e.message + '\n(백업·가져오기 탭에서 다시 시도할 수 있습니다.)'); } }
@@ -361,12 +361,16 @@ function drawContent() {
 
 /* MG-START */
 const GROUPS = [
-  ['teacher', '🧑‍🏫 강사관리', [['teacher', '강사 등록·수정·삭제'], ['pay', '급여관리'], ['tclk', '출퇴근관리']]],
-  ['academy', '🏫 학원관리', [['fee', '회비관리'], ['ledger', '수입·지출관리'], ['plan', '학원 연간일정'], ['school', '학교별 일정']]],
-  ['student', '👨‍🎓 학생관리', [['att', '학생 출결관리'], ['stu', '원생 명단'], ['grade', '성적관리'], ['counsel', '상담관리'], ['progress', '진도관리']]]
+  ['dash', '📊 대시보드', [['dash', '한눈에 보기']]],
+  ['student', '👨‍🎓 학생 통합 관리', [['att', '학생 출결관리'], ['stu', '원생 명단'], ['grade', '성적관리'], ['counsel', '상담관리'], ['progress', '진도관리']]],
+  ['teacher', '🧑‍🏫 강사 통합 관리', [['teacher', '강사 등록·수정·삭제'], ['tclk', '출퇴근관리'], ['pay', '급여관리']]],
+  ['klass', '📚 수업/시간표', [['klass', '수업·시간표 등록']]],
+  ['money', '💰 수입·지출 통합 관리', [['sum', '종합 현황'], ['ledger', '수입·지출 내역'], ['fee', '회비관리(수입)'], ['pay', '강사 급여(지출)']]],
+  ['plan', '🏫 학원 일정', [['plan', '학원 연간일정'], ['school', '학교별 일정']]],
+  ['etc', '➕ 지점 추가 항목', [['etc', '자유 기록 (지점이 원하는 항목)']]]
 ];
 const DEF_GRADES = ['초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3'];
-const MG = { group: 'teacher', tab: 'teacher', date: null, month: null, year: new Date().getFullYear(), pid: null, school: '', cfg: null, kGrade: null, attGrade: '' };
+const MG = { group: 'dash', tab: 'dash', date: null, month: null, year: new Date().getFullYear(), pid: null, school: '', cfg: null, kGrade: null, attGrade: '' };
 const won = n => (Number(n) || 0).toLocaleString('ko-KR') + '원';
 const today = () => dayOf(Date.now());
 const hm = ts => ts ? new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '-';
@@ -453,9 +457,17 @@ const byDateAsc = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.sch
 const range2 = r => (r.date || '') + (r.end ? ' ~ ' + r.end : '');
 const MG_CRUD = {
   teacher: { name: '강사목록', add: '+ 강사 등록', empty: '등록된 강사가 없습니다.', sort: byName,
-    f: [['name', '강사 이름', 'text'], ['phone', '연락처', 'text'], ['payType', '급여 방식', 'select', ['시급', '주급', '월급']], ['pay', '금액(원) — 선택한 급여 방식의 금액', 'number'], ['payDay', '급여일 (매월 며칠)', 'number'], ['memo', '메모', 'text']],
-    title: r => r.name, sub: r => [r.payType + ' ' + won(r.pay) + (r.payDay ? ' · 급여일 매월 ' + r.payDay + '일' : ''), r.phone, r.memo],
-    cols: [['이름', r => r.name], ['연락처', r => r.phone], ['급여 방식', r => r.payType], ['금액', r => won(r.pay)], ['급여일', r => r.payDay ? '매월 ' + r.payDay + '일' : ''], ['메모', r => r.memo]] },
+    f: [['name', '강사 이름', 'text'], ['phone', '연락처', 'text'], ['subject', '담당 과목', 'text'], ['status', '재직 상태', 'select', ['재직 중', '휴직 중', '퇴사']], ['hire', '입사일', 'date'], ['payType', '급여 방식', 'select', ['시급', '주급', '월급']], ['pay', '금액(원) — 선택한 급여 방식의 금액', 'number'], ['payDay', '급여일 (매월 며칠)', 'number'], ['memo', '메모', 'text']],
+    title: r => r.name + (r.subject ? ' · ' + r.subject : '') + (r.status && r.status !== '재직 중' ? ' [' + r.status + ']' : ''), sub: r => [r.payType + ' ' + won(r.pay) + (r.payDay ? ' · 급여일 매월 ' + r.payDay + '일' : ''), r.phone, (r.hire ? '입사 ' + r.hire : ''), r.memo],
+    cols: [['이름', r => r.name], ['담당 과목', r => r.subject], ['상태', r => r.status || '재직 중'], ['입사일', r => r.hire], ['연락처', r => r.phone], ['급여 방식', r => r.payType], ['금액', r => won(r.pay)], ['급여일', r => r.payDay ? '매월 ' + r.payDay + '일' : ''], ['메모', r => r.memo]] },
+  klass: { name: '수업시간표', add: '+ 수업 등록', empty: '등록된 수업이 없습니다.', sort: (a, b) => (a.name || '').localeCompare(b.name || '', 'ko'),
+    f: [['name', '수업명 / 클래스명', 'text'], ['teacher', '담당 강사', 'text'], ['subject', '수업 과목', 'text'], ['days', '수업 요일 (예: 월·수·금)', 'text'], ['time', '시작 시간 (예: 14:30)', 'text'], ['minutes', '수업 시간(분)', 'number'], ['memo', '메모', 'text']],
+    title: r => r.name + (r.subject ? ' · ' + r.subject : ''), sub: r => [[r.days, r.time ? r.time + ' 시작' : '', r.minutes ? r.minutes + '분' : ''].filter(Boolean).join(' · '), r.teacher ? '담당 ' + r.teacher : '', r.memo],
+    cols: [['수업명', r => r.name], ['과목', r => r.subject], ['담당 강사', r => r.teacher], ['요일', r => r.days], ['시작', r => r.time], ['시간(분)', r => r.minutes], ['메모', r => r.memo]] },
+  etc: { name: '지점추가항목', add: '+ 기록 추가', empty: '기록이 없습니다. 지점에서 필요한 내용을 자유롭게 적어 두세요.', sort: byDateDesc, note: '분류 칸에 "차량운행", "비품" 등 원하는 이름을 적어 자유롭게 사용하세요.',
+    f: [['title', '제목', 'text'], ['date', '날짜', 'date'], ['category', '분류 (예: 차량운행, 비품, 행사)', 'text'], ['content', '내용', 'area']],
+    title: r => r.date + ' · ' + (r.category ? '[' + r.category + '] ' : '') + r.title, sub: r => [r.content],
+    cols: [['날짜', r => r.date], ['분류', r => r.category], ['제목', r => r.title], ['내용', r => r.content]] },
   stu: { name: '원생명단', add: '+ 원생 추가', empty: '계정 없는 원생이 없습니다.', sort: byName, note: '학습 계정이 있는 학생은 자동으로 포함됩니다. 계정이 없는 원생만 여기에 추가하세요.',
     f: [['name', '이름', 'text'], ['grade', '학년 (학년은 "학생 출결관리"에서 등록)', 'select', () => MG.cfg.grades], ['phone', '학부모 연락처', 'text'], ['memo', '메모', 'text']],
     title: r => r.name + (r.grade ? ' (' + r.grade + ')' : ''), sub: r => [r.phone, r.memo],
@@ -793,6 +805,40 @@ async function renderGrade() {
   box.append(act, h('p', 'text-[11px] text-slate-400 mt-3', '※ 학습 기록은 30일 뒤 자동 삭제됩니다. 오래 보관하려면 달이 끝나기 전에 "저장 (성적표 보관)"을 눌러 두세요. 저장한 성적표는 계속 남습니다.'));
 }
 
+/* 대시보드 · 종합 현황 */
+async function renderDash() {
+  const box = $('mg-body'), month = today().slice(0, 7);
+  const [roster, teachers, klass, att, led, fee, counsel] = await Promise.all([loadRoster(), mgGet('teacher'), mgGet('klass'), loadAtt(), mgGet('ledger'), mgGet('fee', ['month', month]), mgGet('counsel')]);
+  const inc = led.filter(r => r.type === '수입' && (r.date || '').startsWith(month)).reduce((a, r) => a + (r.amount || 0), 0), exp = led.filter(r => r.type === '지출' && (r.date || '').startsWith(month)).reduce((a, r) => a + (r.amount || 0), 0);
+  const unpaid = fee.filter(d => !d.paid && d.amount > 0).length, tod = att.filter(d => d.date === today() && d.arrival).length;
+  const card = (t, v, sub, tab, grp) => { const b = h('button', 'text-left p-4 bg-white border-2 border-slate-200 rounded-2xl hover:border-indigo-400'); b.append(h('div', 'text-xs font-bold text-slate-500', t), h('div', 'text-2xl font-black text-slate-800 mt-1', v), h('div', 'text-[11px] text-slate-400 mt-1', sub)); b.onclick = () => { MG.group = grp; MG.tab = tab; safe(renderManage); }; return b; };
+  const g = h('div', 'grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5');
+  g.append(card('재원 학생', roster.length + '명', '원생 명단 보기', 'stu', 'student'), card('오늘 등원', tod + '명', '학생 출결관리', 'att', 'student'), card('등록 강사', teachers.filter(t => t.status !== '퇴사').length + '명', '강사 명단 보기', 'teacher', 'teacher'), card('등록 수업', klass.length + '개', '수업·시간표', 'klass', 'klass'),
+    card(month + ' 수입', won(inc), '수입·지출 내역', 'ledger', 'money'), card(month + ' 지출', won(exp), '수입·지출 내역', 'ledger', 'money'), card('회비 미납', unpaid + '명', '회비관리', 'fee', 'money'), card('누적 상담', counsel.length + '건', '상담관리', 'counsel', 'student'));
+  box.append(g, h('h3', 'text-sm font-bold text-indigo-700 mb-2', '최근 상담 기록'));
+  if (!counsel.length) box.append(h('div', 'text-xs text-slate-400 py-4', '상담 기록이 없습니다.'));
+  counsel.sort(byDateDesc).slice(0, 5).forEach(r => box.append(h('div', 'text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 mb-1.5', r.date + ' · ' + r.name + ' (' + r.who + ') — ' + (r.content || ''))));
+  box.append(h('h3', 'text-sm font-bold text-indigo-700 mt-4 mb-2', '이번 달 학원 일정'));
+  const pl = (await mgGet('plan')).filter(r => (r.date || '').startsWith(month)).sort(byDateAsc);
+  if (!pl.length) box.append(h('div', 'text-xs text-slate-400 py-4', '등록된 일정이 없습니다.'));
+  pl.forEach(r => box.append(h('div', 'text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 mb-1.5', range2(r).slice(5) + ' · ' + r.title)));
+}
+async function renderSum() {
+  const box = $('mg-body'), month = MG.month || (MG.month = today().slice(0, 7));
+  const [led, fee, pay] = await Promise.all([mgGet('ledger'), mgGet('fee', ['month', month]), mgGet('pay', ['month', month])]);
+  const lm = led.filter(r => (r.date || '').startsWith(month)), sm = (a, f) => a.filter(f).reduce((x, r) => x + (Number(r.amount) || 0), 0);
+  const rows = [['회비 수입(납부 완료)', sm(fee, d => d.paid)], ['기타 수입', sm(lm, r => r.type === '수입')], ['강사 급여(지급 완료)', sm(pay, d => d.paid)], ['기타 지출', sm(lm, r => r.type === '지출')]];
+  const inc = rows[0][1] + rows[1][1], exp = rows[2][1] + rows[3][1];
+  const bar = h('div', 'flex flex-wrap items-center gap-3 mb-3'), mi = inp('month'); mi.value = month; mi.onchange = () => { if (mi.value) { MG.month = mi.value; safe(renderSum); } };
+  const all = rows.map(r => [r[0], won(r[1])]).concat([['총 수입', won(inc)], ['총 지출', won(exp)], ['당기 순이익', won(inc - exp)]]);
+  bar.append(mi, h('span', 'flex-grow text-xs text-slate-400 font-bold', '회비 미납·급여 미지급 금액은 합계에 넣지 않습니다.'), exportBar('수입지출종합_' + month, ['항목', '금액'], all, month + ' 종합'));
+  box.append(bar);
+  const g = h('div', 'grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4');
+  [['총 수입', inc, 'text-indigo-700'], ['총 지출', exp, 'text-rose-600'], ['당기 순이익', inc - exp, inc - exp >= 0 ? 'text-emerald-600' : 'text-rose-600']].forEach(([t, v, c]) => { const d = h('div', 'p-4 bg-white border-2 border-slate-200 rounded-2xl'); d.append(h('div', 'text-xs font-bold text-slate-500', t), h('div', 'text-2xl font-black mt-1 ' + c, won(v))); g.append(d); });
+  box.append(g);
+  rows.forEach(r => box.append(h('div', 'text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-2 flex justify-between', r[0]).appendChild(h('span', '', won(r[1]))).parentNode));
+}
+
 /* 학원관리 메인 (F 페이지) */
 async function renderManage() {
   const v = $('view-manage'); v.innerHTML = '';
@@ -804,34 +850,39 @@ async function renderManage() {
   }
   const g = GROUPS.find(x => x[0] === MG.group) || GROUPS[0]; MG.group = g[0];
   if (!g[2].some(t => t[0] === MG.tab)) MG.tab = g[2][0][0];
-  const gr = h('div', 'grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3');
-  GROUPS.forEach(x => gr.append(btn(x[1], 'py-4 rounded-2xl text-base font-bold border-2 transition ' + (x[0] === MG.group ? 'bg-indigo-900 text-white border-indigo-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'), () => { MG.group = x[0]; MG.tab = x[2][0][0]; return renderManage(); })));
+  const gr = h('div', 'grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3');
+  GROUPS.forEach(x => gr.append(btn(x[1], 'py-3 px-2 rounded-2xl text-sm font-bold border-2 transition ' + (x[0] === MG.group ? 'bg-indigo-900 text-white border-indigo-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'), () => { MG.group = x[0]; MG.tab = x[2][0][0]; return renderManage(); })));
   const chips = h('div', 'flex flex-wrap items-center gap-2 mb-5');
   g[2].forEach(([id, label]) => chips.append(btn(label, 'font-bold text-sm px-4 py-2 rounded-xl transition ' + (MG.tab === id ? 'bg-amber-500 text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'), () => { MG.tab = id; return renderManage(); })));
   chips.append(btn('📎 자료 파일 올리기', 'font-bold text-sm px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 ml-auto', async () => { S.fFiles = true; setView('content'); }));
   const body = h('div'); body.id = 'mg-body'; v.append(gr, chips, body);
   toast('불러오는 중...');
   try {
-    if (MG_CRUD[MG.tab]) await renderCrud(MG.tab); else if (MG.tab === 'tclk') await renderTclk(); else if (MG.tab === 'pay') await renderPay();
+    if (MG.tab === 'dash') await renderDash(); else if (MG.tab === 'sum') await renderSum(); else if (MG_CRUD[MG.tab]) await renderCrud(MG.tab); else if (MG.tab === 'tclk') await renderTclk(); else if (MG.tab === 'pay') await renderPay();
     else if (MG.tab === 'fee') await renderFee(); else if (MG.tab === 'att') await renderAtt(); else await renderGrade();
   } finally { toast(''); }
 }
 /* MG-END */
 
 /* F-START */
-const F_DEFAULTS = ['강사관리', '학원관리', '학생관리'];
+const F_DEFAULTS = ['강사 통합 관리', '수입·지출 통합 관리', '학생 통합 관리', '수업·시간표', '학원 일정'];
+const F_OLD = ['강사관리', '학원관리', '학생관리'];
 const F_EXT = ['pdf', 'xlsx', 'xls', 'csv', 'docx', 'doc', 'hwp', 'hwpx', 'pptx', 'ppt', 'txt', 'png', 'jpg', 'jpeg'];
 const isPdf = it => !it.fileName || /\.pdf$/i.test(it.fileName);
 async function ensureFFolders() {
   const bid = curBranch(), isMain = bid === 'main';
-  const rec = isMain ? { fSeeded: S.fSeededMain } : (S.me.role === 'super' ? S.branches.find(b => b.id === bid) : S.me);
-  if (!rec || rec.fSeeded) return;
-  const b = db.batch();
-  F_DEFAULTS.forEach((n, i) => b.set(db.collection('items').doc('F_' + bid + '_' + i), { folder: 'F', branchId: bid, type: 'folder', name: n, parentId: null, tabId: 'video', visible: true, order: (i + 1) * 1000, createdAt: Date.now() }));
-  if (isMain) b.set(db.collection('config').doc('main'), { fSeeded: true }, { merge: true });
-  else b.update(db.collection('branches').doc(bid), { fSeeded: true });
+  const rec = isMain ? { fVer: S.fVerMain } : (S.me.role === 'super' ? S.branches.find(b => b.id === bid) : S.me);
+  if (!rec || rec.fVer >= 2) return;
+  const cur = (await db.collection('items').where('folder', '==', 'F').where('branchId', '==', bid).get()).docs, b = db.batch();
+  F_DEFAULTS.forEach((n, i) => {
+    const id = 'F_' + bid + '_' + i, ex = cur.find(d => d.id === id);
+    if (!ex) b.set(db.collection('items').doc(id), { folder: 'F', branchId: bid, type: 'folder', name: n, parentId: null, tabId: 'video', visible: true, order: (i + 1) * 1000, createdAt: Date.now() });
+    else if (F_OLD.includes(ex.data().name)) b.update(db.collection('items').doc(id), { name: n });
+  });
+  if (isMain) b.set(db.collection('config').doc('main'), { fSeeded: true, fVer: 2 }, { merge: true });
+  else b.update(db.collection('branches').doc(bid), { fSeeded: true, fVer: 2 });
   await b.commit();
-  rec.fSeeded = true; if (isMain) S.fSeededMain = true;
+  rec.fVer = 2; if (isMain) S.fVerMain = 2;
 }
 /* F-END */
 
