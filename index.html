@@ -215,7 +215,7 @@ if (configured) auth.onAuthStateChanged(async u => {
       S.me.academyName = b.exists ? b.data().academyName : '최강수학메이드영어학원';
       S.me.logoUrl = b.exists ? (b.data().logoUrl || '') : ''; S.me.logoPath = b.exists ? (b.data().logoPath || '') : ''; S.me.fSeeded = b.exists ? !!b.data().fSeeded : true; S.me.fVer = b.exists ? (b.data().fVer || 0) : 2;
     }
-    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.fSeededMain = !!c.data().fSeeded; S.fVerMain = c.data().fVer || 0; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
+    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.fSeededMain = !!c.data().fSeeded; S.fVerMain = c.data().fVer || 0; S.hqName = c.data().academyName || ''; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
     if (p.role === 'super') {
       await loadBranches();
       if (!S.seeded) { try { await seedMaterials(); } catch (e) { toast(''); alert('기존 학습 자료 등록 실패: ' + e.message + '\n(백업·가져오기 탭에서 다시 시도할 수 있습니다.)'); } }
@@ -380,7 +380,7 @@ const tsOf = (date, t) => /^\d{1,2}:\d{2}$/.test(t) ? new Date(date + 'T' + t.pa
 const mgRef = id => db.collection('mg').doc(id);
 const newId = k => k + '_' + Date.now() + Math.random().toString(36).slice(2, 6);
 const prevMonth = m => { const [y, mo] = m.split('-').map(Number), d = new Date(y, mo - 2, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
-const acadName = () => S.me.role === 'super' ? (curBranch() === 'main' ? '최강수학메이드영어학원 본원' : branchName(curBranch())) : S.me.academyName;
+const acadName = () => S.me.role === 'super' ? (curBranch() === 'main' ? (S.hqName || '최강수학메이드영어학원 본원') : branchName(curBranch())) : S.me.academyName;
 function estPay(t, hrs, month) {
   const pay = Number(t.pay) || 0, [y, m] = month.split('-').map(Number);
   return t.payType === '시급' ? Math.round(pay * hrs) : t.payType === '주급' ? Math.round(pay * new Date(y, m, 0).getDate() / 7) : pay;
@@ -716,10 +716,13 @@ async function renderAtt() {
     box.innerHTML = ''; acts.innerHTML = '';
     const grades = cfg.grades.concat([...new Set(roster.map(r => r.grade).filter(g => g && !cfg.grades.includes(g)))]), flt = grades.includes(MG.attGrade) ? MG.attGrade : '', list = roster.filter(r => !flt || r.grade === flt), td = today();
     if (S.me.role === 'sub' || (S.me.role === 'super' && bid === 'main')) { const lf = h('input'); lf.type = 'file'; lf.accept = 'image/png,image/jpeg,image/webp,image/gif,application/pdf'; lf.className = 'hidden'; lf.onchange = () => { const f = lf.files[0]; lf.value = ''; if (f) safe(async () => { await setLogo(f); await renderAtt(); }); }; acts.append(lf, btn('🖼 학원 로고 변경', 'bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-2.5 rounded-xl font-bold', async () => lf.click())); }
-    const bf0 = h('input'); bf0.type = 'file'; bf0.accept = 'image/png,image/jpeg,image/webp'; bf0.className = 'hidden';
-    bf0.onchange = () => { const f = bf0.files[0]; bf0.value = ''; if (f) safe(async () => { const d = await resizeToDataUrl(f, 1100, 0.82); if (d.length > 800000) throw new Error('배너 이미지가 너무 큽니다. 더 작은 이미지를 사용하세요.'); cfg.banner = d; toast('배너 저장 중...'); await saveCfg(); toast(''); draw(); }); };
-    acts.append(bf0, btn('🖼 배너 이미지 올리기', 'bg-rose-700 hover:bg-rose-800 text-white text-xs px-3 py-2.5 rounded-xl font-bold', async () => bf0.click()));
-    if (cfg.banner) acts.append(btn('배너 삭제', 'bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-2.5 rounded-xl font-bold', async () => { cfg.banner = ''; await saveCfg(); draw(); }));
+    acts.append(btn('✏️ 학원명 변경', 'bg-rose-700 hover:bg-rose-800 text-white text-xs px-3 py-2.5 rounded-xl font-bold', async () => {
+      const n = (prompt('변경할 학원명을 입력하세요.', acad) || '').trim(); if (!n) return; if (n.length > 40) return alert('학원명은 40자 이내로 입력하세요.');
+      if (S.me.role === 'sub') { const b = db.batch(); b.update(db.collection('branches').doc(S.me.uid), { academyName: n }); b.update(db.collection('users').doc(S.me.uid), { academyName: n, name: n }); await b.commit(); S.me.academyName = n; $('hd-name').textContent = n; $('badge').textContent = '🏛️ ' + n + ' 원장님'; }
+      else if (bid === 'main') { await db.collection('config').doc('main').set({ academyName: n }, { merge: true }); S.hqName = n; }
+      else { const b = db.batch(); b.update(db.collection('branches').doc(bid), { academyName: n }); b.update(db.collection('users').doc(bid), { academyName: n, name: n }); await b.commit(); const br = S.branches.find(x => x.id === bid); if (br) br.academyName = n; }
+      toast('학원명이 변경되었습니다.'); setTimeout(() => toast(''), 1500); await renderManage();
+    }));
     acts.append(btn('⚙ 학년·배너·비밀번호', 'bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2.5 rounded-xl font-bold', async () => { showSet = !showSet; draw(); }),
       btn('+ 학생 등록', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2.5 rounded-xl font-bold', async () => { const o = await openForm('학생 등록', MG_CRUD.stu.f, null, roster); if (!o) return; await mgSave(newId('stu'), { kind: 'stu', ...o }); roster.splice(0, roster.length, ...(await loadRoster())); draw(); }),
       btn('⛶ 전체화면 터치 모드', 'bg-rose-600 hover:bg-rose-700 text-white text-xs px-3 py-2.5 rounded-xl font-bold', async () => openKiosk(cfg, roster)));
@@ -727,7 +730,7 @@ async function renderAtt() {
     const lb = h('div', 'flex items-center gap-4'), ic = h('div', 'w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl overflow-hidden flex-shrink-0'); if (logo) { const im = h('img', 'w-full h-full object-contain bg-white'); im.src = logo; ic.append(im); } else ic.textContent = '🎓';
     const tx = h('div'); tx.append(h('div', 'text-[10px] font-bold tracking-widest opacity-80', '태블릿 입·출결 모드 BANNER'), h('div', 'text-xl font-black', acad), h('div', 'text-xs opacity-90 mt-1', '이름을 터치하여 등원시 [도착시간], 수업 완료 후 한번 더 터치시 [하원/수업시간]이 기록됩니다.')); lb.append(ic, tx);
     const cnt = h('div', 'bg-white/15 rounded-xl px-5 py-3 text-center'); cnt.append(h('div', 'text-[11px] opacity-90', '오늘 등원 완료'), h('div', 'text-2xl font-black', roster.filter(st => docs.some(d => d.date === td && d.pid === st.id && d.arrival)).length + '명'));
-    if (cfg.banner) { const bw = h('div', 'relative rounded-2xl overflow-hidden mb-4 shadow-lg bg-slate-100'), bi = h('img', 'w-full block max-h-64 object-cover'); bi.src = cfg.banner; cnt.className = 'absolute top-3 right-3 bg-black/60 text-white rounded-xl px-4 py-2 text-center'; bw.append(bi, cnt); box.append(bw); } else { bn.append(lb, cnt); box.append(bn); }
+    bn.append(lb, cnt); box.append(bn);
     if (showSet) {
       const gm = h('div', 'mb-4 p-4 bg-white border border-slate-200 rounded-2xl shadow-sm'), tags = h('div', 'flex flex-wrap gap-2 mb-3');
       gm.append(h('div', 'text-xs font-bold text-slate-600 mb-2', '학년 관리 (터치 화면의 학년 탭이 됩니다)'));
