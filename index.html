@@ -267,6 +267,8 @@ function setView(v) {
 
 /* ===== 학습 자료 ===== */
 const branchScoped = () => S.folder === 'A' || S.folder === 'F';
+const sharedScoped = () => ['B', 'C', 'D'].includes(S.folder);
+const inheritShared = a => (a && a.shared ? a.shared.filter(x => !(a.pathOnly || []).includes(x)) : []);
 const isEdit = () => S.me.role === 'super' || (S.me.role === 'sub' && branchScoped());
 const curBranch = () => S.me.role === 'super' ? S.viewBranch : S.me.branchId;
 
@@ -276,6 +278,7 @@ async function loadItems() {
     q = q.where('branchId', '==', curBranch());
     if (S.folder === 'A' && S.me.role === 'student') q = q.where('visible', '==', true);
   }
+  if (sharedScoped() && S.me.role !== 'super') q = q.where('shared', 'array-contains', S.me.branchId);
   S.items = (await q.get()).docs.map(d => ({ id: d.id, ...d.data() }));
 }
 async function renderContent() { toast('불러오는 중...'); if (S.folder === 'F') await ensureFFolders(); await loadItems(); toast(''); drawContent(); }
@@ -292,9 +295,9 @@ function drawContent() {
 
   // 안내문
   const notes = {
-    B: '본원 공용 자료입니다. 모든 지점과 학생에게 공유되며 PDF 자료는 열어서 인쇄할 수 있습니다.',
+    B: S.me.role === 'super' ? '본원 공용 자료입니다. 자료마다 "🔗 공유"로 보여 줄 지점을 고르세요. 공유하지 않은 지점에는 보이지 않습니다.' : '본원에서 우리 지점에 공유해 준 자료입니다. PDF 자료는 열어서 인쇄할 수 있습니다.',
     A: S.me.role === 'student' ? '우리 지점에서 공개한 자료입니다.' : '우리 지점 전용 폴더입니다. 자료마다 학생 공개/비공개를 정할 수 있고, 새 자료는 비공개로 시작합니다.',
-    C: '수학 전용 폴더입니다.', D: '국어 전용 폴더입니다.', E: '전과목 통합 폴더입니다.',
+    C: S.me.role === 'super' ? '수학 전용 폴더입니다. 자료마다 "🔗 공유"로 보여 줄 지점을 고르세요.' : '수학 자료 중 본원에서 우리 지점에 공유해 준 자료입니다.', D: S.me.role === 'super' ? '국어 전용 폴더입니다. 자료마다 "🔗 공유"로 보여 줄 지점을 고르세요.' : '국어 자료 중 본원에서 우리 지점에 공유해 준 자료입니다.', E: '전과목 통합 폴더입니다.',
     F: '학원 관리 자료 파일입니다. 우리 지점 관리자와 본원 관리자만 볼 수 있고 학생에게는 보이지 않습니다. 링크나 파일(PDF·엑셀·워드·한글 등)을 올려 보관하세요.'
   };
   $('note').textContent = '💡 ' + notes[S.folder];
@@ -318,6 +321,8 @@ function drawContent() {
     tools.append(btn('+ 새 폴더', B1, () => addItem('folder')), btn('🔗 링크 등록', 'bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('link')), btn(S.folder === 'F' ? '📎 파일 등록' : '📄 PDF 등록', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => addItem('pdf')));
   }
 
+  if (S.me.role === 'super' && sharedScoped()) tools.append(btn('🔗 선택 지점에 전체 공유 추가', 'bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-2 rounded-xl font-bold', shareAll));
+
   // 탭
   const tabs = $('tabs'); tabs.innerHTML = ''; tabs.classList.toggle('hidden', S.folder === 'F');
   if (!TABS.some(t => t[0] === S.tab)) S.tab = TABS[0][0];
@@ -339,12 +344,13 @@ function drawContent() {
   }
   const kids = visibleKids();
   if (edit && kids.length) list.append(h('div', 'text-[11px] text-slate-400 font-bold px-1', '↕ 항목을 끌어서 순서를 바꾸거나, 폴더 위(가운데)에 놓으면 그 폴더로 이동합니다. 위쪽 경로나 "상위 폴더로 이동"에 놓으면 그 위치로 이동합니다.'));
-  if (!kids.length) { list.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', '등록된 학습 자료가 없습니다.')); return; }
+  if (!kids.length) { list.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', sharedScoped() && S.me.role !== 'super' ? '아직 본원에서 공유해 준 학습 자료가 없습니다.' : '등록된 학습 자료가 없습니다.')); return; }
   kids.forEach(it => {
     const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap justify-between items-center gap-3 font-bold text-slate-700 text-sm');
     const l = h('div', 'flex items-center gap-2.5 flex-grow min-w-0');
     l.append(h('span', 'text-xl', it.type === 'folder' ? '📂' : it.pdfUrl ? '📄' : '🔗'), h('span', 'text-base break-all', it.name));
     if (S.folder === 'A' && edit) l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (it.visible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'), it.visible ? '학생공개' : '비공개'));
+    if (sharedScoped() && S.me.role === 'super') { const n = (it.shared || []).length; l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (n ? 'bg-violet-100 text-violet-700' : 'bg-slate-200 text-slate-500'), n ? '공유 ' + n + '개 지점' : '미공유')); }
     if (it.type === 'folder') { l.classList.add('cursor-pointer'); l.onclick = () => { S.folderId = it.id; drawContent(); }; }
     row.append(l);
     const r = h('div', 'flex flex-wrap items-center gap-1.5');
@@ -353,10 +359,44 @@ function drawContent() {
     if (it.pdfUrl) r.append(btn(isPdf(it) ? '📄 PDF 열기·인쇄' : '📎 파일 열기', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => { startStudy(it); window.open(it.pdfUrl, '_blank', 'noopener'); }));
     if (edit) {
       if (S.folder === 'A') r.append(btn(it.visible ? '🔒 비공개로' : '🔓 학생 공개', B2, async () => { await db.collection('items').doc(it.id).update({ visible: !it.visible }); it.visible = !it.visible; drawContent(); }));
+      if (sharedScoped()) r.append(btn('🔗 공유', 'bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs px-2.5 py-2 rounded-xl font-bold', () => shareItem(it)));
       r.append(btn('✏️', B2, () => renameItem(it)), btn('🗑', B2, () => deleteItem(it)));
     }
     row.append(r); if (edit) wireDrag(row, it); list.append(row);
   });
+}
+
+/* ===== 지점별 공유 (B·C·D 폴더, 본원 관리자) ===== */
+async function writeShared(upd) {
+  const ent = [...upd.entries()];
+  for (let i = 0; i < ent.length; i += 400) { const b = db.batch(); ent.slice(i, i + 400).forEach(([id, v]) => b.update(db.collection('items').doc(id), { shared: v.s, pathOnly: v.p })); await b.commit(); }
+  ent.forEach(([id, v]) => { const x = S.items.find(i => i.id === id); if (x) { x.shared = v.s.slice(); x.pathOnly = v.p.slice(); } });
+}
+function shareDialog(title, initial, okLabel) {
+  return new Promise(res => {
+    if (!S.branches.length) { alert('등록된 지점이 없습니다. 먼저 "지점 관리"에서 지점을 등록하세요.'); return res(null); }
+    const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4'), card = h('div', 'bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 max-h-full overflow-y-auto'), boxes = [];
+    card.append(h('h3', 'text-base font-bold text-slate-800 mb-1', title), h('p', 'text-xs text-slate-500 mb-3', '체크한 지점의 원장님과 학생에게만 보입니다.'));
+    const all = h('label', 'flex items-center gap-2 py-2 border-b border-slate-200 text-sm font-bold text-indigo-700'), ac = h('input'); ac.type = 'checkbox'; all.append(ac, document.createTextNode('전체 선택'));
+    ac.onchange = () => boxes.forEach(([c]) => { c.checked = ac.checked; }); card.append(all);
+    S.branches.slice().sort((a, b) => (a.academyName || '').localeCompare(b.academyName || '', 'ko')).forEach(b => { const l = h('label', 'flex items-center gap-2 py-2 text-sm font-bold text-slate-700'), c = h('input'); c.type = 'checkbox'; c.checked = initial.includes(b.id); l.append(c, document.createTextNode(b.academyName)); boxes.push([c, b.id]); card.append(l); });
+    const done = v => { ov.remove(); res(v); }, row = h('div', 'flex gap-2 pt-4');
+    row.append(btn(okLabel, 'flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl', async () => done(boxes.filter(([c]) => c.checked).map(([, id]) => id))), btn('취소', 'flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl', async () => done(null)));
+    card.append(row); ov.append(card); document.body.append(ov);
+  });
+}
+async function shareItem(it) {
+  const pick = await shareDialog('"' + it.name + '" 공유 지점', it.shared || [], '저장'); if (!pick) return;
+  const ids = it.type === 'folder' ? descendants(it.id) : new Set([it.id]), upd = new Map();
+  S.items.forEach(i => { if (ids.has(i.id)) upd.set(i.id, { s: pick.slice(), p: [] }); });
+  if (pick.length) { let p = it.parentId; while (p) { const a = S.items.find(x => x.id === p); if (!a) break; const sh = a.shared || [], add = pick.filter(x => !sh.includes(x)); if (add.length) upd.set(a.id, { s: sh.concat(add), p: (a.pathOnly || []).concat(add) }); p = a.parentId; } }
+  toast('공유 설정 저장 중...'); await writeShared(upd); toast(''); drawContent();
+}
+async function shareAll() {
+  const pick = await shareDialog('이 폴더의 모든 자료를 공유할 지점', [], '전체 공유 추가'); if (!pick || !pick.length) return;
+  if (!confirm('이 폴더의 모든 자료(' + S.items.length + '개)를 선택한 ' + pick.length + '개 지점에 공유 추가할까요?')) return;
+  const upd = new Map(); S.items.forEach(i => upd.set(i.id, { s: [...new Set((i.shared || []).concat(pick))], p: (i.pathOnly || []).filter(x => !pick.includes(x)) }));
+  toast('공유 설정 저장 중...'); await writeShared(upd); toast(''); drawContent();
 }
 
 /* MG-START */
@@ -977,7 +1017,10 @@ async function moveInto(dragId, target) {
   if ((it.parentId || null) === target) return;
   if (target && descendants(dragId).has(target)) return alert('폴더를 자기 자신이나 그 하위 폴더로 옮길 수 없습니다.');
   await db.collection('items').doc(dragId).update({ parentId: target, order: firebase.firestore.FieldValue.delete() });
-  it.parentId = target; delete it.order; drawContent();
+  it.parentId = target; delete it.order;
+  const par = target ? S.items.find(i => i.id === target) : null;
+  if (sharedScoped() && par) { const sh = inheritShared(par), upd = new Map(); descendants(dragId).forEach(id => upd.set(id, { s: sh.slice(), p: [] })); await writeShared(upd); }
+  drawContent();
 }
 async function reorder(dragId, targetId, after) {
   const d = S.items.find(i => i.id === dragId), t = S.items.find(i => i.id === targetId);
@@ -1019,7 +1062,7 @@ function wireDropTarget(el, parentId) {
 /* DND-END */
 
 function baseItem() {
-  return { folder: S.folder, parentId: S.folderId, tabId: S.tab, visible: S.folder !== 'A', createdAt: Date.now(), ...(branchScoped() ? { branchId: curBranch() } : {}) };
+  return { folder: S.folder, parentId: S.folderId, tabId: S.tab, visible: S.folder !== 'A', createdAt: Date.now(), ...(branchScoped() ? { branchId: curBranch() } : {}), ...(sharedScoped() ? { shared: S.folderId ? inheritShared(S.items.find(i => i.id === S.folderId)) : [], pathOnly: [] } : {}) };
 }
 async function addItem(kind) {
   const name = prompt(kind === 'folder' ? '새 폴더 이름:' : '학습 자료 제목:'); if (!name || !name.trim()) return;
