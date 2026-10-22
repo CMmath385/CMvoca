@@ -47,7 +47,7 @@ body{font-family:'Pretendard',sans-serif}
       </div>
       <div class="flex items-center gap-3">
         <span id="badge" class="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1.5 rounded-xl border border-indigo-100"></span>
-        <button onclick="auth.signOut()" class="text-xs text-slate-500 hover:text-slate-800 font-bold border border-slate-200 px-3 py-1.5 rounded-xl">로그아웃</button>
+        <button onclick="doLogout()" class="text-xs text-slate-500 hover:text-slate-800 font-bold border border-slate-200 px-3 py-1.5 rounded-xl">로그아웃</button>
       </div>
     </div>
   </header>
@@ -125,14 +125,24 @@ const FB = {
   appId: '1:371199594988:web:a74f2bd1cc853d15d4f0c9'
 };
 const DOMAIN = '@cmacademy.com', ADMIN_ID = 'admin', MAX_STUDENTS = 10;
-const FOLDERS = [
-  { id: 'A', name: 'A · 우리 지점 전용' },
-  { id: 'B', name: 'B · 본원 공용 자료' },
-  { id: 'C', name: 'C · 수학' },
-  { id: 'D', name: 'D · 국어' },
-  { id: 'E', name: 'E · 전과목 통합' },
-  { id: 'F', name: 'F · 학원관리' }
+const DEF_FOLDERS = [
+  { id: 'A', name: 'A · 우리 지점 전용', kind: 'branch' },
+  { id: 'B', name: 'B · 영어', kind: 'shared' },
+  { id: 'C', name: 'C · 수학', kind: 'shared' },
+  { id: 'D', name: 'D · 국어', kind: 'shared' },
+  { id: 'E', name: 'E · 전과목 통합', kind: 'all' },
+  { id: 'F', name: 'F · 학원관리', kind: 'mgmt' }
 ];
+let FOLDERS = DEF_FOLDERS.map(f => ({ ...f }));
+const KIND_NAME = { branch: '지점 전용형', shared: '공유 선택형', all: '전체 공개형', mgmt: '학원관리' };
+const kindOf = id => (FOLDERS.find(f => f.id === id) || {}).kind || 'shared';
+const firstFolder = () => (FOLDERS.find(f => f.id === 'B') || FOLDERS.find(f => f.kind !== 'mgmt') || FOLDERS[0]).id;
+function applyFolders(list) {
+  if (!Array.isArray(list) || !list.length) return;
+  const ok = list.filter(f => f && f.id && f.name && ['branch', 'shared', 'all', 'mgmt'].includes(f.kind)).map(f => ({ id: String(f.id), name: String(f.name), kind: f.kind }));
+  if (!ok.some(f => f.id === 'F')) ok.push({ ...DEF_FOLDERS[5] });
+  FOLDERS = ok;
+}
 let TABS = [['video', '영상학습훈련'], ['voca', '단어'], ['passage', '본문']];
 const tabOf = i => { const t = i.tabId || 'video'; return TABS.some(x => x[0] === t) ? t : TABS[0][0]; };
 
@@ -176,6 +186,7 @@ async function createAuth(id, pw) {
 }
 
 /* ===== 로그인 ===== */
+async function doLogout() { if (S.unsubSess) { S.unsubSess(); S.unsubSess = null; } try { if (S.me) localStorage.removeItem('cmSid_' + S.me.uid); } catch (_) {} await auth.signOut(); }
 const setErr = m => { $('login-error').textContent = m; };
 const AUTH_MSG = {
   'auth/invalid-api-key': 'Firebase apiKey가 올바르지 않습니다. index.html 상단의 FB.apiKey를 확인하세요.',
@@ -190,15 +201,39 @@ const AUTH_MSG = {
   'auth/invalid-email': '아이디 형식이 올바르지 않습니다.'
 };
 async function handleLogin(e) {
-  e.preventDefault();
+  e.preventDefault(); S.fresh = true;
   if (!configured) return setErr('index.html 상단의 Firebase 설정값(FB)을 먼저 입력하세요.');
   setErr('');
   const id = $('login-id').value.trim().toLowerCase(), pw = $('login-pw').value;
   try { await auth.signInWithEmailAndPassword(id.includes('@') ? id : id + DOMAIN, pw); }
-  catch (x) { setErr((AUTH_MSG[x.code] || '로그인 오류') + ' [' + (x.code || x.message) + ']'); }
+  catch (x) { S.fresh = false; setErr((AUTH_MSG[x.code] || '로그인 오류') + ' [' + (x.code || x.message) + ']'); }
+}
+/* 한 아이디 = 한 곳에서만 학습: 새로 로그인하면 이전 접속은 자동 로그아웃 */
+const SESS_MSG = '다른 곳에서 같은 아이디로 로그인하여 이 화면은 로그아웃되었습니다.';
+async function claimSession(u) {
+  const ref = db.collection('sessions').doc(u.uid), SK = 'cmSid_' + u.uid;
+  let sid = null; try { sid = localStorage.getItem(SK); } catch (_) {}
+  if (!S.fresh && sid) {
+    const d = await ref.get();
+    if (d.exists && d.data().sid !== sid) { await auth.signOut(); setErr(SESS_MSG); return false; }
+    if (!d.exists) await ref.set({ sid, ts: Date.now() });
+  } else {
+    sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    await ref.set({ sid, ts: Date.now() });
+    try { localStorage.setItem(SK, sid); } catch (_) {}
+  }
+  S.fresh = false; S.sid = sid;
+  if (S.unsubSess) S.unsubSess();
+  S.unsubSess = ref.onSnapshot(sn => { if (sn.exists && sn.data().sid && sn.data().sid !== S.sid) kickMe(); }, () => {});
+  return true;
+}
+async function kickMe() {
+  if (S.unsubSess) { S.unsubSess(); S.unsubSess = null; }
+  S.sid = null; try { closeYt(); hideStudyModal(); } catch (_) {}
+  await auth.signOut().catch(() => {}); setErr(SESS_MSG); alert(SESS_MSG);
 }
 if (configured) auth.onAuthStateChanged(async u => {
-  if (!u) { S.me = null; $('login-screen').classList.remove('hidden'); $('app').classList.add('hidden'); return; }
+  if (!u) { if (S.unsubSess) { S.unsubSess(); S.unsubSess = null; } S.sid = null; S.me = null; $('login-screen').classList.remove('hidden'); $('app').classList.add('hidden'); return; }
   try {
     let p;
     if (u.email === ADMIN_ID + DOMAIN) {
@@ -215,13 +250,14 @@ if (configured) auth.onAuthStateChanged(async u => {
       S.me.academyName = b.exists ? b.data().academyName : '최강수학메이드영어학원';
       S.me.logoUrl = b.exists ? (b.data().logoUrl || '') : ''; S.me.logoPath = b.exists ? (b.data().logoPath || '') : ''; S.me.fSeeded = b.exists ? !!b.data().fSeeded : true; S.me.fVer = b.exists ? (b.data().fVer || 0) : 2;
     }
-    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.fSeededMain = !!c.data().fSeeded; S.fVerMain = c.data().fVer || 0; S.hqName = c.data().academyName || ''; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
+    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.fSeededMain = !!c.data().fSeeded; S.fVerMain = c.data().fVer || 0; S.hqName = c.data().academyName || ''; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; applyFolders(c.data().folders); if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
     if (p.role === 'super') {
       await loadBranches();
       if (!S.seeded) { try { await seedMaterials(); } catch (e) { toast(''); alert('기존 학습 자료 등록 실패: ' + e.message + '\n(백업·가져오기 탭에서 다시 시도할 수 있습니다.)'); } }
     }
+    if (!(await claimSession(u))) return;
     enterPortal();
-  } catch (e) { await auth.signOut(); setErr('로그인 처리 중 오류: ' + e.message); }
+  } catch (e) { S.fresh = false; await auth.signOut(); setErr('로그인 처리 중 오류: ' + e.message); }
 });
 
 function enterPortal() {
@@ -230,7 +266,7 @@ function enterPortal() {
   $('hd-name').textContent = m.role === 'super' ? '최강수학메이드영어학원 본원 관리센터' : m.academyName;
   $('hd-sub').textContent = { super: '전체 관리', sub: '지점 관리자 모드', student: '학생 학습관' }[m.role];
   $('badge').textContent = m.role === 'super' ? '👑 최고 관리자' : m.role === 'sub' ? '🏛️ ' + m.academyName + ' 원장님' : '👨‍🎓 ' + m.name + ' 학생';
-  S.folder = 'B'; S.folderId = null; S.viewBranch = 'main'; S.stuBranch = 'main'; S.tab = TABS[0][0]; drawLogo(); setTimeout(showStudyModal, 600);
+  S.folder = firstFolder(); S.folderId = null; S.viewBranch = 'main'; S.stuBranch = 'main'; S.tab = TABS[0][0]; drawLogo(); setTimeout(showStudyModal, 600);
   buildSide(); setView('content');
 }
 
@@ -243,12 +279,59 @@ async function loadBranches() {
 /* ===== 내비게이션 ===== */
 function buildSide() {
   const c = $('side'); c.innerHTML = '';
-  FOLDERS.filter(f => f.id !== 'F' || S.me.role !== 'student').forEach(f => {
+  FOLDERS.filter(f => f.kind !== 'mgmt' || S.me.role !== 'student').forEach(f => {
     const on = S.folder === f.id;
     c.append(btn(f.name, 'w-full text-left font-bold p-3 rounded-xl text-sm border transition ' + (on ? 'bg-indigo-900 text-white border-indigo-900' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'), async () => {
       S.folder = f.id; S.folderId = null; S.fFiles = false; buildSide(); setView('content');
     }));
   });
+  if (S.me.role === 'super') c.append(btn('⚙️ 폴더 이름·순서·추가·삭제', 'w-full text-center font-bold p-2.5 rounded-xl text-xs border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 mt-3', async () => openFolderEditor()));
+}
+function openFolderEditor() {
+  let list = FOLDERS.map(f => ({ ...f }));
+  const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4'), card = h('div', 'bg-white rounded-2xl shadow-2xl max-w-lg w-full p-5 max-h-full overflow-y-auto'), box = h('div', 'space-y-2');
+  const close = () => ov.remove();
+  const draw = () => {
+    box.innerHTML = '';
+    list.forEach((f, i) => {
+      const row = h('div', 'flex items-center gap-1.5 p-2 border border-slate-200 rounded-xl bg-slate-50');
+      const inp = h('input', 'flex-1 min-w-0 p-2 border border-slate-300 rounded-lg text-sm font-bold'); inp.value = f.name; inp.oninput = () => { f.name = inp.value; };
+      const tag = h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold bg-indigo-100 text-indigo-700 whitespace-nowrap', KIND_NAME[f.kind]);
+      const up = btn('▲', 'px-2 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-bold disabled:opacity-30', async () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; draw(); });
+      const dn = btn('▼', 'px-2 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-bold disabled:opacity-30', async () => { [list[i + 1], list[i]] = [list[i], list[i + 1]]; draw(); });
+      up.disabled = i === 0; dn.disabled = i === list.length - 1;
+      row.append(inp, tag, up, dn);
+      if (f.kind === 'mgmt') row.append(h('span', 'text-[10px] text-slate-400 w-9 text-center', '필수'));
+      else row.append(btn('삭제', 'px-2 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold', async () => { list.splice(i, 1); draw(); }));
+      box.append(row);
+    });
+  };
+  const add = h('div', 'flex gap-2 mt-3');
+  const sel = h('select', 'flex-1 p-2 border border-slate-300 rounded-xl text-xs font-bold');
+  [['shared', '공유 선택형 (본원이 올리고 지점별로 골라 공유)'], ['branch', '지점 전용형 (각 지점이 자기 자료를 올림)']].forEach(([v, t]) => { const o = h('option', '', t); o.value = v; sel.append(o); });
+  add.append(sel, btn('+ 폴더 추가', 'bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold whitespace-nowrap', async () => {
+    const n = prompt('새 학습 폴더 이름:'); if (!n || !n.trim()) return;
+    list.push({ id: 'g' + Date.now().toString(36), name: n.trim(), kind: sel.value }); draw();
+  }));
+  const save = btn('저장', 'flex-1 bg-indigo-900 hover:bg-indigo-800 text-white font-bold py-3 rounded-xl', async () => {
+    if (list.some(f => !f.name.trim())) return alert('이름이 비어 있는 폴더가 있습니다.');
+    list.forEach(f => { f.name = f.name.trim(); });
+    const removed = FOLDERS.filter(f => !list.some(x => x.id === f.id));
+    if (removed.length && !confirm('삭제할 폴더: ' + removed.map(f => f.name).join(', ') + '\n\n폴더 안의 모든 자료(PDF·링크·HTML 코드 포함)가 영구 삭제되며 되돌릴 수 없습니다.\n(삭제 전에 백업을 받아 두세요) 계속할까요?')) return;
+    toast('저장 중...');
+    for (const f of removed) {
+      const items = await delQuery(db.collection('items').where('folder', '==', f.id));
+      for (const t of items) if (t.pdfPath) st.ref(t.pdfPath).delete().catch(() => {});
+      await delQuery(db.collection('pages').where('folder', '==', f.id));
+    }
+    await db.collection('config').doc('main').set({ folders: list.map(f => ({ id: f.id, name: f.name, kind: f.kind })) }, { merge: true });
+    applyFolders(list);
+    if (!FOLDERS.some(f => f.id === S.folder)) { S.folder = firstFolder(); S.folderId = null; }
+    close(); toast(''); buildSide(); setView('content');
+  });
+  const row2 = h('div', 'flex gap-2 pt-4'); row2.append(save, btn('취소', 'flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl', async () => close()));
+  card.append(h('h3', 'text-base font-bold text-slate-800 mb-1', '학습 폴더 편집'), h('p', 'text-xs text-slate-500 mb-3', '이름 수정 · ▲▼ 순서 변경 · 폴더 추가/삭제 후 [저장]을 누르세요. 모든 지점과 학생에게 적용됩니다.'), box, add, row2);
+  draw(); ov.append(card); document.body.append(ov);
 }
 function setView(v) {
   if (v === 'content' && S.folder === 'F' && !S.fFiles && S.me.role !== 'student') v = 'manage';
@@ -266,8 +349,9 @@ function setView(v) {
 }
 
 /* ===== 학습 자료 ===== */
-const branchScoped = () => S.folder === 'A' || S.folder === 'F';
-const sharedScoped = () => ['B', 'C', 'D'].includes(S.folder);
+const branchScoped = () => ['branch', 'mgmt'].includes(kindOf(S.folder));
+const sharedScoped = () => kindOf(S.folder) === 'shared';
+const isA = () => kindOf(S.folder) === 'branch';
 const inheritShared = a => (a && a.shared ? a.shared.filter(x => !(a.pathOnly || []).includes(x)) : []);
 const isEdit = () => S.me.role === 'super' || (S.me.role === 'sub' && branchScoped());
 const curBranch = () => S.me.role === 'super' ? S.viewBranch : S.me.branchId;
@@ -276,7 +360,7 @@ async function loadItems() {
   let q = db.collection('items').where('folder', '==', S.folder);
   if (branchScoped()) {
     q = q.where('branchId', '==', curBranch());
-    if (S.folder === 'A' && S.me.role === 'student') q = q.where('visible', '==', true);
+    if (isA() && S.me.role === 'student') q = q.where('visible', '==', true);
   }
   if (sharedScoped() && S.me.role !== 'super') q = q.where('shared', 'array-contains', S.me.branchId);
   S.items = (await q.get()).docs.map(d => ({ id: d.id, ...d.data() }));
@@ -284,7 +368,7 @@ async function loadItems() {
 async function renderContent() { toast('불러오는 중...'); if (S.folder === 'F') await ensureFFolders(); await loadItems(); toast(''); drawContent(); }
 
 function drawContent() {
-  const f = FOLDERS.find(x => x.id === S.folder), edit = isEdit();
+  const f = FOLDERS.find(x => x.id === S.folder) || FOLDERS[0], edit = isEdit();
   // 경로
   const path = []; let cur = S.folderId;
   while (cur) { const it = S.items.find(i => i.id === cur); if (!it) break; path.unshift(it); cur = it.parentId || null; }
@@ -294,13 +378,14 @@ function drawContent() {
   $('title').textContent = path.length ? path[path.length - 1].name : f.name;
 
   // 안내문
+  const sup = S.me.role === 'super';
   const notes = {
-    B: S.me.role === 'super' ? '본원 공용 자료입니다. 자료마다 "🔗 공유"로 보여 줄 지점을 고르세요. 공유하지 않은 지점에는 보이지 않습니다.' : '본원에서 우리 지점에 공유해 준 자료입니다. PDF 자료는 열어서 인쇄할 수 있습니다.',
-    A: S.me.role === 'student' ? '우리 지점에서 공개한 자료입니다.' : '우리 지점 전용 폴더입니다. 자료마다 학생 공개/비공개를 정할 수 있고, 새 자료는 비공개로 시작합니다.',
-    C: S.me.role === 'super' ? '수학 전용 폴더입니다. 자료마다 "🔗 공유"로 보여 줄 지점을 고르세요.' : '수학 자료 중 본원에서 우리 지점에 공유해 준 자료입니다.', D: S.me.role === 'super' ? '국어 전용 폴더입니다. 자료마다 "🔗 공유"로 보여 줄 지점을 고르세요.' : '국어 자료 중 본원에서 우리 지점에 공유해 준 자료입니다.', E: '전과목 통합 폴더입니다.',
-    F: '학원 관리 자료 파일입니다. 우리 지점 관리자와 본원 관리자만 볼 수 있고 학생에게는 보이지 않습니다. 링크나 파일(PDF·엑셀·워드·한글 등)을 올려 보관하세요.'
+    shared: sup ? '자료마다 "🔗 공유"로 보여 줄 지점을 고르세요. 공유하지 않은 지점에는 보이지 않습니다.' : '본원에서 우리 지점에 공유해 준 자료입니다. PDF 자료는 열어서 인쇄할 수 있습니다.',
+    branch: S.me.role === 'student' ? '우리 지점에서 공개한 자료입니다.' : '우리 지점 전용 폴더입니다. 자료마다 학생 공개/비공개를 정할 수 있고, 새 자료는 비공개로 시작합니다.',
+    all: '전과목 통합 폴더입니다.',
+    mgmt: '학원 관리 자료 파일입니다. 우리 지점 관리자와 본원 관리자만 볼 수 있고 학생에게는 보이지 않습니다. 링크나 파일(PDF·엑셀·워드·한글 등)을 올려 보관하세요.'
   };
-  $('note').textContent = '💡 ' + notes[S.folder];
+  $('note').textContent = '💡 ' + notes[f.kind];
 
   // 슈퍼관리자: A 폴더에서 지점 선택
   const bp = $('branch-pick'); bp.innerHTML = '';
@@ -350,7 +435,7 @@ function drawContent() {
     const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap justify-between items-center gap-3 font-bold text-slate-700 text-sm');
     const l = h('div', 'flex items-center gap-2.5 flex-grow min-w-0');
     l.append(h('span', 'text-xl', it.type === 'folder' ? '📂' : it.htmlPage ? '🧩' : it.pdfUrl ? '📄' : '🔗'), h('span', 'text-base break-all', it.name));
-    if (S.folder === 'A' && edit) l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (it.visible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'), it.visible ? '학생공개' : '비공개'));
+    if (isA() && edit) l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (it.visible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'), it.visible ? '학생공개' : '비공개'));
     if (sharedScoped() && S.me.role === 'super') { const n = (it.shared || []).length; l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (n ? 'bg-violet-100 text-violet-700' : 'bg-slate-200 text-slate-500'), n ? '공유 ' + n + '개 지점' : '미공유')); }
     if (it.type === 'folder') { l.classList.add('cursor-pointer'); l.onclick = () => { S.folderId = it.id; drawContent(); }; }
     row.append(l);
@@ -360,7 +445,7 @@ function drawContent() {
     if (it.htmlPage) r.append(btn('학습하기', B1, () => openHtml(it)));
     if (it.pdfUrl) r.append(btn(isPdf(it) ? '📄 PDF 열기·인쇄' : '📎 파일 열기', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', () => { startStudy(it); window.open(it.pdfUrl, '_blank', 'noopener'); }));
     if (edit) {
-      if (S.folder === 'A') r.append(btn(it.visible ? '🔒 비공개로' : '🔓 학생 공개', B2, async () => { await db.collection('items').doc(it.id).update({ visible: !it.visible }); it.visible = !it.visible; drawContent(); }));
+      if (isA()) r.append(btn(it.visible ? '🔒 비공개로' : '🔓 학생 공개', B2, async () => { await db.collection('items').doc(it.id).update({ visible: !it.visible }); it.visible = !it.visible; drawContent(); }));
       if (sharedScoped()) r.append(btn('🔗 공유', 'bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs px-2.5 py-2 rounded-xl font-bold', () => shareItem(it)));
       if (it.htmlPage) r.append(btn('🔄 코드 교체', B2, () => replaceHtml(it)));
       r.append(btn('✏️', B2, () => renameItem(it)), btn('🗑', B2, () => deleteItem(it)));
@@ -1065,7 +1150,7 @@ function wireDropTarget(el, parentId) {
 /* DND-END */
 
 function baseItem() {
-  return { folder: S.folder, parentId: S.folderId, tabId: S.tab, visible: S.folder !== 'A', createdAt: Date.now(), ...(branchScoped() ? { branchId: curBranch() } : {}), ...(sharedScoped() ? { shared: S.folderId ? inheritShared(S.items.find(i => i.id === S.folderId)) : [], pathOnly: [] } : {}) };
+  return { folder: S.folder, parentId: S.folderId, tabId: S.tab, visible: !isA(), createdAt: Date.now(), ...(branchScoped() ? { branchId: curBranch() } : {}), ...(sharedScoped() ? { shared: S.folderId ? inheritShared(S.items.find(i => i.id === S.folderId)) : [], pathOnly: [] } : {}) };
 }
 async function addItem(kind) {
   const name = prompt(kind === 'folder' ? '새 폴더 이름:' : '학습 자료 제목:'); if (!name || !name.trim()) return;
@@ -1495,12 +1580,11 @@ async function delQuery(q) {
   return docs.map(d => d.data());
 }
 async function delBranch(b) {
-  if (!confirm('"' + b.academyName + '" 지점을 삭제할까요?\n이 지점의 학생 계정, 지점 전용(A) 자료, 학습 이력, 학원관리(F) 데이터가 모두 삭제되며 되돌릴 수 없습니다.\n(삭제 전에 백업을 받아 두세요)')) return;
+  if (!confirm('"' + b.academyName + '" 지점을 삭제할까요?\n이 지점의 학생 계정, 지점 전용 자료, 학습 이력, 학원관리 데이터가 모두 삭제되며 되돌릴 수 없습니다.\n(삭제 전에 백업을 받아 두세요)')) return;
   if (prompt('확인을 위해 지점 아이디를 입력하세요: ' + b.loginId) !== b.loginId) return alert('아이디가 일치하지 않아 취소했습니다.');
   toast('삭제 중...'); if (b.logoPath) st.ref(b.logoPath).delete().catch(() => {});
-  const items = await delQuery(db.collection('items').where('folder', '==', 'A').where('branchId', '==', b.id));
-  const itemsF = await delQuery(db.collection('items').where('folder', '==', 'F').where('branchId', '==', b.id));
-  for (const t of items.concat(itemsF)) if (t.pdfPath) st.ref(t.pdfPath).delete().catch(() => {});
+  const items = await delQuery(db.collection('items').where('branchId', '==', b.id));
+  for (const t of items) if (t.pdfPath) st.ref(t.pdfPath).delete().catch(() => {});
   await delQuery(db.collection('users').where('branchId', '==', b.id).where('role', '==', 'student'));
   await delQuery(db.collection('history').where('branchId', '==', b.id));
   await delQuery(db.collection('mg').where('branchId', '==', b.id));
