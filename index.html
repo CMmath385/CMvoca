@@ -1472,10 +1472,64 @@ async function renderBranches() {
   S.branches.forEach(b => {
     const c = h('div', 'p-5 bg-slate-50 border border-slate-200 rounded-2xl');
     const dl = daysLeft(b.endDate), per = h('div', 'mt-2 text-xs font-bold px-3 py-2 rounded-xl border ' + (dl !== null && dl < 0 ? 'bg-rose-50 text-rose-600 border-rose-200' : dl !== null && dl <= 30 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-white text-slate-600 border-slate-200'), '📅 사용기간: ' + (dl === null ? '무제한' : '~ ' + b.endDate + (dl < 0 ? ' (만료됨)' : dl === 0 ? ' (오늘까지)' : ' (' + dl + '일 남음)')));
-    c.append(h('div', 'font-bold text-slate-800 text-lg mb-2', b.academyName), h('div', 'text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200', '🆔 아이디: ' + b.loginId), per, btn('📅 사용기간 변경', 'mt-2 w-full text-indigo-600 hover:bg-indigo-50 text-xs py-2 rounded-xl font-bold border border-indigo-200', async () => { const e = askEndDate(b.endDate || '', false); if (e === null) return; await db.collection('branches').doc(b.id).update({ endDate: e }); await renderBranches(); }), btn('지점 삭제', 'mt-3 w-full text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200', () => delBranch(b)));
+    c.append(h('div', 'font-bold text-slate-800 text-lg mb-2', b.academyName), h('div', 'text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200', '🆔 아이디: ' + b.loginId), per, btn('📅 사용기간 변경', 'mt-2 w-full text-indigo-600 hover:bg-indigo-50 text-xs py-2 rounded-xl font-bold border border-indigo-200', async () => { const e = askEndDate(b.endDate || '', false); if (e === null) return; await db.collection('branches').doc(b.id).update({ endDate: e }); await renderBranches(); }), btn('🔑 아이디·비밀번호 변경', 'mt-2 w-full text-emerald-700 hover:bg-emerald-50 text-xs py-2 rounded-xl font-bold border border-emerald-200', async () => changeBranchLogin(b)), btn('지점 삭제', 'mt-3 w-full text-rose-500 hover:bg-rose-50 text-xs py-2 rounded-xl font-bold border border-rose-200', () => delBranch(b)));
     grid.append(c);
   });
   v.append(top, grid);
+}
+/* ===== 지점 아이디·비밀번호 변경 (최고관리자 전용) =====
+   Firebase 인증은 브라우저에서 "다른 계정"을 직접 바꿀 수 없어서, 보조 앱(auth2)으로 그 지점 계정에
+   현재 비밀번호로 잠깐 로그인한 뒤 바꿉니다. 지점 계정 번호(uid)는 그대로라 지점의 자료·학생·기록은 영향이 없습니다. */
+async function changeBranchLogin(b) {
+  if (!S.me || S.me.role !== 'super') return;
+  const oldId = b.loginId || '';
+  const curPw = prompt('[' + (b.academyName || oldId) + '] 지점의 현재 비밀번호를 입력하세요.\n(지점 계정 확인용 — 지점 등록 때 정한 비밀번호)');
+  if (curPw === null) return;
+  if (!curPw) return alert('현재 비밀번호를 입력해야 변경할 수 있습니다.');
+  const idIn = prompt('새 아이디 (영문 소문자·숫자·._- 조합 3~30자)\n아이디를 바꾸지 않으려면 그대로 두고 확인을 누르세요.', oldId);
+  if (idIn === null) return;
+  const newId = idIn.trim().toLowerCase();
+  if (!/^[a-z0-9._-]{3,30}$/.test(newId)) return alert('아이디는 영문 소문자·숫자·._- 조합 3~30자로 입력하세요.');
+  if (newId === ADMIN_ID) return alert('사용할 수 없는 아이디입니다.');
+  const newPw = prompt('새 비밀번호 (6자리 이상)\n비밀번호를 바꾸지 않으려면 비워 두고 확인을 누르세요.', '');
+  if (newPw === null) return;
+  if (newPw && newPw.length < 6) return alert('비밀번호는 6자리 이상이어야 합니다.');
+  const idCh = newId !== oldId, pwCh = !!newPw;
+  if (!idCh && !pwCh) return alert('바뀐 내용이 없습니다.');
+  if (!confirm('[' + (b.academyName || oldId) + '] 지점 계정을 변경할까요?\n\n' + (idCh ? '아이디: ' + oldId + ' → ' + newId + '\n' : '') + (pwCh ? '비밀번호: 새 비밀번호로 변경\n' : '') + '\n지점에서 접속 중이었다면 새 정보로 다시 로그인해야 합니다.')) return;
+  toast('지점 계정 확인 중...');
+  let u, idDone = false;
+  try { u = (await auth2.signInWithEmailAndPassword(oldId + DOMAIN, curPw)).user; }
+  catch (e) {
+    toast(''); await auth2.signOut().catch(() => {});
+    const bad = ['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/user-not-found'].includes(e.code);
+    return alert(bad ? '현재 비밀번호가 맞지 않습니다.' : e.code === 'auth/too-many-requests' ? '시도가 너무 많습니다. 잠시 후 다시 시도하세요.' : '지점 계정 확인 실패: ' + (e.code || e.message));
+  }
+  try {
+    if (u.uid !== b.id) throw new Error('지점 계정 정보가 일치하지 않습니다. (계정 번호 불일치)');
+    if (idCh) {
+      toast('아이디 변경 중...');
+      try { await u.updateEmail(newId + DOMAIN); }
+      catch (e) {
+        if (e.code === 'auth/email-already-in-use') throw new Error('이미 사용 중인 아이디입니다: ' + newId);
+        if (e.code === 'auth/operation-not-allowed') throw new Error('Firebase 설정 때문에 아이디를 바꿀 수 없습니다.\nFirebase 콘솔 → Authentication → 설정 → 사용자 작업에서\n"이메일 열거 보호"를 끄고 다시 시도하세요. (비밀번호만 바꾸는 것은 이 설정과 상관없이 됩니다)');
+        throw e;
+      }
+      idDone = true;
+      const bt = db.batch();
+      bt.update(db.collection('users').doc(b.id), { loginId: newId });
+      bt.update(db.collection('branches').doc(b.id), { loginId: newId });
+      await bt.commit();
+    }
+    if (pwCh) { toast('비밀번호 변경 중...'); await u.updatePassword(newPw); }
+  } catch (e) {
+    toast(''); await auth2.signOut().catch(() => {}); await renderBranches();
+    return alert('변경하지 못했습니다.\n' + (e.message || e.code) + (idDone ? '\n\n※ 아이디는 ' + newId + '(으)로 이미 바뀌었습니다. 비밀번호는 바뀌지 않았습니다.' : ''));
+  }
+  await auth2.signOut().catch(() => {});
+  toast('');
+  alert('변경되었습니다.\n\n아이디: ' + newId + (pwCh ? '\n비밀번호: 새 비밀번호로 변경됨' : '\n비밀번호: 그대로') + '\n\n지점에 새 로그인 정보를 알려 주세요.');
+  await renderBranches();
 }
 function askEndDate(cur, isNew) {
   const d = prompt('사용 종료일을 입력하세요. (예: ' + dayOf(Date.now() + 365 * 86400000) + ')\n비워 두면 사용기간 제한이 없습니다.' + (isNew ? '' : '\n현재: ' + (cur || '무제한')), cur || '');
