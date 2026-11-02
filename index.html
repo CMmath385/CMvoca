@@ -84,6 +84,11 @@ body{font-family:'Pretendard',sans-serif}
 
       <section id="view-import" class="hidden">
         <h2 class="text-xl font-bold text-slate-800 mb-4">백업 · 가져오기</h2>
+        <div class="mb-8 p-4 rounded-2xl border border-rose-200 bg-rose-50 max-w-xl">
+          <h3 class="text-sm font-bold text-rose-800 mb-1">📦 CM 교재 한꺼번에 올리기</h3>
+          <p class="text-xs text-slate-600 mb-3">교재 묶음 파일(<b>…_CMVOCA등록.json</b>)을 고르면 폴더 만들기 · 앱 학습 HTML 등록 · 교재 QR 코드 연결 · 지점 공유를 한 번에 합니다. 같은 파일을 다시 올리면 새 내용으로 덮어씁니다.</p>
+          <input type="file" id="bundle-file" accept=".json,application/json" class="text-xs">
+        </div>
         <button onclick="safe(exportData)" class="mb-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-md transition">📥 전체 데이터 JSON 백업 다운로드</button>
         <h3 class="text-sm font-bold text-slate-700 mb-2">백업 파일 가져오기</h3>
         <p class="text-xs text-slate-600 mb-4 max-w-xl">이 화면에서 받은 새 백업 JSON을 올리면 자료(폴더·링크·PDF 정보)와 메뉴가 복원됩니다. 이전 버전의 백업 JSON(academy_platform_backup.json) 또는 예전 사이트의 index.html 파일을 올리면, 기존 카테고리가 B 폴더(본원 공용)의 최상위 폴더로 옮겨집니다. 같은 파일을 다시 올려도 중복되지 않고 덮어씁니다.</p>
@@ -1698,6 +1703,66 @@ async function seedMaterials() {
   alert('예전 사이트의 학습 자료 ' + ops.length + '개가 B 폴더에 등록되었습니다.');
 }
 /* SEED-END */
+
+/* ===== CM 교재 묶음 올리기 (본원 전용) =====
+   묶음 파일: { cmBundle: 1, title, folder: 'B', folders: [{id, name}], items: [{code, name, html}] }
+   폴더·자료 번호는 고정 코드라 다시 올리면 덮어씀 (중복 없음). 자료 번호 = 교재 QR 코드 */
+async function importBundle(file) {
+  if (S.me.role !== 'super') return alert('본원 관리자만 사용할 수 있습니다.');
+  let b; try { b = JSON.parse(await file.text()); } catch (_) { return alert('교재 묶음 파일(JSON)이 아닙니다.'); }
+  const folder = String(b.folder || 'B');
+  if (b.cmBundle !== 1 || !Array.isArray(b.items) || !b.items.length || !Array.isArray(b.folders) || !b.folders.length) return alert('CM 교재 묶음 파일이 아닙니다.');
+  if (!FOLDERS.some(f => f.id === folder && f.kind !== 'mgmt')) return alert('묶음 파일의 폴더(' + folder + ')가 CMVOCA에 없습니다.');
+  for (const f of b.folders) if (!okCode(normCode(f.id)) || !String(f.name || '').trim()) return alert('묶음 파일의 폴더 정보가 올바르지 않습니다.');
+  for (const it of b.items) {
+    if (!okCode(normCode(it.code)) || !String(it.name || '').trim() || typeof it.html !== 'string' || !/<html|<!doctype/i.test(it.html)) return alert('묶음 파일의 자료 정보가 올바르지 않습니다: ' + (it.code || it.name || ''));
+    if (new Blob([it.html]).size > 900 * 1024) return alert('자료가 너무 큽니다(900KB 초과): ' + it.code);
+  }
+  await loadBranches();
+  // 다시 올리는 경우: 처음 올린 탭을 기본으로
+  let prevTab = null; try { const d = await db.collection('items').doc(normCode(b.items[0].code)).get(); if (d.exists && !d.data().deleted) prevTab = d.data().tabId || null; } catch (_) {}
+  const opt = await bundleDialog(b, folder, prevTab); if (!opt) return;
+  toast('교재 올리는 중...');
+  const union = async ref => { try { const d = await ref.get(); return d.exists && !d.data().deleted ? (d.data().shared || []) : []; } catch (_) { return []; } };
+  let parent = null;
+  for (const f of b.folders) {
+    const id = normCode(f.id), ref = db.collection('items').doc(id), old = await union(ref);
+    await ref.set({ folder, type: 'folder', name: String(f.name).trim(), parentId: parent, tabId: opt.tab, visible: true, shared: [...new Set(old.concat(opt.shared))], pathOnly: [], createdAt: Date.now() });
+    parent = id;
+  }
+  const done = [];
+  for (let i = 0; i < b.items.length; i++) {
+    const it = b.items[i], id = normCode(it.code), ref = db.collection('items').doc(id), old = await union(ref);
+    await db.collection('pages').doc(id).set({ html: it.html, name: String(it.name).trim(), folder, branchId: 'main', createdAt: Date.now() });
+    await ref.set({ folder, type: 'file', htmlPage: true, name: String(it.name).trim(), parentId: parent, tabId: opt.tab, visible: true, shared: [...new Set(old.concat(opt.shared))], pathOnly: [], order: i, createdAt: Date.now() });
+    done.push(id);
+  }
+  toast('');
+  alert('교재를 올렸습니다: ' + (b.title || '') + '\n자료 ' + done.length + '개 · 공유 지점 ' + opt.shared.length + '곳 · 탭 "' + ((TABS.find(t => t[0] === opt.tab) || [, opt.tab])[1]) + '"\n\nQR 코드: ' + done[0] + (done.length > 1 ? ' … ' + done[done.length - 1] : ''));
+}
+function bundleDialog(b, folder, prevTab) {
+  return new Promise(res => {
+    const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4'), card = h('div', 'bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-full overflow-y-auto');
+    const fname = (FOLDERS.find(f => f.id === folder) || {}).name || folder;
+    card.append(h('h3', 'text-lg font-bold text-slate-800 mb-1', '📦 ' + (b.title || 'CM 교재')), h('p', 'text-xs text-slate-500 mb-3', fname + ' > ' + b.folders.map(f => f.name).join(' > ') + ' 폴더에 자료 ' + b.items.length + '개를 올립니다.'));
+    const ul = h('div', 'text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 space-y-1');
+    b.items.forEach(it => ul.append(h('div', '', '🧩 ' + it.name + '  ·  ' + normCode(it.code)))); card.append(ul);
+    card.append(h('label', 'block text-xs font-bold text-slate-600 mb-1', '보여 줄 탭'));
+    const sel = h('select', 'w-full p-2 border border-slate-300 rounded-xl text-sm font-bold mb-3');
+    TABS.forEach(([id, name]) => { const o = h('option', '', name); o.value = id; sel.append(o); });
+    sel.value = [prevTab, b.tab, S.tab].find(t => TABS.some(x => x[0] === t)) || TABS[0][0]; card.append(sel);
+    card.append(h('label', 'block text-xs font-bold text-slate-600 mb-1', '공유할 지점'));
+    const boxes = [], list = h('div', 'border border-slate-200 rounded-xl p-2 mb-3');
+    if (!S.branches.length) list.append(h('div', 'text-xs text-slate-400 p-2', '등록된 지점이 없습니다. 본원에만 올라갑니다.'));
+    S.branches.forEach(br => { const l = h('label', 'flex items-center gap-2 py-1.5 text-sm font-bold text-slate-700'), c = h('input'); c.type = 'checkbox'; c.checked = true; boxes.push([c, br.id]); l.append(c, document.createTextNode(br.academyName || br.id)); list.append(l); });
+    card.append(list);
+    const row = h('div', 'flex gap-2');
+    row.append(btn('올리기', 'flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl', async () => { ov.remove(); res({ tab: sel.value, shared: boxes.filter(([c]) => c.checked).map(([, id]) => id) }); }),
+      btn('취소', 'flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl', async () => { ov.remove(); res(null); }));
+    card.append(row); ov.append(card); document.body.append(ov);
+  });
+}
+$('bundle-file').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) safe(() => importBundle(f)); };
 
 /* ===== 기존 데이터 가져오기 ===== */
 function grabJs(txt, key, open, close) {
