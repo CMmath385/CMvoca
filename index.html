@@ -1785,36 +1785,61 @@ async function renderHistory() {
   const names = [...new Set(rec.map(r => r.studentName).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
   const flt = names.includes(S.hFilter) ? S.hFilter : ''; S.hFilter = flt;
   if (flt) rec = rec.filter(r => r.studentName === flt);
+  // 날짜 지정 (기본: 오늘, '전체 기간' 선택 가능) · 보기 방식 (기본: 학생 이름순)
+  if (S.hDate === undefined) S.hDate = today();
+  if (!S.hSort) S.hSort = 'name';
+  const recDay = r => r.day || dayOf(r.kind === 'study' ? r.startTs || r.ts : r.ts);
+  if (S.hDate) rec = rec.filter(r => recDay(r) === S.hDate);
+  const byName = (a, b) => (a.studentName || '').localeCompare(b.studentName || '', 'ko') || ((a.startTs || a.ts) - (b.startTs || b.ts));
+  if (S.hSort === 'name') rec.sort(byName);
   const v = $('view-history'); v.innerHTML = '';
   const top = h('div', 'flex flex-wrap justify-between items-center gap-3 mb-2 pb-4 border-b border-slate-100');
   const left = h('div', 'flex flex-wrap items-center gap-3');
   left.append(h('h2', 'text-xl font-bold text-slate-800', '학생 학습 이력'));
   const sel = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold');
   [''].concat(names).forEach(n => { const o = h('option', '', n || '전체 학생'); o.value = n; sel.append(o); });
-  sel.value = flt; sel.onchange = () => { S.hFilter = sel.value; safe(renderHistory); }; left.append(sel);
+  sel.value = flt; sel.onchange = () => { S.hFilter = sel.value; safe(renderHistory); };
+  const di = h('input', 'p-2 border border-slate-300 rounded-xl text-xs font-bold'); di.type = 'date'; di.value = S.hDate || ''; di.disabled = !S.hDate;
+  di.onchange = () => { if (di.value) { S.hDate = di.value; safe(renderHistory); } };
+  const allL = h('label', 'flex items-center gap-1 text-xs font-bold text-slate-600 cursor-pointer'), allC = h('input'); allC.type = 'checkbox'; allC.checked = !S.hDate;
+  allC.onchange = () => { S.hDate = allC.checked ? '' : today(); safe(renderHistory); }; allL.append(allC, document.createTextNode('전체 기간'));
+  const srt = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold');
+  [['name', '학생 이름순'], ['time', '최신순']].forEach(([k, t]) => { const o = h('option', '', t); o.value = k; srt.append(o); });
+  srt.value = S.hSort; srt.onchange = () => { S.hSort = srt.value; safe(renderHistory); };
+  left.append(di, btn('오늘', B2, async () => { S.hDate = today(); await renderHistory(); }), allL, sel, srt);
   const heads = ['날짜', '학생'].concat(sup ? ['지점'] : []).concat(['학습 자료', '시작', '종료', '학습 시간', '문항(맞힘/전체)', '점수(100점)', '상태']);
   const cells = rec.map(r => [r, histCells(r)]);
   const plain = cells.map(([r, c]) => [c.date, r.studentName || ''].concat(sup ? [branchName(r.branchId)] : []).concat([r.title || '', c.start, c.end, c.dur, c.qs, c.score, c.state]));
   const right = h('div', 'flex flex-wrap gap-2');
-  right.append(exportBar('학생 학습 이력' + (flt ? '_' + flt : ''), heads, plain, flt ? flt + ' 학생' : '전체 학생'), btn('+ 점수 입력', B1, addScore));
+  right.append(exportBar('학생 학습 이력_' + (S.hDate || '전체기간') + (flt ? '_' + flt : ''), heads, plain, (S.hDate || '전체 기간') + ' · ' + (flt ? flt + ' 학생' : '전체 학생') + ' · ' + (S.hSort === 'name' ? '학생 이름순' : '최신순')), btn('+ 점수 입력', B1, addScore));
   top.append(left, right);
   v.append(top);
   // 요약: 건수 · 평균 점수 · 총 학습 시간
   const sc = rec.filter(r => r.score != null), secs = rec.reduce((a, r) => a + (r.durationSec || 0), 0);
   v.append(h('div', 'text-xs font-bold bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-xl px-3 py-2 mb-3', '학습 ' + rec.length + '건 · 완료 ' + cells.filter(([, c]) => c.done).length + '건 · 평균 점수 ' + (sc.length ? Math.round(sc.reduce((a, r) => a + r.score, 0) / sc.length) + '점' : '-') + ' · 총 학습 시간 ' + fmtD(secs)));
   v.append(h('p', 'text-xs text-slate-400 mb-3', '학습 이력은 30일 동안 보관되고 이후 자동 삭제됩니다. 학생이 자료를 열면 시작 시각이, "학습 완료 저장"을 누르면 종료 시각·학습 시간·문항·점수가 기록됩니다.'));
-  const rows = cells.map(([r, c]) => {
+  const rowOf = ([r, c]) => {
     const state = pill(c.state, !c.done ? 'bg-amber-100 text-amber-700' : r.kind === 'study' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600');
     const sc2 = h('span', 'font-bold ' + (r.score == null ? 'text-slate-400' : r.score >= 90 ? 'text-emerald-600' : r.score >= 70 ? 'text-indigo-700' : 'text-rose-600'), c.score);
     const qs = r.wrongCount ? [c.qs, '오답 ' + r.wrongCount + '개' + (r.wrong && r.wrong.length ? ' · ' + [...new Set(r.wrong)].slice(0, 5).join(', ') : '')] : c.qs;
     return [h('span', 'whitespace-nowrap text-slate-600', c.date), h('span', 'font-bold text-slate-800 whitespace-nowrap', r.studentName || '-')]
       .concat(sup ? [h('span', 'whitespace-nowrap text-slate-500', branchName(r.branchId))] : [])
       .concat([h('span', 'text-slate-800', r.title || '-'), h('span', 'whitespace-nowrap', c.start), h('span', 'whitespace-nowrap', c.end), h('span', 'whitespace-nowrap', c.dur), qs, sc2, state]);
-  });
-  v.append(mkTable(heads, rows, i => lnk('삭제', 'text-rose-600', async () => {
-    const [r] = cells[i]; if (!confirm('이 학습 기록을 삭제할까요?\n' + (r.studentName || '') + ' · ' + (r.title || ''))) return;
+  };
+  const delAct = list => i => lnk('삭제', 'text-rose-600', async () => {
+    const [r] = list[i]; if (!confirm('이 학습 기록을 삭제할까요?\n' + (r.studentName || '') + ' · ' + (r.title || ''))) return;
     await db.collection('history').doc(r.id).delete(); await renderHistory();
-  })));
+  });
+  if (!cells.length) { v.append(h('div', 'text-center py-12 text-slate-400 text-sm bg-white border border-slate-200 rounded-2xl', (S.hDate ? S.hDate + '에는 ' : '') + '학습 이력이 없습니다. 다른 날짜를 고르거나 "전체 기간"을 선택해 보세요.')); return; }
+  if (S.hSort !== 'name') { v.append(mkTable(heads, cells.map(rowOf), delAct(cells))); return; }
+  // 학생 이름순: 학생별 묶음 (이름 가나다순, 학생 안에서는 시작 시각순)
+  const groups = []; cells.forEach(x => { const n = x[0].studentName || '(이름 없음)'; const g = groups.find(g => g.n === n); g ? g.list.push(x) : groups.push({ n, list: [x] }); });
+  groups.forEach(g => {
+    const scs = g.list.filter(([r]) => r.score != null), sec = g.list.reduce((a, [r]) => a + (r.durationSec || 0), 0);
+    const hd = h('div', 'flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-5 mb-2');
+    hd.append(h('h3', 'text-base font-bold text-slate-800', '👤 ' + g.n), h('span', 'text-xs font-bold text-slate-500', g.list.length + '건 · 평균 ' + (scs.length ? Math.round(scs.reduce((a, [r]) => a + r.score, 0) / scs.length) + '점' : '-') + ' · 학습 시간 ' + fmtD(sec)));
+    v.append(hd, mkTable(heads, g.list.map(rowOf), delAct(g.list)));
+  });
 }
 async function addScore() {
   const bid = S.me.role === 'super' ? S.stuBranch : S.me.uid;
