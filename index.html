@@ -98,7 +98,13 @@ body{font-family:'Pretendard',sans-serif}
   <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
     <h3 class="text-lg font-bold text-slate-800 mb-1">학습을 마쳤나요?</h3>
     <p id="study-info" class="text-xs text-slate-500 mb-4"></p>
-    <label class="block text-xs font-bold text-slate-600 mb-1.5">학습 후 화면에 나온 점수 (0~100, 없으면 비워 두세요)</label>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <div><label class="block text-xs font-bold text-slate-600 mb-1.5">전체 문항 수</label>
+        <input id="study-total" type="number" min="1" inputmode="numeric" placeholder="예) 20" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold"></div>
+      <div><label class="block text-xs font-bold text-slate-600 mb-1.5">맞힌 문항 수</label>
+        <input id="study-correct" type="number" min="0" inputmode="numeric" placeholder="예) 17" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold"></div>
+    </div>
+    <label class="block text-xs font-bold text-slate-600 mb-1.5">100점 만점 점수 <span class="font-medium text-slate-400">(문항 수를 넣으면 자동 계산 · 없으면 비워 두세요)</span></label>
     <input id="study-score" type="number" min="0" max="100" inputmode="numeric" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold mb-4">
     <div class="flex gap-2">
       <button onclick="safe(saveStudy)" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-3 rounded-xl">학습 완료 저장</button>
@@ -1243,8 +1249,9 @@ function openItem(it) {
   if (it.pdfUrl) { startStudy(it); window.open(it.pdfUrl, '_blank', 'noopener'); }
 }
 async function autoFinish() {
-  if (!pend) return; const p = pend, sc = S.autoScore; pend = null; S.autoScore = null; sessionStorage.removeItem('pend');
-  try { await db.collection('history').doc(p.id).update({ endTs: Date.now(), durationSec: Math.round((Date.now() - p.start) / 1000), score: sc != null ? sc : null, status: 'done' }); } catch (_) {}
+  if (!pend) return; const p = pend, sc = S.autoScore, tot = S.autoTotal, cor = S.autoCorrect; pend = null; S.autoScore = S.autoTotal = S.autoCorrect = null; sessionStorage.removeItem('pend');
+  try { await db.collection('history').doc(p.id).update({ endTs: Date.now(), durationSec: Math.round((Date.now() - p.start) / 1000), score: sc != null ? sc : null, status: 'done', ...(tot ? { total: tot } : {}) }); } catch (_) {}
+  saveCorrect(p.id, cor);
 }
 window.addEventListener('message', e => {
   const d = e.data; if (!d || typeof d !== 'object' || !d.cmResult || !S.viewFrame || e.source !== S.viewFrame.contentWindow) return;
@@ -1252,9 +1259,16 @@ window.addEventListener('message', e => {
   if (typeof r.score === 'number') sc = r.score; else if (r.total > 0 && typeof r.correct === 'number') sc = r.correct / r.total * 100;
   if (sc != null) sc = Math.max(0, Math.min(100, Math.round(sc)));
   S.autoScore = sc;
+  S.autoTotal = Number(r.total) > 0 ? Math.round(Number(r.total)) : null;
+  S.autoCorrect = typeof r.correct === 'number' && r.correct >= 0 ? Math.round(r.correct) : null;
   const wrong = (Array.isArray(r.wrong) ? r.wrong : []).map(x => String((x && x.type) || x).slice(0, 30)).slice(0, 60);
-  if (pend && S.me && S.me.role === 'student') db.collection('history').doc(pend.id).update({ ...(sc != null ? { score: sc } : {}), wrong, wrongCount: wrong.length, total: Number(r.total) || null }).catch(() => {});
+  if (pend && S.me && S.me.role === 'student') {
+    db.collection('history').doc(pend.id).update({ ...(sc != null ? { score: sc } : {}), wrong, wrongCount: wrong.length, total: Number(r.total) || null }).catch(() => {});
+    if (S.autoCorrect != null) saveCorrect(pend.id, S.autoCorrect);
+  }
 });
+/* 맞힌 문항 수 저장 — 따로 저장해서, Firestore 규칙에 correct가 아직 없어도 다른 학습 기록은 그대로 저장됨 */
+function saveCorrect(id, correct) { if (id && correct != null) db.collection('history').doc(id).update({ correct }).catch(() => {}); }
 S.zoom = 1;
 async function openHtml(it) {
   toast('불러오는 중...');
@@ -1714,36 +1728,52 @@ function showStudyModal() {
   if (!$('yt-modal').classList.contains('hidden')) return;
   $('study-info').textContent = '"' + pend.title + '" · 시작 ' + fmtT(pend.start) + ' · 경과 ' + fmtD(Math.round((Date.now() - pend.start) / 1000));
   $('study-score').value = S.autoScore != null ? S.autoScore : '';
+  $('study-total').value = S.autoTotal != null ? S.autoTotal : '';
+  $('study-correct').value = S.autoCorrect != null ? S.autoCorrect : '';
   $('study-modal').classList.remove('hidden'); $('study-modal').classList.add('flex');
 }
+function calcStudyScore() {
+  const t = parseInt($('study-total').value, 10), c = parseInt($('study-correct').value, 10);
+  if (t > 0 && c >= 0 && c <= t) $('study-score').value = Math.round(c / t * 100);
+}
+['study-total', 'study-correct'].forEach(id => $(id).addEventListener('input', calcStudyScore));
 function hideStudyModal() { $('study-modal').classList.add('hidden'); $('study-modal').classList.remove('flex'); }
 async function saveStudy() {
   if (!pend) return hideStudyModal();
+  const tv = $('study-total').value.trim(), cv = $('study-correct').value.trim();
+  let total = null, correct = null;
+  if (tv !== '' || cv !== '') {
+    total = parseInt(tv, 10); correct = parseInt(cv, 10);
+    if (!(total > 0) || !(correct >= 0) || correct > total) return alert('전체 문항 수와 맞힌 문항 수를 함께 올바르게 입력하세요.\n(맞힌 문항 수는 전체 문항 수보다 클 수 없습니다)');
+  }
   const sv = $('study-score').value.trim(); let score = null;
-  if (sv !== '') { score = Number(sv); if (!(score >= 0 && score <= 100)) return alert('점수는 0~100 사이로 입력하세요.'); }
-  const end = Date.now();
-  await db.collection('history').doc(pend.id).update({ endTs: end, durationSec: Math.round((end - pend.start) / 1000), score, status: 'done' });
-  pend = null; S.autoScore = null; sessionStorage.removeItem('pend'); hideStudyModal();
+  if (total) score = Math.round(correct / total * 100);
+  else if (sv !== '') { score = Number(sv); if (!(score >= 0 && score <= 100)) return alert('점수는 0~100 사이로 입력하세요.'); score = Math.round(score); }
+  const end = Date.now(), id = pend.id;
+  await db.collection('history').doc(id).update({ endTs: end, durationSec: Math.round((end - pend.start) / 1000), score, status: 'done', ...(total ? { total } : {}) });
+  saveCorrect(id, correct);
+  pend = null; S.autoScore = S.autoTotal = S.autoCorrect = null; sessionStorage.removeItem('pend'); hideStudyModal();
   toast('학습 기록이 저장되었습니다.'); setTimeout(() => toast(''), 2000);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) showStudyModal(); });
 
-/* 학습 이력 보기 (지점장·어드민) */
-function histRow(r, sup) {
-  const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl mb-2');
-  const hd = h('div', 'flex flex-wrap items-center gap-2 mb-1');
-  hd.append(h('span', 'font-bold text-slate-800 text-base', r.studentName || ''));
-  if (r.kind === 'study') {
-    const done = r.status === 'done';
-    hd.append(h('span', 'text-xs px-2 py-0.5 rounded-full font-bold ' + (done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'), done ? '학습 완료' : '완료 기록 없음'));
-    if (done) hd.append(h('span', 'text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold', r.score != null ? r.score + '점' : '점수 미입력'));
-  } else if (r.kind === 'score') hd.append(h('span', 'text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold', r.score + '점'));
-  if (sup) hd.append(h('span', 'text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold', branchName(r.branchId)));
-  row.append(hd, h('div', 'text-sm text-slate-600 font-medium', r.kind === 'score' ? r.title + ' (' + r.correct + ' / ' + r.total + ' 정답)' : '📖 ' + r.title));
-  if (r.wrongCount) row.append(h('div', 'text-xs text-rose-600 font-bold mt-1', '❌ 오답 ' + r.wrongCount + '개' + (r.wrong && r.wrong.length ? ' · ' + [...new Set(r.wrong)].join(', ') : '')));
-  const t = r.kind === 'study' ? '시작 ' + fmtT(r.startTs) + (r.endTs ? ' → 완료 ' + fmtT(r.endTs) + ' (소요 ' + fmtD(r.durationSec) + ')' : '') : fmtT(r.ts) + ' 기록';
-  row.append(h('div', 'text-xs text-slate-400 mt-1', t));
-  return row;
+/* 학습 이력 보기 (지점장·어드민) — 표 형태 */
+const fmtDT = ts => { const d = new Date(ts); return dayOf(ts) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+const fmtHM = ts => { const d = new Date(ts); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0'); };
+// 맞힌 문항: 저장된 값, 없으면 점수·전체 문항으로 역산 (전체 100문항 이하에서는 정확히 같음)
+const histCorrect = r => r.correct != null ? r.correct : (r.total > 0 && r.total <= 100 && r.score != null ? Math.round(r.score * r.total / 100) : null);
+function histCells(r) {
+  const study = r.kind === 'study', done = !study || r.status === 'done', c = histCorrect(r);
+  return {
+    date: fmtDT(study ? r.startTs || r.ts : r.ts),
+    start: study && r.startTs ? fmtHM(r.startTs) : '-',
+    end: study ? (r.endTs ? fmtHM(r.endTs) : '-') : fmtHM(r.ts),
+    dur: study && r.durationSec ? fmtD(r.durationSec) : '-',
+    qs: r.total > 0 ? (c != null ? c + ' / ' + r.total : '- / ' + r.total) : '-',
+    score: r.score != null ? r.score + '점' : '-',
+    state: !study ? '점수 입력' : done ? '완료' : '학습 중·완료 기록 없음',
+    done,
+  };
 }
 async function renderHistory() {
   const sup = S.me.role === 'super', cut = Date.now() - KEEP;
@@ -1751,7 +1781,7 @@ async function renderHistory() {
   const old = snap.docs.filter(d => d.data().ts < cut);
   if (sup) { try { (await db.collection('history').where('ts', '<', cut).limit(400).get()).docs.forEach(d => { if (!old.some(o => o.id === d.id)) old.push(d); }); } catch (_) {} }
   for (let i = 0; i < old.length; i += 400) { const b = db.batch(); old.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit().catch(() => {}); }
-  let rec = snap.docs.filter(d => d.data().ts >= cut).map(d => d.data()).sort((a, b) => b.ts - a.ts);
+  let rec = snap.docs.filter(d => d.data().ts >= cut).map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.ts - a.ts);
   const names = [...new Set(rec.map(r => r.studentName).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
   const flt = names.includes(S.hFilter) ? S.hFilter : ''; S.hFilter = flt;
   if (flt) rec = rec.filter(r => r.studentName === flt);
@@ -1762,14 +1792,29 @@ async function renderHistory() {
   const sel = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold');
   [''].concat(names).forEach(n => { const o = h('option', '', n || '전체 학생'); o.value = n; sel.append(o); });
   sel.value = flt; sel.onchange = () => { S.hFilter = sel.value; safe(renderHistory); }; left.append(sel);
-  top.append(left, btn('+ 점수 입력', B1, addScore));
-  v.append(top, h('p', 'text-xs text-slate-400 mb-4', '학습 이력은 30일 동안 보관되고 이후 자동 삭제됩니다.'));
-  if (!rec.length) v.append(h('div', 'text-center py-12 text-slate-400 text-sm', '학습 이력이 없습니다. 학생이 자료를 열면 시작 시각이 자동으로 기록됩니다.'));
-  const days = {}; rec.forEach(r => { (days[r.day || dayOf(r.ts)] ||= []).push(r); });
-  Object.keys(days).sort().reverse().forEach(day => {
-    v.append(h('h3', 'text-sm font-bold text-indigo-700 mt-5 mb-2', day + ' · ' + days[day].length + '건'));
-    days[day].forEach(r => v.append(histRow(r, sup)));
+  const heads = ['날짜', '학생'].concat(sup ? ['지점'] : []).concat(['학습 자료', '시작', '종료', '학습 시간', '문항(맞힘/전체)', '점수(100점)', '상태']);
+  const cells = rec.map(r => [r, histCells(r)]);
+  const plain = cells.map(([r, c]) => [c.date, r.studentName || ''].concat(sup ? [branchName(r.branchId)] : []).concat([r.title || '', c.start, c.end, c.dur, c.qs, c.score, c.state]));
+  const right = h('div', 'flex flex-wrap gap-2');
+  right.append(exportBar('학생 학습 이력' + (flt ? '_' + flt : ''), heads, plain, flt ? flt + ' 학생' : '전체 학생'), btn('+ 점수 입력', B1, addScore));
+  top.append(left, right);
+  v.append(top);
+  // 요약: 건수 · 평균 점수 · 총 학습 시간
+  const sc = rec.filter(r => r.score != null), secs = rec.reduce((a, r) => a + (r.durationSec || 0), 0);
+  v.append(h('div', 'text-xs font-bold bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-xl px-3 py-2 mb-3', '학습 ' + rec.length + '건 · 완료 ' + cells.filter(([, c]) => c.done).length + '건 · 평균 점수 ' + (sc.length ? Math.round(sc.reduce((a, r) => a + r.score, 0) / sc.length) + '점' : '-') + ' · 총 학습 시간 ' + fmtD(secs)));
+  v.append(h('p', 'text-xs text-slate-400 mb-3', '학습 이력은 30일 동안 보관되고 이후 자동 삭제됩니다. 학생이 자료를 열면 시작 시각이, "학습 완료 저장"을 누르면 종료 시각·학습 시간·문항·점수가 기록됩니다.'));
+  const rows = cells.map(([r, c]) => {
+    const state = pill(c.state, !c.done ? 'bg-amber-100 text-amber-700' : r.kind === 'study' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600');
+    const sc2 = h('span', 'font-bold ' + (r.score == null ? 'text-slate-400' : r.score >= 90 ? 'text-emerald-600' : r.score >= 70 ? 'text-indigo-700' : 'text-rose-600'), c.score);
+    const qs = r.wrongCount ? [c.qs, '오답 ' + r.wrongCount + '개' + (r.wrong && r.wrong.length ? ' · ' + [...new Set(r.wrong)].slice(0, 5).join(', ') : '')] : c.qs;
+    return [h('span', 'whitespace-nowrap text-slate-600', c.date), h('span', 'font-bold text-slate-800 whitespace-nowrap', r.studentName || '-')]
+      .concat(sup ? [h('span', 'whitespace-nowrap text-slate-500', branchName(r.branchId))] : [])
+      .concat([h('span', 'text-slate-800', r.title || '-'), h('span', 'whitespace-nowrap', c.start), h('span', 'whitespace-nowrap', c.end), h('span', 'whitespace-nowrap', c.dur), qs, sc2, state]);
   });
+  v.append(mkTable(heads, rows, i => lnk('삭제', 'text-rose-600', async () => {
+    const [r] = cells[i]; if (!confirm('이 학습 기록을 삭제할까요?\n' + (r.studentName || '') + ' · ' + (r.title || ''))) return;
+    await db.collection('history').doc(r.id).delete(); await renderHistory();
+  })));
 }
 async function addScore() {
   const bid = S.me.role === 'super' ? S.stuBranch : S.me.uid;
