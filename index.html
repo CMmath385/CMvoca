@@ -193,7 +193,8 @@ const QR_BASE = 'https://cmvoca.com/?q=';
 const normCode = v => String(v || '').trim().toUpperCase();
 const okCode = c => /^[A-Z0-9][A-Z0-9_-]{2,59}$/.test(c);
 // 주소창의 ?q=코드 를 기억했다가 로그인 후 열기 (로그인 화면을 거쳐도 유지)
-(() => { try { const q = normCode(new URLSearchParams(location.search).get('q')); if (q && okCode(q)) { sessionStorage.setItem('cmGo', q); history.replaceState(null, '', location.pathname); } } catch (_) {} })();
+// (sessionStorage가 지워지는 QR 앱 브라우저 대비: localStorage에도 10분 동안 보관)
+(() => { try { const q = normCode(new URLSearchParams(location.search).get('q')); if (q && okCode(q)) { try { sessionStorage.setItem('cmGo', q); } catch (_) {} try { localStorage.setItem('cmGo', JSON.stringify({ c: q, t: Date.now() })); } catch (_) {} history.replaceState(null, '', location.pathname); } } catch (_) {} })();
 // 등록할 때 교재 코드 묻기: 빈칸이면 자동 번호, 이미 쓰는 코드면 다시 입력
 async function askCode(kind) {
   for (;;) {
@@ -224,15 +225,51 @@ function showQr(it) {
   ov.append(card); document.body.append(ov);
 }
 // 로그인 후: 기억해 둔 코드의 자료 열기
+//  · 자료가 들어 있는 폴더(같은 단원 목록)로 먼저 이동 → 이전/다음 단원으로 바로 이동 가능
+//  · "▶ 열기"를 한 번 눌러서 열기: 휴대폰 브라우저는 화면을 누르지 않고 연 자료의 소리(발음·재생 버튼)를 막기 때문
+function takePendingCode() {
+  let c = null;
+  try { c = sessionStorage.getItem('cmGo'); sessionStorage.removeItem('cmGo'); } catch (_) {}
+  try { const j = JSON.parse(localStorage.getItem('cmGo') || 'null'); localStorage.removeItem('cmGo'); if (!c && j && j.c && Date.now() - j.t < 600000) c = j.c; } catch (_) {}
+  return c;
+}
+async function findCodeItem(c) {
+  try { const d = await db.collection('items').doc(c).get(); if (d.exists) return { id: d.id, ...d.data() }; } catch (_) {}
+  // 학생·지점 계정: 문서 한 개 읽기가 막히면 공유 목록 조건으로 다시 찾기
+  if (S.me.branchId) {
+    try { const q = await db.collection('items').where(firebase.firestore.FieldPath.documentId(), '==', c).where('shared', 'array-contains', S.me.branchId).get(); if (!q.empty) return { id: q.docs[0].id, ...q.docs[0].data() }; } catch (_) {}
+    try { const q = await db.collection('items').where(firebase.firestore.FieldPath.documentId(), '==', c).where('branchId', '==', S.me.branchId).get(); if (!q.empty) return { id: q.docs[0].id, ...q.docs[0].data() }; } catch (_) {}
+  }
+  return null;
+}
+function unlockSound() {
+  try { if ('speechSynthesis' in window) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } } catch (_) {}
+  try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { const ac = new AC(); const o = ac.createOscillator(), g = ac.createGain(); g.gain.value = 0; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.05); setTimeout(() => ac.close().catch(() => {}), 300); } } catch (_) {}
+}
+function qrOpenCard(it) {
+  const ov = h('div', 'fixed inset-0 bg-slate-900/70 flex items-center justify-center p-4'), card = h('div', 'bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center');
+  ov.style.zIndex = '70';
+  card.append(h('div', 'text-4xl mb-2', '📱'), h('h3', 'text-base font-bold text-slate-500 mb-1', '교재 QR 자료'), h('p', 'text-lg font-bold text-slate-800 break-all mb-4', it.name));
+  const go = btn('▶ 열기', 'w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg py-4 rounded-xl', async () => { unlockSound(); ov.remove(); openItem(it); });
+  card.append(go, h('p', 'text-[11px] text-slate-400 mt-3', '🔊 소리를 켜고 눌러 주세요.'));
+  ov.append(card); document.body.append(ov); try { go.focus(); } catch (_) {}
+}
 async function openPendingCode() {
-  let c = null; try { c = sessionStorage.getItem('cmGo'); sessionStorage.removeItem('cmGo'); } catch (_) {}
+  const c = takePendingCode();
   if (!c) return;
-  let d = null; try { d = await db.collection('items').doc(c).get(); } catch (_) {}
-  if (!d || !d.exists || d.data().deleted || d.data().type === 'folder') return alert('QR 자료를 찾을 수 없거나 볼 수 있는 권한이 없습니다.\n(코드: ' + c + ')\n학원 선생님께 문의해 주세요.');
-  const it = { id: d.id, ...d.data() };
+  const it = await findCodeItem(c);
+  if (!it || it.deleted || it.type === 'folder') { toast(''); return alert('QR 자료를 찾을 수 없거나 볼 수 있는 권한이 없습니다.\n(코드: ' + c + ')\n학원 선생님께 문의해 주세요.'); }
   if (S.me.role === 'student' && it.folder === 'F') return alert('볼 수 있는 권한이 없는 자료입니다.');
   if (!it.htmlPage && !it.linkUrl && !it.pdfUrl) return;
-  openItem(it);
+  // 자료가 있는 폴더·탭으로 이동해서 목록을 띄워 둠 (돌아가기 하면 같은 단원 목록, 이전/다음 단원 이동)
+  if (FOLDERS.some(f => f.id === it.folder) && !(S.me.role === 'student' && kindOf(it.folder) === 'mgmt')) {
+    S.folder = it.folder; S.folderId = it.parentId || null; S.fFiles = it.folder === 'F';
+    if (it.branchId && S.me.role === 'super' && branchScoped()) S.viewBranch = it.branchId;
+    S.tab = tabOf(it); buildSide(); S.view = 'content';
+    ['content', 'students', 'history', 'manage', 'settings', 'branches', 'import', 'hw', 'trash'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== 'content'));
+    try { await renderContent(); } catch (_) {}
+  }
+  qrOpenCard(it);
 }
 
 /* ===== 계정 생성 (Firebase Auth) ===== */
@@ -437,15 +474,18 @@ const isEdit = () => S.me.role === 'super' || (S.me.role === 'sub' && branchScop
 const curBranch = () => S.me.role === 'super' ? S.viewBranch : S.me.branchId;
 
 async function loadItems() {
+  const f0 = S.folder, b0 = S.viewBranch; // 불러오는 사이에 다른 폴더로 바뀌면(QR 바로 열기 등) 늦게 온 결과는 버림
   let q = db.collection('items').where('folder', '==', S.folder);
   if (branchScoped()) {
     q = q.where('branchId', '==', curBranch());
     if (isA() && S.me.role === 'student') q = q.where('visible', '==', true);
   }
   if (sharedScoped() && S.me.role !== 'super') q = q.where('shared', 'array-contains', S.me.branchId);
-  S.items = (await q.get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.deleted);
+  const items = (await q.get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.deleted);
+  if (S.folder !== f0 || S.viewBranch !== b0) return false;
+  S.items = items; return true;
 }
-async function renderContent() { toast('불러오는 중...'); if (S.folder === 'F') await ensureFFolders(); await loadItems(); toast(''); drawContent(); }
+async function renderContent() { toast('불러오는 중...'); if (S.folder === 'F') await ensureFFolders(); const ok = await loadItems(); toast(''); if (ok) drawContent(); }
 
 function drawContent() {
   const f = FOLDERS.find(x => x.id === S.folder) || FOLDERS[0], edit = isEdit();
