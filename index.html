@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>최강수학메이드영어학원 - 스마트 학습 플랫폼</title>
+<script>
+/* QR을 앱 안의 브라우저(카카오톡·네이버·인스타그램·카메라 앱 등)로 열면 음성(발음·강의 영상 소리)이 나오지 않음
+   → 안드로이드는 크롬으로, 카카오톡은 기본 브라우저로 자동으로 다시 열기 (주소의 ?q=코드 그대로 유지) */
+(function () {
+  try {
+    var ua = navigator.userAgent || '', url = location.href;
+    if (/[?&]cmext=1/.test(location.search)) return; // 이미 한 번 옮긴 경우 반복 금지
+    var ext = url + (location.search ? '&' : '?') + 'cmext=1';
+    if (/KAKAOTALK/i.test(ua)) { location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(ext); return; }
+    var android = /Android/i.test(ua), inapp = /NAVER\(inapp|NAVER\/|Line\/|Instagram|FBAN|FBAV|DaumApps|DaumDevice|everytimeApp|BAND\/|; wv\)/i.test(ua);
+    if (android && inapp) location.href = 'intent://' + ext.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(ext) + ';end';
+  } catch (_) {}
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -195,6 +209,7 @@ const okCode = c => /^[A-Z0-9][A-Z0-9_-]{2,59}$/.test(c);
 // 주소창의 ?q=코드 를 기억했다가 로그인 후 열기 (로그인 화면을 거쳐도 유지)
 // (sessionStorage가 지워지는 QR 앱 브라우저 대비: localStorage에도 10분 동안 보관)
 (() => { try { const q = normCode(new URLSearchParams(location.search).get('q')); if (q && okCode(q)) { try { sessionStorage.setItem('cmGo', q); } catch (_) {} try { localStorage.setItem('cmGo', JSON.stringify({ c: q, t: Date.now() })); } catch (_) {} history.replaceState(null, '', location.pathname); } } catch (_) {} })();
+(() => { try { if (/[?&]cmext=1/.test(location.search)) history.replaceState(null, '', location.pathname); } catch (_) {} })();
 // 등록할 때 교재 코드 묻기: 빈칸이면 자동 번호, 이미 쓰는 코드면 다시 입력
 async function askCode(kind) {
   for (;;) {
@@ -253,6 +268,23 @@ function qrOpenCard(it) {
   const go = btn('▶ 열기', 'w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg py-4 rounded-xl', async () => { unlockSound(); ov.remove(); openItem(it); });
   card.append(go, h('p', 'text-[11px] text-slate-400 mt-3', '🔊 소리를 켜고 눌러 주세요.'));
   ov.append(card); document.body.append(ov); try { go.focus(); } catch (_) {}
+}
+// 이 브라우저에서 음성(TTS)이 되는지 확인 → 안 되면 위쪽에 안내 (크롬·사파리로 열기)
+function ttsCheck() {
+  const show = () => {
+    if (document.getElementById('tts-warn')) return;
+    const and = /Android/i.test(navigator.userAgent), url = location.origin + location.pathname;
+    const bar = h('div', 'fixed left-0 right-0 top-0 bg-amber-100 border-b-2 border-amber-400 text-amber-900 text-sm font-bold p-3 flex flex-wrap items-center justify-center gap-2 text-center'); bar.id = 'tts-warn'; bar.style.zIndex = '80';
+    bar.append(h('span', '', '🔇 이 브라우저(앱 안의 브라우저)에서는 발음·강의 영상 소리가 나오지 않습니다. ' + (and ? '크롬으로 열어 주세요.' : '오른쪽 위 메뉴(… 또는 공유)에서 "Safari로 열기"를 눌러 주세요.')));
+    if (and) bar.append(btn('크롬으로 열기', 'bg-amber-500 text-white px-3 py-1.5 rounded-lg', async () => { location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end'; }));
+    bar.append(btn('닫기', 'bg-white border border-amber-400 px-3 py-1.5 rounded-lg', async () => bar.remove()));
+    document.body.append(bar);
+  };
+  if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return show();
+  const has = () => (speechSynthesis.getVoices() || []).length > 0;
+  if (has()) return;
+  let done = false; speechSynthesis.addEventListener && speechSynthesis.addEventListener('voiceschanged', () => { done = has(); });
+  setTimeout(() => { if (!done && !has()) show(); }, 2500);
 }
 async function openPendingCode() {
   const c = takePendingCode();
@@ -374,6 +406,7 @@ function enterPortal() {
   S.folder = firstFolder(); S.folderId = null; S.viewBranch = 'main'; S.stuBranch = 'main'; S.tab = TABS[0][0]; applyBrand(); setTimeout(showStudyModal, 600);
   buildSide(); setView('content');
   setTimeout(() => safe(openPendingCode), 700);
+  setTimeout(() => { try { ttsCheck(); } catch (_) {} }, 1200);
   if (m.role === 'student') setTimeout(async () => { try { const { list, done } = await loadMyHw(); const n = list.filter(w => w.kind === 'hw' && !(done[w.id] && done[w.id].done)).length; if (n) { toast('📝 미완료 숙제가 ' + n + '개 있습니다. 위의 "숙제·알림장"에서 확인하세요.'); setTimeout(() => toast(''), 6000); } } catch (_) {} }, 1500);
 }
 
