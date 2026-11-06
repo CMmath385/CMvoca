@@ -1925,7 +1925,9 @@ function bundleDialog(b, folder, prevTab) {
     card.append(h('label', 'block text-xs font-bold text-slate-600 mb-1', '보여 줄 탭'));
     const sel = h('select', 'w-full p-2 border border-slate-300 rounded-xl text-sm font-bold mb-3');
     TABS.forEach(([id, name]) => { const o = h('option', '', name); o.value = id; sel.append(o); });
-    sel.value = [prevTab, b.tab, S.tab].find(t => TABS.some(x => x[0] === t)) || TABS[0][0]; card.append(sel);
+    // 묶음 파일이 정한 탭(기본: 영상학습훈련)을 가장 먼저 따름 → 다시 올리면 본문 등 다른 탭에 있던 자료도 이 탭으로 옮겨짐
+    const vt = (TABS.find(x => x[0] === 'video') || TABS.find(x => /영상/.test(x[1])) || [])[0];
+    sel.value = [b.tab, vt, prevTab, S.tab].find(t => TABS.some(x => x[0] === t)) || TABS[0][0]; card.append(sel);
     card.append(h('label', 'block text-xs font-bold text-slate-600 mb-1', '공유할 지점'));
     const boxes = [], list = h('div', 'border border-slate-200 rounded-xl p-2 mb-3');
     if (!S.branches.length) list.append(h('div', 'text-xs text-slate-400 p-2', '등록된 지점이 없습니다. 본원에만 올라갑니다.'));
