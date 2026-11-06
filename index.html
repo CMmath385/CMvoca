@@ -603,7 +603,7 @@ function drawContent() {
       if (sharedScoped()) r.append(btn('🔗 공유', 'bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs px-2.5 py-2 rounded-xl font-bold', () => shareItem(it)));
       if (it.htmlPage) r.append(btn('🔄 코드 교체', B2, () => replaceHtml(it)));
       if (it.type !== 'folder') r.append(btn('📱 QR', B2, () => showQr(it)));
-      r.append(btn('✏️', B2, () => renameItem(it)), btn('🗑', B2, () => deleteItem(it)));
+      r.append(btn('📂 이동', B2, () => moveDialog(it)), btn('✏️', B2, () => renameItem(it)), btn('🗑', B2, () => deleteItem(it)));
     }
     row.append(r); if (edit) wireDrag(row, it); list.append(row);
   });
@@ -1424,6 +1424,74 @@ async function openHtml(it) {
   ov.append(bar, tb, fr); document.body.append(ov); document.body.style.overflow = 'hidden';
 }
 
+
+/* ===== 다른 학습 폴더(예: C → B)나 그 안의 하위 폴더로 자료·폴더 옮기기 =====
+   폴더를 옮기면 안의 하위 폴더·자료도 함께 옮겨짐. 폴더 종류(지점 전용 A / 공유 B·C·D / 전과목 E)에 맞게 공유·지점 정보도 바꿈 */
+function moveTargets() {
+  return FOLDERS.filter(f => f.kind !== 'mgmt' && (S.me.role === 'super' || f.kind === 'branch'));
+}
+async function folderTree(folder, branch) {
+  let q = db.collection('items').where('folder', '==', folder);
+  if (kindOf(folder) === 'branch') q = q.where('branchId', '==', branch);
+  const all = (await q.get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.deleted && i.type === 'folder');
+  const out = [], walk = (pid, depth) => all.filter(i => (i.parentId || null) === pid).sort((a, b) => ordOf(a) - ordOf(b) || byName(a, b)).forEach(i => { out.push({ ...i, depth }); walk(i.id, depth + 1); });
+  walk(null, 0); return out;
+}
+function moveDialog(it) {
+  const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4'), card = h('div', 'bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-full overflow-y-auto');
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  card.append(h('h3', 'text-lg font-bold text-slate-800 mb-1', '📂 다른 폴더로 이동'), h('p', 'text-sm text-slate-600 font-bold break-all mb-3', (it.type === 'folder' ? '📁 ' : '📄 ') + it.name + (it.type === 'folder' ? '  (안의 자료도 함께 이동)' : '')));
+  const fs = h('select', 'w-full p-2 border border-slate-300 rounded-xl text-sm font-bold mb-2');
+  moveTargets().forEach(f => { const o = h('option', '', f.name); o.value = f.id; fs.append(o); }); fs.value = S.folder;
+  const bs = h('select', 'w-full p-2 border border-slate-300 rounded-xl text-sm font-bold mb-2');
+  if (S.me.role === 'super') [['main', '본원']].concat(S.branches.map(b => [b.id, b.academyName || b.id])).forEach(([id, n]) => { const o = h('option', '', n); o.value = id; bs.append(o); });
+  bs.value = curBranch();
+  const list = h('div', 'border border-slate-200 rounded-xl p-2 mb-3 max-h-72 overflow-y-auto text-sm');
+  card.append(h('label', 'block text-xs font-bold text-slate-600 mb-1', '옮길 학습 폴더'), fs, h('label', 'block text-xs font-bold text-slate-600 mb-1 bl', '지점 (A · 지점 전용 폴더)'), bs, h('label', 'block text-xs font-bold text-slate-600 mb-1', '들어갈 위치'), list);
+  let target = null; const skip = it.type === 'folder' ? descendants(it.id) : new Set([it.id]);
+  const draw = async () => {
+    const isB = kindOf(fs.value) === 'branch' && S.me.role === 'super'; bs.classList.toggle('hidden', !isB); card.querySelector('.bl').classList.toggle('hidden', !isB);
+    list.innerHTML = '<div class="text-slate-400 p-2">불러오는 중...</div>';
+    const tree = await folderTree(fs.value, S.me.role === 'super' ? bs.value : S.me.branchId);
+    list.innerHTML = ''; target = null;
+    const row = (id, label, depth, dis) => { const l = h('label', 'flex items-center gap-2 py-1.5 px-1 rounded-lg ' + (dis ? 'text-slate-300' : 'hover:bg-slate-50 cursor-pointer')); l.style.paddingLeft = (4 + depth * 18) + 'px';
+      const r = h('input'); r.type = 'radio'; r.name = 'mvto'; r.disabled = dis; r.onchange = () => { target = id; }; if (id === null && !dis) { r.checked = true; target = null; } l.append(r, document.createTextNode(label)); list.append(l); };
+    row(null, '📂 맨 위 (' + ((FOLDERS.find(f => f.id === fs.value) || {}).name || fs.value) + ')', 0, false);
+    tree.forEach(f => row(f.id, '📁 ' + f.name, f.depth + 1, skip.has(f.id)));
+    if (!tree.length) list.append(h('div', 'text-xs text-slate-400 p-2', '하위 폴더가 없습니다. 맨 위로 옮겨집니다.'));
+  };
+  fs.onchange = () => safe(draw); bs.onchange = () => safe(draw);
+  const row = h('div', 'flex gap-2');
+  row.append(btn('이동하기', 'flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl', async () => {
+    const tf = fs.value, tb = S.me.role === 'super' ? bs.value : S.me.branchId;
+    if (tf === it.folder && (target || null) === (it.parentId || null) && (kindOf(tf) !== 'branch' || tb === it.branchId)) return alert('지금 있는 위치와 같습니다.');
+    ov.remove(); await moveItemTo(it, tf, target || null, tb);
+  }), btn('취소', 'flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl', async () => ov.remove()));
+  card.append(row); ov.append(card); document.body.append(ov); safe(draw);
+}
+async function moveItemTo(it, folder, parentId, branch) {
+  toast('옮기는 중...');
+  const ids = it.type === 'folder' ? [...descendants(it.id)] : [it.id], D = firebase.firestore.FieldValue.delete(), kind = kindOf(folder);
+  let parentShared = [];
+  if (kind === 'shared' && parentId) { try { const p = await db.collection('items').doc(parentId).get(); if (p.exists) parentShared = inheritShared(p.data()); } catch (_) {} }
+  const items = ids.map(id => S.items.find(i => i.id === id) || (id === it.id ? it : null)).filter(Boolean);
+  for (let i = 0; i < items.length; i += 200) {
+    const b = db.batch();
+    items.slice(i, i + 200).forEach(x => {
+      const up = { folder };
+      if (x.id === it.id) { up.parentId = parentId; up.order = D; }
+      if (kind === 'branch') { up.branchId = branch; up.shared = D; up.pathOnly = D; }
+      else if (kind === 'shared') { up.branchId = D; up.shared = parentId ? parentShared.slice() : (x.folder && kindOf(x.folder) === 'shared' ? (x.shared || []) : []); up.pathOnly = []; }
+      else { up.branchId = D; up.shared = D; up.pathOnly = D; }
+      b.update(db.collection('items').doc(x.id), up);
+      if (x.htmlPage) b.set(db.collection('pages').doc(x.id), { folder, ...(kind === 'branch' ? { branchId: branch } : {}) }, { merge: true });
+    });
+    await b.commit();
+  }
+  toast(''); await renderContent();
+  const f = FOLDERS.find(x => x.id === folder);
+  alert('"' + it.name + '"' + (items.length > 1 ? ' (안의 자료 포함 ' + items.length + '개)' : '') + '을(를) ' + (f ? f.name : folder) + '(으)로 옮겼습니다.' + (kind === 'shared' ? '\n공유 지점은 "🔗 공유"에서 확인하세요.' : ''));
+}
 async function renameItem(it) {
   const n = prompt('새 이름:', it.name); if (!n || !n.trim()) return;
   const upd = { name: n.trim() };
