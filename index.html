@@ -206,9 +206,11 @@ const branchName = id => id === 'main' ? '본원' : ((S.branches.find(b => b.id 
 const QR_BASE = 'https://cmvoca.com/?q=';
 const normCode = v => String(v || '').trim().toUpperCase();
 const okCode = c => /^[A-Z0-9][A-Z0-9_-]{2,59}$/.test(c);
+// QR 주소의 코드는 대소문자를 그대로 보관 (직접 등록한 자료의 자동 번호는 대·소문자가 섞여 있음)
+const okRawCode = c => /^[A-Za-z0-9][A-Za-z0-9_-]{2,59}$/.test(c);
 // 주소창의 ?q=코드 를 기억했다가 로그인 후 열기 (로그인 화면을 거쳐도 유지)
 // (sessionStorage가 지워지는 QR 앱 브라우저 대비: localStorage에도 10분 동안 보관)
-(() => { try { const q = normCode(new URLSearchParams(location.search).get('q')); if (q && okCode(q)) { try { sessionStorage.setItem('cmGo', q); } catch (_) {} try { localStorage.setItem('cmGo', JSON.stringify({ c: q, t: Date.now() })); } catch (_) {} history.replaceState(null, '', location.pathname); } } catch (_) {} })();
+(() => { try { const q = String(new URLSearchParams(location.search).get('q') || '').trim(); if (q && okRawCode(q)) { try { sessionStorage.setItem('cmGo', q); } catch (_) {} try { localStorage.setItem('cmGo', JSON.stringify({ c: q, t: Date.now() })); } catch (_) {} history.replaceState(null, '', location.pathname); } } catch (_) {} })();
 (() => { try { if (/[?&]cmext=1/.test(location.search)) history.replaceState(null, '', location.pathname); } catch (_) {} })();
 // 등록할 때 교재 코드 묻기: 빈칸이면 자동 번호, 이미 쓰는 코드면 다시 입력
 async function askCode(kind) {
@@ -249,6 +251,11 @@ function takePendingCode() {
   return c;
 }
 async function findCodeItem(c) {
+  // 대소문자를 그대로 먼저 찾고, 없으면 대문자로 다시 찾기 (예전 QR·직접 입력 코드 대비)
+  for (const k of [...new Set([String(c), normCode(c)])]) { const r = await findCodeItem1(k); if (r) return r; }
+  return null;
+}
+async function findCodeItem1(c) {
   try { const d = await db.collection('items').doc(c).get(); if (d.exists) return { id: d.id, ...d.data() }; } catch (_) {}
   // 학생·지점 계정: 문서 한 개 읽기가 막히면 공유 목록 조건으로 다시 찾기
   if (S.me.branchId) {
@@ -1885,6 +1892,7 @@ async function seedMaterials() {
 async function importBundle(file) {
   if (S.me.role !== 'super') return alert('본원 관리자만 사용할 수 있습니다.');
   let b; try { b = JSON.parse(await file.text()); } catch (_) { return alert('교재 묶음 파일(JSON)이 아닙니다.'); }
+  if (b && b.cmBundle === 2) return importBundle2(b);
   const folder = String(b.folder || 'B');
   if (b.cmBundle !== 1 || !Array.isArray(b.items) || !b.items.length || !Array.isArray(b.folders) || !b.folders.length) return alert('CM 교재 묶음 파일이 아닙니다.');
   if (!FOLDERS.some(f => f.id === folder && f.kind !== 'mgmt')) return alert('묶음 파일의 폴더(' + folder + ')가 CMVOCA에 없습니다.');
@@ -1915,11 +1923,61 @@ async function importBundle(file) {
   toast('');
   alert('교재를 올렸습니다: ' + (b.title || '') + '\n자료 ' + done.length + '개 · 공유 지점 ' + opt.shared.length + '곳 · 탭 "' + ((TABS.find(t => t[0] === opt.tab) || [, opt.tab])[1]) + '"\n\nQR 코드: ' + done[0] + (done.length > 1 ? ' … ' + done[done.length - 1] : ''));
 }
+/* ===== CM 교재 묶음 v2: 한 파일로 여러 폴더(학년 전체)를 기존 폴더 아래에 올리기 =====
+   { cmBundle: 2, title, folder: 'B', tab,
+     folders: [{ id, name, parent }],          // parent: 이미 있는 폴더 번호 또는 앞에 적은 폴더 id (null = 맨 위)
+     items:   [{ code, name, html, parent, order }] }
+   · 이미 있는 폴더는 손대지 않음(이름·순서·공유 그대로), 없는 폴더만 새로 만듦
+   · 이미 있는 자료 번호면 HTML만 새것으로 바꾸고 위치·탭·공유는 그대로 (QR·숙제·학습 이력 유지)
+   · 번호는 대소문자를 그대로 씀 (기존 자동 번호와 맞추기 위해) */
+async function importBundle2(b) {
+  const folder = String(b.folder || 'B');
+  const folders = Array.isArray(b.folders) ? b.folders : [], items = Array.isArray(b.items) ? b.items : [];
+  if (!items.length) return alert('CM 교재 묶음 파일이 아닙니다.');
+  if (!FOLDERS.some(f => f.id === folder && f.kind !== 'mgmt')) return alert('묶음 파일의 폴더(' + folder + ')가 CMVOCA에 없습니다.');
+  const known = new Set();
+  for (const f of folders) {
+    if (!okRawCode(String(f.id || '')) || !String(f.name || '').trim()) return alert('묶음 파일의 폴더 정보가 올바르지 않습니다: ' + (f.id || f.name || ''));
+    known.add(String(f.id));
+  }
+  for (const it of items) {
+    if (!okRawCode(String(it.code || '')) || !String(it.name || '').trim() || typeof it.html !== 'string' || !/<html|<!doctype/i.test(it.html)) return alert('묶음 파일의 자료 정보가 올바르지 않습니다: ' + (it.code || it.name || ''));
+    if (new Blob([it.html]).size > 900 * 1024) return alert('자료가 너무 큽니다(900KB 초과): ' + it.code);
+  }
+  await loadBranches();
+  const exists = async id => { try { const d = await db.collection('items').doc(id).get(); return d.exists && !d.data().deleted ? d.data() : null; } catch (_) { return null; } };
+  // 부모 폴더가 CMVOCA에 실제로 있는지 먼저 확인 (없으면 아무것도 올리지 않음)
+  for (const p of new Set(folders.map(f => f.parent).concat(items.map(it => it.parent)).filter(Boolean).map(String))) {
+    if (known.has(p)) continue;
+    const d = await exists(p); if (!d || d.type !== 'folder' || d.folder !== folder) return alert('묶음 파일이 가리키는 폴더가 CMVOCA에 없습니다: ' + p + '\n(백업 이후 폴더를 지웠거나 옮겼는지 확인해 주세요)');
+  }
+  const opt = await bundleDialog(b, folder, null); if (!opt) return;
+  toast('교재 올리는 중...');
+  let nf = 0, nNew = 0, nUpd = 0;
+  for (const f of folders) {
+    const id = String(f.id); if (await exists(id)) continue;
+    await db.collection('items').doc(id).set({ folder, type: 'folder', name: String(f.name).trim(), parentId: f.parent ? String(f.parent) : null, tabId: opt.tab, visible: true, shared: opt.shared, pathOnly: [], ...(typeof f.order === 'number' ? { order: f.order } : {}), createdAt: Date.now() });
+    nf++;
+  }
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i], id = String(it.code), ref = db.collection('items').doc(id), old = await exists(id);
+    if (old && old.type === 'folder') { toast(''); return alert('자료 번호가 폴더 번호와 겹칩니다: ' + id); }
+    await db.collection('pages').doc(id).set({ html: it.html, name: String(it.name).trim(), folder, branchId: (old && old.branchId) || 'main', updatedAt: Date.now() }, { merge: true });
+    if (old) { await ref.update({ htmlPage: true, shared: [...new Set((old.shared || []).concat(opt.shared))] }); nUpd++; }
+    else {
+      await ref.set({ folder, type: 'file', htmlPage: true, name: String(it.name).trim(), parentId: it.parent ? String(it.parent) : null, tabId: opt.tab, visible: true, shared: opt.shared, pathOnly: [], order: typeof it.order === 'number' ? it.order : (i + 1) * 1000, createdAt: Date.now() });
+      nNew++;
+    }
+  }
+  toast('');
+  alert('교재를 올렸습니다: ' + (b.title || '') + '\n새 폴더 ' + nf + '개 · 새 자료 ' + nNew + '개 · 내용 바꾼 자료 ' + nUpd + '개\n공유 지점 ' + opt.shared.length + '곳 · 새 자료 탭 "' + ((TABS.find(t => t[0] === opt.tab) || [, opt.tab])[1]) + '"');
+  try { await renderContent(); } catch (_) {}
+}
 function bundleDialog(b, folder, prevTab) {
   return new Promise(res => {
     const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4'), card = h('div', 'bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-full overflow-y-auto');
     const fname = (FOLDERS.find(f => f.id === folder) || {}).name || folder;
-    card.append(h('h3', 'text-lg font-bold text-slate-800 mb-1', '📦 ' + (b.title || 'CM 교재')), h('p', 'text-xs text-slate-500 mb-3', fname + ' > ' + b.folders.map(f => f.name).join(' > ') + ' 폴더에 자료 ' + b.items.length + '개를 올립니다.'));
+    card.append(h('h3', 'text-lg font-bold text-slate-800 mb-1', '📦 ' + (b.title || 'CM 교재')), h('p', 'text-xs text-slate-500 mb-3', b.cmBundle === 2 ? fname + ' 안의 폴더 ' + ((b.folders || []).length) + '개에 자료 ' + b.items.length + '개를 올립니다. (이미 있는 자료는 내용만 바뀌고 QR은 그대로)' : fname + ' > ' + b.folders.map(f => f.name).join(' > ') + ' 폴더에 자료 ' + b.items.length + '개를 올립니다.'));
     const ul = h('div', 'text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 space-y-1');
     b.items.forEach(it => ul.append(h('div', '', '🧩 ' + it.name + '  ·  ' + normCode(it.code)))); card.append(ul);
     card.append(h('label', 'block text-xs font-bold text-slate-600 mb-1', '보여 줄 탭'));
