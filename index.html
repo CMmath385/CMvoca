@@ -1979,7 +1979,7 @@ function bundleDialog(b, folder, prevTab) {
     const fname = (FOLDERS.find(f => f.id === folder) || {}).name || folder;
     card.append(h('h3', 'text-lg font-bold text-slate-800 mb-1', '📦 ' + (b.title || 'CM 교재')), h('p', 'text-xs text-slate-500 mb-3', b.cmBundle === 2 ? fname + ' 안의 폴더 ' + ((b.folders || []).length) + '개에 자료 ' + b.items.length + '개를 올립니다. (이미 있는 자료는 내용만 바뀌고 QR은 그대로)' : fname + ' > ' + b.folders.map(f => f.name).join(' > ') + ' 폴더에 자료 ' + b.items.length + '개를 올립니다.'));
     const ul = h('div', 'text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 space-y-1');
-    b.items.forEach(it => ul.append(h('div', '', '🧩 ' + it.name + '  ·  ' + normCode(it.code)))); card.append(ul);
+    b.items.forEach(it => ul.append(h('div', '', '🧩 ' + it.name + '  ·  ' + (b.cmBundle === 2 ? String(it.code) : normCode(it.code))))); card.append(ul);
     card.append(h('label', 'block text-xs font-bold text-slate-600 mb-1', '보여 줄 탭'));
     const sel = h('select', 'w-full p-2 border border-slate-300 rounded-xl text-sm font-bold mb-3');
     TABS.forEach(([id, name]) => { const o = h('option', '', name); o.value = id; sel.append(o); });
