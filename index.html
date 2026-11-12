@@ -215,12 +215,19 @@ const okRawCode = c => /^[A-Za-z0-9][A-Za-z0-9_-]{2,59}$/.test(c);
 // 등록할 때 교재 코드 묻기: 빈칸이면 자동 번호, 이미 쓰는 코드면 다시 입력
 async function askCode(kind) {
   for (;;) {
-    const v = prompt('교재 QR 코드 (선택)\n교재에 인쇄한 QR과 연결할 코드를 넣으세요. 예) CMBUILD-L1-U01-' + (kind === 'html' ? 'A' : 'V') + '\n영문 대문자·숫자·-·_ 3~60자. 비워 두면 자동 번호로 저장됩니다.', '');
+    const v = prompt('교재 QR 코드 (선택)\n교재에 인쇄한 QR과 연결할 코드를 넣으세요. 예) GUMUN-L1-U01-' + (kind === 'html' ? 'A' : 'V') + '\n영문 대문자·숫자·-·_ 3~60자. 비워 두면 자동 번호로 저장됩니다.', '');
     if (v === null) return null;
     const c = normCode(v); if (!c) return '';
     if (!okCode(c)) { alert('코드는 영문·숫자·-·_ 로 3~60자여야 합니다.'); continue; }
-    let used = false; try { used = (await db.collection('items').doc(c).get()).exists; } catch (_) { used = true; }
-    if (used) { alert('이미 쓰고 있는 코드입니다: ' + c); continue; }
+    let d = null, blocked = false; try { d = await db.collection('items').doc(c).get(); } catch (_) { blocked = true; }
+    if (blocked) { alert('이미 쓰고 있는 코드입니다: ' + c + '\n(다른 지점 또는 본원 자료일 수 있습니다)'); continue; }
+    if (d.exists && d.data().deleted) {
+      // 휴지통에 있는 자료가 같은 코드를 쓰는 경우: 완전히 지우고 새 자료에 사용
+      if (!confirm('이 코드(' + c + ')는 휴지통에 있는 자료 "' + (d.data().name || '') + '"이(가) 쓰고 있습니다.\n휴지통에서 완전히 지우고 이 코드를 새 자료에 쓸까요?\n(완전히 지운 자료는 복원할 수 없습니다)')) continue;
+      await purgeItems([{ id: d.id, ...d.data() }]);
+      return c;
+    }
+    if (d.exists) { alert('이미 쓰고 있는 코드입니다: ' + c + '\n자료 "' + (d.data().name || '') + '"이(가) 이 코드를 쓰고 있어요. 다른 코드를 넣거나, 그 자료를 지운 뒤 다시 시도하세요.'); continue; }
     return c;
   }
 }
