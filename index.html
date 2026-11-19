@@ -653,34 +653,28 @@ async function shareAll() {
 }
 
 /* ===== PDF 자료실 (본원 관리자 전용) =====
-   · PDF 일괄 올리기: 파일 이름 {교재}_{레벨}_{U00}_{종류}.pdf 로 관련 앱 옆에 자동 연결, 못 찾으면 "PDF 미분류" 폴더
-   · 미분류 PDF는 "🧩 앱에 연결"로 직접 관련 앱 옆에 넣음
-   · 지점 공유: 한 개씩 / 여러 개 선택해서 한꺼번에
-   · 학생에게는 모든 PDF가 보이지 않음 */
-const PDF_BOOKS = { 'CM문법': 'MUNBEOP', 'CM구문': 'GUMUN', 'CM워크북': 'WORKBOOK', 'CM어휘': 'EOHWI', 'CM내신': 'NAESIN', 'CM독서': 'DOKSEO', 'CM논술': 'NONSUL', 'CM과학': 'GWAHAK', 'CM국어': 'GUGEO', 'CM수학': 'SUHAK', 'CM주니어': 'JUNIOR' };
-const PDF_KINDS = ['본책', '워크북', '테스트', '정답'];
-const PDF_MAX = 20 * 1024 * 1024;
-const PL = { items: [], apps: [], sel: new Set(), f: { subject: '', book: '', level: '', state: '', q: '' } };
+   · 폴더째(또는 파일 여러 개) 올리면 "과목 > 학년 > 출판사" PDF 폴더를 만들어 그 안에 정리 (영어=B, 수학=C, 국어=D 폴더 안의 "PDF 자료")
+   · PDF(20MB 이하)와 PPTX(50MB 이하)를 받음. 앱 옆에 붙이지 않으며, 필요하면 "🧩 앱에 연결"로 직접 연결
+   · 지점 공유: 한 개씩 / 여러 개 선택해서 한꺼번에, 폴더째 공유도 기존 "🔗 공유"로 가능
+   · 학생에게는 모든 PDF·PPT가 보이지 않음 */
+const PDF_LIMIT = { pdf: 20 * 1024 * 1024, pptx: 50 * 1024 * 1024 };
+const PDF_MIME = { pdf: 'application/pdf', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
+const PUBLISHERS = ['천재', '미래엔', '비상', '동아', '지학사', 'YBM', '능률', '창비', '신사고', '금성', 'CM자체교재'];
+const PL = { items: [], apps: [], sel: new Set(), f: { subject: '', grade: '', publisher: '', state: '', q: '' } };
 const hash36 = s => { let a = 5381, b = 52711; for (const ch of s) { const k = ch.codePointAt(0); a = ((a * 33) ^ k) >>> 0; b = ((b * 33) ^ k) >>> 0; } return a.toString(36) + b.toString(36); };
-const numTok = (t, p) => { const m = new RegExp('^' + p + '0*(\\d+)$', 'i').exec(t); return m ? +m[1] : null; };
-function parsePdfName(fileName) {
-  const base = fileName.replace(/\.pdf$/i, '').normalize('NFC'), parts = base.split('_');
-  const book = PDF_BOOKS[parts[0]] ? parts[0] : '', level = parts.find(p => numTok(p, 'L') !== null) || '', unit = parts.find(p => numTok(p, 'U') !== null) || '';
-  const rest = parts.slice(1).join('_'), kind = PDF_KINDS.find(k => rest.includes(k)) || '', g = /(초|중|고)\s?([1-6])/.exec(base);
-  return { base, book, bookCode: PDF_BOOKS[book] || '', level, unit, kind, grade: g ? g[1] + g[2] : '' };
-}
-function matchPdfApp(meta, apps) {
-  if (!meta.bookCode || !meta.unit) return null;
-  const bt = meta.bookCode.split('-'), lv = meta.level ? numTok(meta.level, 'L') : null, un = numTok(meta.unit, 'U');
-  const c = apps.filter(a => {
-    const t = String(a.id).toUpperCase().split(/[-_]/);
-    return bt.every(x => t.includes(x)) && t.some(x => numTok(x, 'U') === un) && (lv === null || t.some(x => numTok(x, 'L') === lv));
-  });
-  if (!c.length) return null;
-  c.sort((a, b) => (/[-_]A$/i.test(b.id) ? 1 : 0) - (/[-_]A$/i.test(a.id) ? 1 : 0) || String(a.id).localeCompare(String(b.id)));
-  return c[0];
+const extOf = n => { const m = /\.([A-Za-z0-9]+)$/.exec(n); return m ? m[1].toLowerCase() : ''; };
+function classifyPdf(rel) {
+  const segs = String(rel).normalize('NFC').split('/').filter(Boolean), name = segs[segs.length - 1] || '';
+  let dirs = segs.slice(0, -1); if (dirs.length && segs.length > 1) dirs = dirs.slice(1); // 맨 앞은 고른 폴더 이름
+  while (dirs.length && /^(pdf|ppt|pptx)$/i.test(dirs[0])) dirs.shift();
+  const fromDirs = re => { for (const d of dirs) { const m = re.exec(d); if (m) return m[0]; } return null; };
+  const subject = fromDirs(/국어|수학|영어/) || (/국어|수학|영어/.exec(name) || [])[0] || '기타';
+  const grade = fromDirs(/(초|중|고)\s?[1-6]/) || (dirs.some(d => /학년무관/.test(d)) ? '학년무관' : null) || (/(초|중|고)\s?[1-6]/.exec(name) || [])[0] || '기타';
+  const pub = dirs.length >= 4 ? dirs[dirs.length - 1] : (PUBLISHERS.find(p => name.includes(p) || dirs.some(d => d.includes(p))) || '기타');
+  return { subject, grade: grade.replace(/\s/g, ''), publisher: pub, base: name.replace(/\.[A-Za-z0-9]+$/, ''), ext: extOf(name) };
 }
 const subjName = f => (FOLDERS.find(x => x.id === f) || {}).name || f || '';
+const subjFolder = s => { const f = FOLDERS.find(x => x.kind === 'shared' && x.name.includes(s)) || FOLDERS.find(x => x.id === 'E' && x.kind !== 'mgmt') || FOLDERS.find(x => x.kind === 'shared'); return f ? f.id : null; };
 async function loadPdfLib() {
   const [a, p] = await Promise.all([db.collection('items').where('htmlPage', '==', true).get(), db.collection('items').where('pdfLib', '==', true).get()]);
   PL.apps = a.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.deleted);
@@ -694,40 +688,39 @@ async function renderPdfLib() {
 function drawPdfLib() {
   const box = $('view-pdflib'); box.innerHTML = '';
   box.append(h('h2', 'text-xl font-bold text-slate-800 mb-1', '📚 PDF 자료실'));
-  box.append(h('p', 'text-xs text-slate-500 mb-3', '파일 이름이 "교재_레벨_단원_종류.pdf" 형식(예: CM구문_L1_U01_1_본책.pdf)이면 관련 앱 옆에 자동으로 붙습니다. 학생에게는 PDF가 보이지 않고, 공유한 지점의 선생님만 볼 수 있습니다.'));
-  const bar = h('div', 'flex flex-wrap gap-2 mb-3 items-center'), fi = h('input'); fi.type = 'file'; fi.accept = 'application/pdf'; fi.multiple = true; fi.className = 'hidden';
-  fi.onchange = () => { const fs = [...fi.files]; fi.value = ''; if (fs.length) safe(() => pdfBulkUpload(fs)); };
-  bar.append(fi, btn('📤 PDF 일괄 올리기', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', async () => fi.click()));
+  box.append(h('p', 'text-xs text-slate-500 mb-3', 'PDF·PPT를 올리면 "과목 > 학년 > 출판사" 폴더로 자동 정리됩니다. 영어는 B, 수학은 C, 국어는 D 폴더 안의 "PDF 자료" 폴더에서 볼 수 있습니다. 학생에게는 보이지 않고, 공유한 지점의 선생님만 볼 수 있습니다.'));
+  const bar = h('div', 'flex flex-wrap gap-2 mb-3 items-center'), fd = h('input'), fi = h('input');
+  fd.type = 'file'; fd.multiple = true; fd.setAttribute('webkitdirectory', ''); fd.className = 'hidden'; fi.type = 'file'; fi.multiple = true; fi.accept = '.pdf,.pptx,application/pdf'; fi.className = 'hidden';
+  const go = inp => () => { const fs = [...inp.files]; inp.value = ''; if (fs.length) safe(() => pdfBulkUpload(fs)); };
+  fd.onchange = go(fd); fi.onchange = go(fi);
+  bar.append(fd, fi, btn('📁 폴더째 올리기', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', async () => fd.click()), btn('📄 파일 골라 올리기', 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs px-3 py-2 rounded-xl font-bold', async () => fi.click()));
   box.append(bar);
-  // 필터
   const F = PL.f, items = PL.items, opt = (sel, arr, all) => { sel.append(new Option(all, '')); arr.forEach(([v, t]) => sel.append(new Option(t, v))); };
   const uniq = k => [...new Set(items.map(i => i[k]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'ko', { numeric: true }));
   const fb = h('div', 'flex flex-wrap gap-2 mb-3 items-center'), mk = (key, arr, all) => { const s = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold'); opt(s, arr, all); s.value = F[key]; s.onchange = () => { F[key] = s.value; drawPdfLib(); }; return s; };
-  fb.append(mk('subject', uniq('folder').map(f => [f, subjName(f)]), '전체 과목'), mk('book', uniq('book').map(b => [b, b]), '전체 교재'), mk('level', uniq('level').concat(uniq('grade')).map(l => [l, l]), '전체 레벨·학년'),
-    mk('state', [['unsorted', '미분류'], ['linked', '앱에 연결됨'], ['unshared', '미공유'], ['shared', '공유됨']], '전체 상태'));
+  fb.append(mk('subject', uniq('folder').map(f => [f, subjName(f)]), '전체 과목'), mk('grade', uniq('grade').map(g => [g, g]), '전체 학년'), mk('publisher', uniq('publisher').map(p => [p, p]), '전체 출판사'), mk('state', [['unshared', '미공유'], ['shared', '공유됨']], '전체 공유 상태'));
   const q = h('input', 'p-2 border border-slate-300 rounded-xl text-xs flex-grow min-w-[10rem]'); q.placeholder = '파일 이름 검색'; q.value = F.q; q.onchange = () => { F.q = q.value.trim(); drawPdfLib(); }; fb.append(q);
   box.append(fb);
-  const list = items.filter(i => (!F.subject || i.folder === F.subject) && (!F.book || i.book === F.book) && (!F.level || i.level === F.level || i.grade === F.level)
-    && (!F.state || (F.state === 'unsorted' ? i.unsorted : F.state === 'linked' ? !i.unsorted : F.state === 'unshared' ? !(i.shared || []).length : (i.shared || []).length > 0))
-    && (!F.q || (i.name || '').includes(F.q) || (i.fileName || '').includes(F.q))).sort((a, b) => (a.unsorted ? 1 : 0) - (b.unsorted ? 1 : 0) || byName(a, b));
-  // 선택 도구
+  const list = items.filter(i => (!F.subject || i.folder === F.subject) && (!F.grade || i.grade === F.grade) && (!F.publisher || i.publisher === F.publisher)
+    && (!F.state || (F.state === 'unshared' ? !(i.shared || []).length : (i.shared || []).length > 0))
+    && (!F.q || (i.name || '').includes(F.q) || (i.fileName || '').includes(F.q))).sort((a, b) => byName({ name: a.relPath || a.name }, { name: b.relPath || b.name }));
   const tb = h('div', 'flex flex-wrap gap-2 mb-3 items-center'), all = h('input'); all.type = 'checkbox'; all.checked = list.length > 0 && list.every(i => PL.sel.has(i.id));
   all.onchange = () => { list.forEach(i => all.checked ? PL.sel.add(i.id) : PL.sel.delete(i.id)); drawPdfLib(); };
   const al = h('label', 'flex items-center gap-1.5 text-xs font-bold text-slate-600'); al.append(all, document.createTextNode('목록 전체 선택 (' + list.length + '개)'));
   const chosen = () => PL.items.filter(i => PL.sel.has(i.id));
   tb.append(al, h('span', 'text-xs text-slate-500', '선택 ' + PL.sel.size + '개'),
-    btn('🔗 선택한 PDF 일괄 공유', 'bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-2 rounded-xl font-bold', async () => { const c = chosen(); if (!c.length) return alert('공유할 PDF를 먼저 선택하세요.'); await pdfShare(c); }),
-    btn('🧩 선택한 PDF를 앱에 연결', 'bg-amber-500 hover:bg-amber-600 text-white text-xs px-3 py-2 rounded-xl font-bold', async () => { const c = chosen(); if (!c.length) return alert('연결할 PDF를 먼저 선택하세요.'); await pdfLinkApp(c); }));
+    btn('🔗 선택한 자료 일괄 공유', 'bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-2 rounded-xl font-bold', async () => { const c = chosen(); if (!c.length) return alert('공유할 자료를 먼저 선택하세요.'); await pdfShare(c); }),
+    btn('🧩 선택한 자료를 앱에 연결', 'bg-amber-500 hover:bg-amber-600 text-white text-xs px-3 py-2 rounded-xl font-bold', async () => { const c = chosen(); if (!c.length) return alert('연결할 자료를 먼저 선택하세요.'); await pdfLinkApp(c); }));
   box.append(tb);
-  if (!list.length) { box.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', items.length ? '조건에 맞는 PDF가 없습니다.' : '아직 올린 PDF가 없습니다. "PDF 일괄 올리기"를 눌러 주세요.')); return; }
-  const wrap = h('div', 'space-y-2');
-  list.forEach(it => {
-    const row = h('div', 'p-3 bg-slate-50 border rounded-xl flex flex-wrap items-center gap-2 text-sm font-bold text-slate-700 ' + (it.unsorted ? 'border-amber-300' : 'border-slate-200')), c = h('input'); c.type = 'checkbox'; c.checked = PL.sel.has(it.id);
+  if (!list.length) { box.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', items.length ? '조건에 맞는 자료가 없습니다.' : '아직 올린 자료가 없습니다. "폴더째 올리기"를 눌러 주세요.')); return; }
+  const wrap = h('div', 'space-y-2'), shown = list.slice(0, 300);
+  shown.forEach(it => {
+    const row = h('div', 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center gap-2 text-sm font-bold text-slate-700'), c = h('input'); c.type = 'checkbox'; c.checked = PL.sel.has(it.id);
     c.onchange = () => { c.checked ? PL.sel.add(it.id) : PL.sel.delete(it.id); drawPdfLib(); };
-    const l = h('div', 'flex-grow min-w-0'); l.append(h('div', 'break-all', '📄 ' + it.name));
+    const l = h('div', 'flex-grow min-w-0'); l.append(h('div', 'break-all', (isPdf(it) ? '📄 ' : '📊 ') + it.name));
     const sub = h('div', 'flex flex-wrap gap-1 mt-1'), tag = (t, cl) => sub.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + cl, t));
-    tag(subjName(it.folder), 'bg-slate-200 text-slate-600'); if (it.book) tag(it.book, 'bg-indigo-100 text-indigo-700'); if (it.level) tag(it.level, 'bg-sky-100 text-sky-700'); if (it.grade) tag(it.grade, 'bg-sky-100 text-sky-700'); if (it.kind) tag(it.kind, 'bg-emerald-100 text-emerald-700');
-    tag(it.unsorted ? '미분류' : '앱: ' + (it.linkName || it.linkCode || ''), it.unsorted ? 'bg-amber-100 text-amber-700' : 'bg-fuchsia-100 text-fuchsia-700');
+    tag(subjName(it.folder), 'bg-slate-200 text-slate-600'); if (it.grade) tag(it.grade, 'bg-sky-100 text-sky-700'); if (it.publisher) tag(it.publisher, 'bg-indigo-100 text-indigo-700');
+    if (it.linkName) tag('앱: ' + it.linkName, 'bg-fuchsia-100 text-fuchsia-700');
     const n = (it.shared || []).length; tag(n ? '공유 ' + n + '개 지점' : '미공유', n ? 'bg-violet-100 text-violet-700' : 'bg-slate-200 text-slate-500');
     l.append(sub);
     const r = h('div', 'flex flex-wrap gap-1.5');
@@ -735,45 +728,67 @@ function drawPdfLib() {
     row.append(c, l, r); wrap.append(row);
   });
   box.append(wrap);
+  if (list.length > shown.length) box.append(h('div', 'text-center py-3 text-xs text-slate-400 font-bold', '위에서 ' + shown.length + '개만 보여 줍니다. 과목·학년·출판사를 골라 좁혀 보세요. (전체 ' + list.length + '개)'));
 }
-/* 일괄 올리기 */
+/* 올리기: 폴더 경로 → 과목/학년/출판사 */
+async function pdfEnsureDir(cache, folder, names, parentId) {
+  const id = 'PDFDIR_' + folder + '_' + hash36(names.join('/')), ref = db.collection('items').doc(id);
+  if (!cache.has(id)) {
+    const d = await ref.get();
+    if (!d.exists || d.data().deleted) await ref.set({ folder, type: 'folder', name: names[names.length - 1], parentId: parentId || null, tabId: 'pdf', visible: true, shared: [], pathOnly: [], createdAt: Date.now() });
+    cache.add(id);
+  }
+  return id;
+}
 async function pdfBulkUpload(files) {
   toast('파일을 확인하는 중...'); await loadPdfLib();
-  const rows = files.map(f => { const m = parsePdfName(f.name), id = 'PDFLIB_' + hash36(f.name.normalize('NFC')); return { f, m, id, app: matchPdfApp(m, PL.apps), big: f.size > PDF_MAX, bad: !/\.pdf$/i.test(f.name) && f.type !== 'application/pdf' }; });
-  const seen = new Set(); rows.forEach(r => { if (seen.has(r.id)) r.dup = true; seen.add(r.id); });
-  const exist = new Set(PL.items.map(i => i.id)); rows.forEach(r => { r.over = exist.has(r.id); });
+  const rows = files.map(f => {
+    const rel = f.webkitRelativePath || f.name, c = classifyPdf(rel), id = 'PDFLIB_' + hash36(rel.normalize('NFC'));
+    return { f, rel, c, id, folder: subjFolder(c.subject), skip: !PDF_LIMIT[c.ext] ? '형식 제외(PDF·PPTX만 가능)' : f.size > PDF_LIMIT[c.ext] ? '크기 초과(' + (c.ext === 'pdf' ? '20' : '50') + 'MB)' : '' };
+  });
+  const seen = new Set(); rows.forEach(r => { if (!r.skip && seen.has(r.id)) r.skip = '이름·경로 중복'; seen.add(r.id); });
+  const exist = new Set(PL.items.map(i => i.id)); rows.forEach(r => { r.over = !r.skip && exist.has(r.id); if (!r.skip && !r.folder) r.skip = '넣을 폴더 없음'; });
   toast('');
-  const folders = FOLDERS.filter(f => f.kind === 'shared');
+  const ok = rows.filter(r => !r.skip), groups = new Map();
+  ok.forEach(r => { const k = r.c.subject + ' > ' + r.c.grade + ' > ' + r.c.publisher; const g = groups.get(k) || { n: 0, o: 0 }; g.n++; if (r.over) g.o++; groups.set(k, g); });
+  const skipped = rows.filter(r => r.skip), reasons = {}; skipped.forEach(r => { reasons[r.skip] = (reasons[r.skip] || 0) + 1; });
   const pick = await new Promise(res => {
     const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4'), card = h('div', 'bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-full overflow-y-auto');
-    const ok = rows.filter(r => !r.big && !r.bad && !r.dup), linked = ok.filter(r => r.app).length, over = ok.filter(r => r.over).length;
-    card.append(h('h3', 'text-base font-bold text-slate-800 mb-1', '📤 PDF ' + files.length + '개 올리기 확인'), h('p', 'text-xs text-slate-600 mb-3', '올릴 수 있는 파일 ' + ok.length + '개 · 앱에 자동 연결 ' + linked + '개 · 미분류 ' + (ok.length - linked) + '개' + (over ? ' · 이미 있어서 내용을 덮어쓰는 파일 ' + over + '개' : '') + (ok.length < rows.length ? ' · 제외 ' + (rows.length - ok.length) + '개(20MB 초과·PDF 아님·이름 중복)' : '')));
+    card.append(h('h3', 'text-base font-bold text-slate-800 mb-1', '📤 자료 ' + files.length + '개 올리기 확인'), h('p', 'text-xs text-slate-600 mb-3', '올릴 파일 ' + ok.length + '개' + (skipped.length ? ' · 제외 ' + skipped.length + '개 (' + Object.entries(reasons).map(([k, v]) => k + ' ' + v).join(', ') + ')' : '') + ' · 이미 올라가 있는 파일 ' + ok.filter(r => r.over).length + '개'));
     const ul = h('div', 'border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-72 overflow-y-auto mb-3 text-xs');
-    rows.forEach(r => ul.append(h('div', 'p-2 ' + (r.big || r.bad || r.dup ? 'text-rose-600' : r.app ? 'text-slate-700' : 'text-amber-700'), r.f.name + '  →  ' + (r.big ? '제외(20MB 초과)' : r.bad ? '제외(PDF 아님)' : r.dup ? '제외(이름 중복)' : r.app ? r.app.name + ' (' + r.app.id + ')' : '미분류') + (r.over && !r.big && !r.bad && !r.dup ? ' · 덮어쓰기' : ''))));
+    [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], 'ko')).forEach(([k, g]) => { const li = h('div', 'p-2 flex justify-between gap-2'); li.append(h('span', 'font-bold text-slate-700', '📁 ' + k), h('span', 'text-slate-500', g.n + '개' + (g.o ? ' (이미 있음 ' + g.o + ')' : ''))); ul.append(li); });
+    if (!groups.size) ul.append(h('div', 'p-3 text-slate-400', '올릴 수 있는 파일이 없습니다.'));
     card.append(ul);
-    const sl = h('label', 'block text-xs font-bold text-slate-600 mb-1', '미분류 PDF를 모아 둘 폴더'), sel = h('select', 'w-full p-2 border border-slate-300 rounded-xl text-xs font-bold mb-4');
-    folders.forEach(f => sel.append(new Option(f.name, f.id))); card.append(sl, sel);
+    const lab = h('label', 'flex items-center gap-2 text-xs font-bold text-slate-700 mb-4'), ow = h('input'); ow.type = 'checkbox'; lab.append(ow, document.createTextNode('이미 올라가 있는 파일도 새 파일로 덮어쓰기 (기본: 건너뜀. 위치·공유 설정은 그대로)')); card.append(lab);
     const row = h('div', 'flex gap-2');
-    row.append(btn(ok.length ? '올리기 (' + ok.length + '개)' : '올릴 파일 없음', 'flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl', async () => { if (!ok.length) return; ov.remove(); res({ ok, folder: sel.value }); }), btn('취소', 'flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl', async () => { ov.remove(); res(null); }));
+    row.append(btn(ok.length ? '올리기' : '올릴 파일 없음', 'flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl', async () => { if (!ok.length) return; ov.remove(); res({ overwrite: ow.checked }); }), btn('취소', 'flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl', async () => { ov.remove(); res(null); }));
     card.append(row); ov.append(card); document.body.append(ov);
   });
   if (!pick) return;
-  const uf = 'PDF-UNSORTED-' + pick.folder;
-  if (pick.ok.some(r => !r.app)) { const d = await db.collection('items').doc(uf).get(); if (!d.exists || d.data().deleted) await db.collection('items').doc(uf).set({ folder: pick.folder, type: 'folder', name: 'PDF 미분류', parentId: null, tabId: 'video', visible: true, shared: [], pathOnly: [], createdAt: Date.now() }); }
-  let n = 0, fail = [];
-  for (const r of pick.ok) {
-    n++; toast('올리는 중... ' + n + ' / ' + pick.ok.length);
-    try {
-      const folder = r.app ? r.app.folder : pick.folder, old = PL.items.find(i => i.id === r.id);
-      const ref = st.ref('pdf/' + (old ? old.folder : folder) + '/lib_' + hash36(r.f.name.normalize('NFC')) + '.pdf');
-      await ref.put(r.f, { contentType: 'application/pdf' });
-      const url = await ref.getDownloadURL(), meta = { pdfLib: true, pdfUrl: url, pdfPath: ref.fullPath, fileName: r.f.name, book: r.m.book, level: r.m.level, unit: r.m.unit, kind: r.m.kind, grade: r.m.grade };
-      if (old) await db.collection('items').doc(r.id).update(meta); // 이미 있으면 위치·공유는 그대로, 파일만 새것으로
-      else await db.collection('items').doc(r.id).set({ ...meta, name: r.m.base, type: 'file', folder, parentId: r.app ? (r.app.parentId || null) : uf, tabId: r.app ? (r.app.tabId || 'video') : 'video', visible: false, shared: [], pathOnly: [], unsorted: !r.app, ...(r.app ? { linkCode: r.app.id, linkName: r.app.name } : {}), createdAt: Date.now() });
-    } catch (e) { fail.push(r.f.name + ' (' + (e.message || '오류') + ')'); }
-  }
+  const todo = ok.filter(r => !r.over || pick.overwrite);
+  if (!todo.length) return alert('새로 올릴 파일이 없습니다. (모두 이미 올라가 있음)');
+  if (!TABS.some(t => t[0] === 'pdf')) { TABS.push(['pdf', 'PDF·PPT']); await saveTabs(); }
+  const dirs = new Set(), fail = []; let done = 0, idx = 0;
+  const work = async () => {
+    while (idx < todo.length) {
+      const r = todo[idx++];
+      try {
+        const old = PL.items.find(i => i.id === r.id), folder = old ? old.folder : r.folder;
+        const ref = st.ref('pdf/' + folder + '/lib_' + hash36(r.rel.normalize('NFC')) + '.' + r.c.ext);
+        await ref.put(r.f, { contentType: PDF_MIME[r.c.ext] });
+        const url = await ref.getDownloadURL(), meta = { pdfLib: true, pdfUrl: url, pdfPath: ref.fullPath, fileName: r.f.name, relPath: r.rel.normalize('NFC'), subj: r.c.subject, grade: r.c.grade, publisher: r.c.publisher };
+        if (old) await db.collection('items').doc(r.id).update(meta);
+        else {
+          const d1 = await pdfEnsureDir(dirs, folder, ['PDF 자료'], null), d2 = await pdfEnsureDir(dirs, folder, ['PDF 자료', r.c.grade], d1), d3 = await pdfEnsureDir(dirs, folder, ['PDF 자료', r.c.grade, r.c.publisher], d2);
+          await db.collection('items').doc(r.id).set({ ...meta, name: r.c.base, type: 'file', folder, parentId: d3, tabId: 'pdf', visible: false, shared: [], pathOnly: [], createdAt: Date.now() });
+        }
+      } catch (e) { fail.push(r.f.name + ' (' + (e.code || e.message || '오류') + ')'); }
+      done++; toast('올리는 중... ' + done + ' / ' + todo.length);
+    }
+  };
+  await Promise.all([work(), work(), work()]);
   toast(''); await loadPdfLib(); drawPdfLib();
-  alert('PDF ' + (pick.ok.length - fail.length) + '개를 올렸습니다.' + (fail.length ? '\n\n올리지 못한 파일 ' + fail.length + '개:\n' + fail.slice(0, 10).join('\n') : '') + '\n\n공유는 목록에서 PDF를 골라 "일괄 공유"를 눌러 주세요. (올린 PDF는 처음에 미공유입니다)');
+  alert('자료 ' + (todo.length - fail.length) + '개를 올렸습니다.' + (fail.length ? '\n\n올리지 못한 파일 ' + fail.length + '개:\n' + fail.slice(0, 10).join('\n') + (fail.length > 10 ? '\n…' : '') + '\n(같은 폴더를 다시 올리면 못 올린 파일만 이어서 올라갑니다)' : '') + '\n\n올린 자료는 처음에 미공유입니다. 목록에서 골라 "일괄 공유"를 눌러 주세요.');
 }
 /* 공유: 한 개면 지점을 그대로 지정, 여러 개면 선택한 지점을 추가 */
 async function pdfAncestors(parentId, pick, cache) {
