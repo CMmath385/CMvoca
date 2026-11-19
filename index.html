@@ -355,7 +355,7 @@ function koCall(n) { // 받침이 있으면 "아", 없으면 "야" (철수야 / 
   const c = n.charCodeAt(n.length - 1); if (c < 0xAC00 || c > 0xD7A3) return n;
   return n + ((c - 0xAC00) % 28 === 0 ? '야' : '아');
 }
-const GREET_DEF = '{이름}, 오늘도 함께 열심히 하자. 화이팅!';
+const GREET_DEF = '{이름}, 오늘도 학교 수업하느라 힘들었지? 그래도 우리 같이 조금만 더 힘내자. 화이팅!';
 function greetBuild(tpl, name) { // {이름} → 철수야(받침 따라 야/아), {이름만} → 철수
   const n = koGivenName(name); if (!n) return '';
   const t = String(tpl || '').trim() || GREET_DEF;
