@@ -493,9 +493,33 @@ function openFolderEditor() {
   card.append(h('h3', 'text-base font-bold text-slate-800 mb-1', '학습 폴더 편집'), h('p', 'text-xs text-slate-500 mb-3', '이름 수정 · ▲▼ 순서 변경 · 폴더 추가/삭제 후 [저장]을 누르세요. 모든 지점과 학생에게 적용됩니다.'), box, add, row2);
   draw(); ov.append(card); document.body.append(ov);
 }
+
+/* ===== 뒤로가기(브라우저·폰의 뒤로 버튼): 앱을 나가지 않고 바로 전 화면으로 =====
+   · 폴더를 들어가거나 메뉴를 바꿀 때마다 기록을 쌓고, 뒤로가기를 누르면 그 전 화면으로 돌아감
+   · 학습 화면(자료·영상)이 열려 있으면 뒤로가기는 학습 화면만 닫음 */
+const NAV = { last: '', started: false, viewer: false };
+const navKey = () => [S.view, S.folder, S.folderId || ''].join('|');
+function navPush() {
+  if (!S.me) return; const k = navKey(); if (k === NAV.last) return; NAV.last = k;
+  const st = { cm: 1, view: S.view, folder: S.folder, folderId: S.folderId || null };
+  try { if (!NAV.started) { NAV.started = true; history.replaceState(st, ''); } else history.pushState(st, ''); } catch (_) {}
+}
+function navViewerOpen(fn) { S.backClose = fn; try { if (NAV.viewer) history.replaceState({ cm: 1, viewer: 1 }, ''); else history.pushState({ cm: 1, viewer: 1 }, ''); NAV.viewer = true; } catch (_) {} }
+function navViewerClose() { if (!NAV.viewer) return; NAV.viewer = false; S.backClose = null; try { history.back(); } catch (_) {} }
+async function navRestore(st) {
+  const fc = st.folder !== S.folder || st.view !== S.view; NAV.last = [st.view, st.folder, st.folderId || ''].join('|');
+  S.folder = st.folder; S.folderId = st.folderId; buildSide();
+  if (S.view !== st.view) setView(st.view); else if (st.view === 'content') { if (fc) await renderContent(); else drawContent(); }
+}
+window.addEventListener('popstate', e => {
+  if (S.backClose) { const f = S.backClose; S.backClose = null; NAV.viewer = false; f(); return; }
+  const st = e.state; if (!st || !st.cm || st.viewer || !S.me) return;
+  if ([st.view, st.folder, st.folderId || ''].join('|') === navKey()) return;
+  safe(() => navRestore(st));
+});
 function setView(v) {
   if (v === 'content' && S.folder === 'F' && !S.fFiles && S.me.role !== 'student') v = 'manage';
-  S.view = v;
+  S.view = v; navPush();
   ['content', 'students', 'history', 'manage', 'settings', 'branches', 'pdflib', 'import', 'hw', 'trash'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== v));
   $('side').parentElement.classList.toggle('hidden', v !== 'content' && v !== 'manage');
   const views = [['content', '📂 학습 자료실'], ['hw', '📝 숙제·알림장']];
@@ -533,6 +557,7 @@ async function loadItems() {
 async function renderContent() { toast('불러오는 중...'); if (S.folder === 'F') await ensureFFolders(); const ok = await loadItems(); toast(''); if (ok) drawContent(); }
 
 function drawContent() {
+  navPush();
   const f = FOLDERS.find(x => x.id === S.folder) || FOLDERS[0], edit = isEdit();
   // 경로
   const path = []; let cur = S.folderId;
@@ -603,6 +628,7 @@ function drawContent() {
     if (isA() && edit) l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (it.visible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'), it.visible ? '학생공개' : '비공개'));
     if (sharedScoped() && S.me.role === 'super') { const n = (it.shared || []).length; l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (n ? 'bg-violet-100 text-violet-700' : 'bg-slate-200 text-slate-500'), n ? '공유 ' + n + '개 지점' : '미공유')); }
     if (it.type === 'folder') { l.classList.add('cursor-pointer'); l.onclick = () => { S.folderId = it.id; drawContent(); }; }
+    else if (it.htmlPage || it.linkUrl || it.pdfUrl) { l.classList.add('cursor-pointer'); l.title = '눌러서 열기'; l.onclick = () => { unlockSound(); openItem(it); }; } // 이름을 눌러도 학습이 열림
     row.append(l);
     const r = h('div', 'flex flex-wrap items-center gap-1.5');
     if (it.type === 'folder') r.append(btn('열기', B1, () => { S.folderId = it.id; drawContent(); }));
@@ -1691,7 +1717,7 @@ async function openHtml(it) {
   const ov = h('div', 'fixed inset-0 bg-white flex flex-col'); ov.style.zIndex = '60'; ov.style.height = '100dvh';
   const bar = h('div', 'flex items-center justify-between gap-2 px-3 py-2 bg-slate-900 text-white flex-shrink-0'), prev = document.body.style.overflow;
   const shut = () => { ov.remove(); S.viewFrame = null; document.body.style.overflow = prev; };
-  const close = () => { shut(); showStudyModal(); };
+  const close = () => { navViewerClose(); shut(); showStudyModal(); };
   const go = async o => { shut(); await autoFinish(); openItem(sib[idx + o]); };
   bar.append(btn('← 돌아가기', 'bg-white/15 hover:bg-white/25 text-white font-bold text-sm px-4 py-2.5 rounded-xl', async () => close()), h('div', 'flex-grow min-w-0 text-xs font-bold truncate text-center', it.name + (sib.length > 1 && idx >= 0 ? '  (' + (idx + 1) + '/' + sib.length + ')' : '')), btn('✅ 학습 완료', 'bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm px-4 py-2.5 rounded-xl', async () => close()));
   const fr = h('iframe', 'flex-grow w-full border-0 bg-white'); fr.setAttribute('sandbox', 'allow-scripts allow-forms allow-modals allow-popups'); fr.setAttribute('title', it.name); fr.srcdoc = html; S.viewFrame = fr;
@@ -1701,7 +1727,7 @@ async function openHtml(it) {
   if (idx > 0) tb.append(btn('◀ 이전', TB, async () => go(-1)));
   tb.append(btn('A−', TB, async () => { S.zoom = Math.max(0.7, +(S.zoom - 0.1).toFixed(1)); post({ cmZoom: S.zoom }); }), btn('A+', TB, async () => { S.zoom = Math.min(1.8, +(S.zoom + 0.1).toFixed(1)); post({ cmZoom: S.zoom }); }), btn('🖨 인쇄', TB, async () => post({ cmPrint: 1 })));
   if (idx >= 0 && idx < sib.length - 1) tb.append(btn('다음 ▶', 'bg-indigo-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg', async () => go(1)));
-  ov.append(bar, tb, fr); document.body.append(ov); document.body.style.overflow = 'hidden';
+  ov.append(bar, tb, fr); document.body.append(ov); document.body.style.overflow = 'hidden'; navViewerOpen(close);
 }
 
 
@@ -2330,9 +2356,9 @@ function openLink(it) {
   const id = ytId(it.linkUrl);
   if (!id) { window.open(it.linkUrl, '_blank', 'noopener'); return; }
   $('yt-title').textContent = it.name; $('yt-frame').src = 'https://www.youtube.com/embed/' + id;
-  $('yt-modal').classList.remove('hidden'); $('yt-modal').classList.add('flex');
+  $('yt-modal').classList.remove('hidden'); $('yt-modal').classList.add('flex'); navViewerOpen(closeYt);
 }
-function closeYt() { $('yt-frame').src = ''; $('yt-modal').classList.add('hidden'); $('yt-modal').classList.remove('flex'); showStudyModal(); }
+function closeYt() { if (!$('yt-modal').classList.contains('hidden')) navViewerClose(); $('yt-frame').src = ''; $('yt-modal').classList.add('hidden'); $('yt-modal').classList.remove('flex'); showStudyModal(); }
 
 /* ===== 학습 이력 ===== */
 /* 학습 시작 → 완료 기록 (학생) */
