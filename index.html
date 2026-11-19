@@ -344,8 +344,29 @@ const AUTH_MSG = {
   'auth/user-not-found': '아이디 또는 비밀번호가 올바르지 않습니다.',
   'auth/invalid-email': '아이디 형식이 올바르지 않습니다.'
 };
+/* ===== 로그인 인사 음성: 학생이 로그인하면 "철수야, 오늘도 함께 열심히 하자. 화이팅!" ===== */
+const GREET_COMPOUND = ['남궁', '황보', '제갈', '선우', '독고', '사공', '서문', '동방'];
+function koGivenName(full) { // 김철수 → 철수 (성 떼기). 두 글자 이름·한글이 아닌 이름은 그대로
+  const n = String(full || '').replace(/\s/g, ''); if (!n) return '';
+  if (!/^[가-힣]+$/.test(n) || n.length <= 2) return n;
+  return n.length >= 4 && GREET_COMPOUND.includes(n.slice(0, 2)) ? n.slice(2) : n.slice(1);
+}
+function koCall(n) { // 받침이 있으면 "아", 없으면 "야" (철수야 / 민준아)
+  const c = n.charCodeAt(n.length - 1); if (c < 0xAC00 || c > 0xD7A3) return n;
+  return n + ((c - 0xAC00) % 28 === 0 ? '야' : '아');
+}
+function greetStudent(name) {
+  try {
+    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return;
+    const n = koGivenName(name); if (!n) return;
+    const u = new SpeechSynthesisUtterance(koCall(n) + ', 오늘도 함께 열심히 하자. 화이팅!');
+    u.lang = 'ko-KR'; u.rate = 0.95; u.pitch = 1.15; u.volume = 1;
+    const v = (speechSynthesis.getVoices() || []).find(x => /^ko/i.test(x.lang)); if (v) u.voice = v;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch (_) {}
+}
 async function handleLogin(e) {
-  e.preventDefault(); S.fresh = true;
+  e.preventDefault(); S.fresh = true; try { unlockSound(); } catch (_) {} // 로그인 버튼을 누른 순간 소리를 켜 둠(로그인 인사 음성용)
   if (!configured) return setErr('index.html 상단의 Firebase 설정값(FB)을 먼저 입력하세요.');
   setErr('');
   const id = $('login-id').value.trim().toLowerCase(), pw = $('login-pw').value;
@@ -405,6 +426,7 @@ if (configured) auth.onAuthStateChanged(async u => {
     const wasFresh = S.fresh;
     if (!(await claimSession(u))) return;
     enterPortal();
+    if (wasFresh && p.role === 'student') setTimeout(() => greetStudent(S.me.name), 800); // 로그인 인사 음성
     if (wasFresh && p.role === 'sub') { const dl = daysLeft(S.me.endDate); setTimeout(() => alert('로그인 되었습니다. ' + (dl === null ? '사용기간은 무제한입니다.' : dl === 0 ? '사용기간이 오늘까지입니다.' : '사용기간 ' + dl + '일 남았습니다.')), 400); }
   } catch (e) { S.fresh = false; await auth.signOut(); setErr('로그인 처리 중 오류: ' + e.message); }
 });
