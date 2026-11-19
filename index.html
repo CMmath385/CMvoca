@@ -663,7 +663,7 @@ async function shareAll() {
 const PDF_LIMIT = { pdf: 20 * 1024 * 1024, pptx: 50 * 1024 * 1024 };
 const PDF_MIME = { pdf: 'application/pdf', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
 const PUBLISHERS = ['천재', '미래엔', '비상', '동아', '지학사', 'YBM', '능률', '창비', '신사고', '금성', 'CM자체교재'];
-const PL = { items: [], dirs: [], more: false, sel: new Set(), f: { subject: '', grade: '', publisher: '', state: '', q: '' } };
+const PL = { items: [], dirs: [], opts: { subjects: [], grades: [], pubs: [] }, more: false, sel: new Set(), f: { subject: '', grade: '', publisher: '', state: '', q: '' } };
 const hash36 = s => { let a = 5381, b = 52711; for (const ch of s) { const k = ch.codePointAt(0); a = ((a * 33) ^ k) >>> 0; b = ((b * 33) ^ k) >>> 0; } return a.toString(36) + b.toString(36); };
 const extOf = n => { const m = /\.([A-Za-z0-9]+)$/.exec(n); return m ? m[1].toLowerCase() : ''; };
 function classifyPdf(rel) {
@@ -684,23 +684,32 @@ async function loadPdfDirs() {
 }
 async function loadPdfFiles() {
   const F = PL.f; PL.items = []; PL.more = false;
-  if (F.subject) {
-    let q = db.collection('items').where('pdfLib', '==', true).where('subj', '==', F.subject);
-    if (F.grade) q = q.where('grade', '==', F.grade);
-    if (F.publisher) q = q.where('publisher', '==', F.publisher);
+  if (F.subject && F.grade && F.publisher) {
+    let q = db.collection('items').where('pdfLib', '==', true).where('subj', '==', F.subject).where('grade', '==', F.grade);
+    if (F.publisher !== '*') q = q.where('publisher', '==', F.publisher);
     const p = await q.limit(400).get(); PL.more = p.size >= 400;
     PL.items = p.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.deleted);
   }
   PL.sel = new Set([...PL.sel].filter(id => PL.items.some(i => i.id === id)));
 }
-async function loadPdfLib() { await loadPdfDirs(); await loadPdfFiles(); }
+const pdfHas = async f => { let q = db.collection('items').where('pdfLib', '==', true); if (f.subj) q = q.where('subj', '==', f.subj); if (f.grade) q = q.where('grade', '==', f.grade); if (f.pub) q = q.where('publisher', '==', f.pub); return !(await q.limit(1).get()).empty; };
+const pdfKeep = async (cands, mk) => { const r = await Promise.all(cands.map(async c => ((await pdfHas(mk(c))) ? c : null))); return r.filter(Boolean); };
+const pdfNames = (arr, extra) => [...new Set(arr.concat(extra || []))].filter(Boolean).sort((a, b) => String(a).localeCompare(String(b), 'ko', { numeric: true }));
+async function pdfCalcOpts() { // 실제로 자료가 있는 항목만 남김
+  const F = PL.f, dirs = PL.dirs || [], O = PL.opts = { subjects: [], grades: [], pubs: [] };
+  const roots = dirs.filter(d => !d.parentId).map(d => d.name);
+  O.subjects = await pdfKeep(pdfNames(roots, roots.length ? [] : ['국어', '수학', '영어', '기타']), x => ({ subj: x }));
+  if (F.subject) { const sd = dirs.find(d => !d.parentId && d.name === F.subject); O.grades = await pdfKeep(pdfNames(sd ? dirs.filter(d => d.parentId === sd.id).map(d => d.name) : []), x => ({ subj: F.subject, grade: x })); }
+  if (F.subject && F.grade) { const sd = dirs.find(d => !d.parentId && d.name === F.subject), gd = sd && dirs.find(d => d.parentId === sd.id && d.name === F.grade); O.pubs = await pdfKeep(pdfNames(gd ? dirs.filter(d => d.parentId === gd.id).map(d => d.name) : []), x => ({ subj: F.subject, grade: F.grade, pub: x })); }
+}
+async function loadPdfLib() { await loadPdfDirs(); await pdfCalcOpts(); await loadPdfFiles(); }
 async function renderPdfLib() {
   const box = $('view-pdflib'); if (S.me.role !== 'super') { box.innerHTML = ''; return; }
-  toast('불러오는 중...'); await loadPdfDirs(); await loadBranches(); toast(''); drawPdfLib();
+  toast('불러오는 중...'); await loadPdfDirs(); await pdfCalcOpts(); await loadBranches(); toast(''); drawPdfLib();
 }
 async function pdfPick(key, v) {
   const F = PL.f; F[key] = v; if (key === 'subject') { F.grade = ''; F.publisher = ''; } if (key === 'grade') F.publisher = '';
-  toast('불러오는 중...'); await loadPdfFiles(); toast(''); drawPdfLib();
+  toast('불러오는 중...'); await pdfCalcOpts(); await loadPdfFiles(); toast(''); drawPdfLib();
 }
 function drawPdfLib() {
   const box = $('view-pdflib'); box.innerHTML = '';
@@ -713,20 +722,19 @@ function drawPdfLib() {
   bar.append(fd, fi, btn('📁 폴더째 올리기', 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-xl font-bold', async () => fd.click()), btn('📄 파일 골라 올리기', 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs px-3 py-2 rounded-xl font-bold', async () => fi.click()),
     btn('🚚 이전 위치에 올린 자료를 새 폴더로 옮기기', 'bg-rose-500 hover:bg-rose-600 text-white text-xs px-3 py-2 rounded-xl font-bold', () => pdfMigrate()));
   box.append(bar);
-  const F = PL.f, items = PL.items, dirs = PL.dirs || [];
-  const names = (arr, extra) => [...new Set(arr.concat(extra))].filter(Boolean).sort((a, b) => String(a).localeCompare(String(b), 'ko', { numeric: true }));
-  const sDir = dirs.find(d => !d.parentId && d.name === F.subject), gDir = sDir && dirs.find(d => d.parentId === sDir.id && d.name === F.grade);
-  const subjects = names(dirs.filter(d => !d.parentId).map(d => d.name), ['국어', '수학', '영어', '기타']);
-  const grades = names(sDir ? dirs.filter(d => d.parentId === sDir.id).map(d => d.name) : [], items.map(i => i.grade));
-  const pubs = names(gDir ? dirs.filter(d => d.parentId === gDir.id).map(d => d.name) : [], items.map(i => i.publisher));
-  const fb = h('div', 'flex flex-wrap gap-2 mb-3 items-center'), mk = (key, arr, all) => { const s = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold'); s.append(new Option(all, '')); arr.forEach(v => s.append(new Option(v, v))); s.value = F[key]; s.onchange = () => safe(() => pdfPick(key, s.value)); return s; };
-  fb.append(mk('subject', subjects, '과목을 고르세요'));
-  if (F.subject) fb.append(mk('grade', grades, '전체 학년'), mk('publisher', pubs, '전체 출판사'));
+  const F = PL.f, items = PL.items, O = PL.opts;
+  const fb = h('div', 'flex flex-wrap gap-2 mb-3 items-center'), mk = (key, arr, all, extra) => { const s = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold'); s.append(new Option(all, '')); (extra || []).forEach(([v, t]) => s.append(new Option(t, v))); arr.forEach(v => s.append(new Option(v, v))); s.value = F[key]; s.onchange = () => safe(() => pdfPick(key, s.value)); return s; };
+  fb.append(mk('subject', O.subjects, '① 과목 선택'));
+  if (F.subject) fb.append(mk('grade', O.grades, '② 학년 선택'));
+  if (F.subject && F.grade) fb.append(mk('publisher', O.pubs, '③ 출판사 선택', [['*', '전체 출판사 보기']]));
   const sel2 = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold'); sel2.append(new Option('전체 공유 상태', ''), new Option('미공유', 'unshared'), new Option('공유됨', 'shared')); sel2.value = F.state; sel2.onchange = () => { F.state = sel2.value; drawPdfLib(); };
   const q = h('input', 'p-2 border border-slate-300 rounded-xl text-xs flex-grow min-w-[10rem]'); q.placeholder = '불러온 목록에서 파일 이름 검색'; q.value = F.q; q.onchange = () => { F.q = q.value.trim(); drawPdfLib(); };
-  if (F.subject) fb.append(sel2, q);
+  if (F.subject && F.grade && F.publisher) fb.append(sel2, q);
   box.append(fb);
-  if (!F.subject) { box.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', '위에서 과목을 고르면 그 과목의 자료를 불러옵니다.')); return; }
+  if (!(F.subject && F.grade && F.publisher)) {
+    const msg = !F.subject ? (O.subjects.length ? '① 자료가 있는 과목이 위에 나옵니다. 과목을 고르세요.' : '아직 올린 자료가 없습니다. "폴더째 올리기"를 눌러 주세요. (이미 올렸다면 "새 폴더로 옮기기"를 눌러 주세요)') : !F.grade ? (O.grades.length ? '② 자료가 있는 학년을 고르세요.' : '이 과목에는 학년별 자료가 아직 없습니다. 이전 위치에 올린 자료라면 "새 폴더로 옮기기"를 눌러 주세요.') : '③ 자료가 있는 출판사를 고르세요. (모두 보려면 "전체 출판사 보기")';
+    box.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', msg)); return;
+  }
   const list = items.filter(i => (!F.state || (F.state === 'unshared' ? !(i.shared || []).length : (i.shared || []).length > 0))
     && (!F.q || (i.name || '').includes(F.q) || (i.fileName || '').includes(F.q))).sort((a, b) => byName({ name: a.relPath || a.name }, { name: b.relPath || b.name }));
   const tb = h('div', 'flex flex-wrap gap-2 mb-3 items-center'), all = h('input'); all.type = 'checkbox'; all.checked = list.length > 0 && list.every(i => PL.sel.has(i.id));
