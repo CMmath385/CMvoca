@@ -361,13 +361,22 @@ function greetBuild(tpl, name) { // {이름} → 철수야(받침 따라 야/아
   const t = String(tpl || '').trim() || GREET_DEF;
   return t.includes('{이름') ? t.split('{이름만}').join(n).split('{이름}').join(koCall(n)) : koCall(n) + ', ' + t;
 }
+/* 개념영상(lesson-video)과 같은 한글 음성: Google 한국어 → SunHi → Yuna → Heami 순서로 고르고, 속도 1.15배, 쉼표·마침표에서 1초 쉼 */
+const GREET_PREF = [/Google/i, /SunHi|Sun-Hi/i, /Yuna/i, /Heami/i]; let GREET_ID = 0;
+function greetVoice() { const vs = (speechSynthesis.getVoices() || []).filter(v => /^ko/i.test(v.lang)); for (const p of GREET_PREF) { const v = vs.find(x => p.test(x.name)); if (v) return v; } return vs[0]; }
+try { if ('speechSynthesis' in window) { speechSynthesis.getVoices(); } } catch (_) {}
 function greetSpeak(text) {
   try {
     if (!text || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ko-KR'; u.rate = 0.95; u.pitch = 1.15; u.volume = 1;
-    const v = (speechSynthesis.getVoices() || []).find(x => /^ko/i.test(x.lang)); if (v) u.voice = v;
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
+    const parts = String(text).replace(/['"‘’“”~()\[\]]/g, ' ').split(/[,.!?;:…]+/).map(x => x.trim()).filter(Boolean); if (!parts.length) return;
+    speechSynthesis.cancel(); const id = ++GREET_ID;
+    const next = i => {
+      if (i >= parts.length || id !== GREET_ID) return;
+      const u = new SpeechSynthesisUtterance(parts[i]); u.lang = 'ko-KR'; u.rate = 1.15; const v = greetVoice(); if (v) u.voice = v;
+      let done = false; const nx = () => { if (done) return; done = true; setTimeout(() => next(i + 1), 1000); }; u.onend = nx; u.onerror = nx;
+      speechSynthesis.speak(u);
+    };
+    next(0);
   } catch (_) {}
 }
 function greetStudent(name) { if (S.hqGreetOn === false) return; greetSpeak(greetBuild(S.hqGreetText, name)); }
