@@ -361,25 +361,39 @@ function greetBuild(tpl, name) { // {이름} → 철수야(받침 따라 야/아
   const t = String(tpl || '').trim() || GREET_DEF;
   return t.includes('{이름') ? t.split('{이름만}').join(n).split('{이름}').join(koCall(n)) : koCall(n) + ', ' + t;
 }
-/* 개념영상(lesson-video)과 같은 한글 음성: Google 한국어 → SunHi → Yuna → Heami 순서로 고르고, 속도 1.15배, 쉼표·마침표에서 1초 쉼 */
-const GREET_PREF = [/Google/i, /SunHi|Sun-Hi/i, /Yuna/i, /Heami/i]; let GREET_ID = 0;
-function greetVoice() { const vs = (speechSynthesis.getVoices() || []).filter(v => /^ko/i.test(v.lang)); for (const p of GREET_PREF) { const v = vs.find(x => p.test(x.name)); if (v) return v; } return vs[0]; }
+/* 개념영상(lesson-video)과 같은 음성 고르기: 한글은 Google 한국어 → SunHi → Yuna → Heami, 영어는 Google US → Samantha → Aria·Jenny·Ava 순서.
+   · 영어 단어·문장(알파벳)은 영어 음성으로, 한글은 한국어 음성으로 자동으로 나눠 읽음 (영어 문장만 써도 됨)
+   · 말투(다정하게/밝게/차분하게)에 따라 속도·높낮이·쉬는 시간이 달라짐. 쉼표·마침표에서 쉬고 부호는 읽지 않음 */
+const GREET_STYLES = { warm: { name: '다정하게 (기본)', ko: 1.02, en: 0.92, pitch: 1.12, pause: 700 }, bright: { name: '밝고 활기차게', ko: 1.12, en: 0.97, pitch: 1.25, pause: 500 }, calm: { name: '차분하게', ko: 0.95, en: 0.88, pitch: 1.0, pause: 900 } };
+let GREET_ID = 0;
+function greetVoice(en) {
+  const vs = (speechSynthesis.getVoices() || []).filter(v => (en ? /^en[-_]US/i : /^ko/i).test(v.lang));
+  const pref = en ? [/Google US/i, /Samantha/i, /Aria|Jenny|Ava/i] : [/Google/i, /SunHi|Sun-Hi/i, /Yuna/i, /Heami/i];
+  for (const p of pref) { const v = vs.find(x => p.test(x.name)); if (v) return v; }
+  return vs[0] || (en ? (speechSynthesis.getVoices() || []).find(v => /^en/i.test(v.lang)) : null);
+}
 try { if ('speechSynthesis' in window) { speechSynthesis.getVoices(); } } catch (_) {}
-function greetSpeak(text) {
+function greetSpeak(text, style) {
   try {
     if (!text || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return;
-    const parts = String(text).replace(/['"‘’“”~()\[\]]/g, ' ').split(/[,.!?;:…]+/).map(x => x.trim()).filter(Boolean); if (!parts.length) return;
+    const st = GREET_STYLES[style] || GREET_STYLES.warm;
+    const parts = String(text).replace(/['‘’]/g, "'").replace(/["“”~()\[\]]/g, ' ').split(/[,.!?;:…]+/).map(x => x.trim()).filter(Boolean); if (!parts.length) return;
     speechSynthesis.cancel(); const id = ++GREET_ID;
     const next = i => {
       if (i >= parts.length || id !== GREET_ID) return;
-      const u = new SpeechSynthesisUtterance(parts[i]); u.lang = 'ko-KR'; u.rate = 1.15; const v = greetVoice(); if (v) u.voice = v;
-      let done = false; const nx = () => { if (done) return; done = true; setTimeout(() => next(i + 1), 1000); }; u.onend = nx; u.onerror = nx;
-      speechSynthesis.speak(u);
+      const runs = parts[i].split(/([A-Za-z][A-Za-z' \-]*)/).map(x => x.trim()).filter(Boolean);
+      let done = false; const nx = () => { if (done) return; done = true; setTimeout(() => next(i + 1), st.pause); };
+      runs.forEach((t, k) => {
+        const en = /^[A-Za-z]/.test(t), u = new SpeechSynthesisUtterance(t); u.lang = en ? 'en-US' : 'ko-KR'; u.rate = en ? st.en : st.ko; u.pitch = st.pitch;
+        const v = greetVoice(en); if (v) u.voice = v;
+        if (k === runs.length - 1) { u.onend = nx; u.onerror = nx; }
+        speechSynthesis.speak(u);
+      });
     };
     next(0);
   } catch (_) {}
 }
-function greetStudent(name) { if (S.hqGreetOn === false) return; greetSpeak(greetBuild(S.hqGreetText, name)); }
+function greetStudent(name) { if (S.hqGreetOn === false) return; greetSpeak(greetBuild(S.hqGreetText, name), S.hqGreetStyle); }
 async function handleLogin(e) {
   e.preventDefault(); S.fresh = true; try { unlockSound(); } catch (_) {} // 로그인 버튼을 누른 순간 소리를 켜 둠(로그인 인사 음성용)
   if (!configured) return setErr('index.html 상단의 Firebase 설정값(FB)을 먼저 입력하세요.');
@@ -433,7 +447,7 @@ if (configured) auth.onAuthStateChanged(async u => {
       if (dl !== null && dl < 0) { const ed = S.me.endDate; S.fresh = false; await auth.signOut(); return setErr('사용기간이 만료되었습니다. (' + ed + ') 본원에 문의해 주세요.'); }
       S.me.logoUrl = b.exists ? (b.data().logoUrl || '') : ''; S.me.logoPath = b.exists ? (b.data().logoPath || '') : ''; S.me.fSeeded = b.exists ? !!b.data().fSeeded : true; S.me.fVer = b.exists ? (b.data().fVer || 0) : 2;
     }
-    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.fSeededMain = !!c.data().fSeeded; S.fVerMain = c.data().fVer || 0; S.hqName = c.data().academyName || ''; S.hqGreetOn = c.data().greetOn !== false; S.hqGreetText = c.data().greetText || ''; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; applyFolders(c.data().folders); if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
+    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { S.seeded = !!c.data().seeded; S.fSeededMain = !!c.data().fSeeded; S.fVerMain = c.data().fVer || 0; S.hqName = c.data().academyName || ''; S.hqGreetOn = c.data().greetOn !== false; S.hqGreetText = c.data().greetText || ''; S.hqGreetStyle = c.data().greetStyle || 'warm'; S.hqLogo = c.data().logoUrl || ''; S.hqLogoPath = c.data().logoPath || ''; applyFolders(c.data().folders); if (c.data().tabs && c.data().tabs.length) TABS = c.data().tabs.map(t => [t.id, t.name]); } } catch (_) {}
     if (p.role === 'super') {
       await loadBranches();
       if (!S.seeded) { try { await seedMaterials(); } catch (e) { toast(''); alert('기존 학습 자료 등록 실패: ' + e.message + '\n(백업·가져오기 탭에서 다시 시도할 수 있습니다.)'); } }
@@ -2510,16 +2524,17 @@ function renderSettings() {
   v.append(box);
   if (sup) {
     const g = h('div', 'bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xl space-y-3 mt-5');
-    g.append(h('h3', 'text-base font-bold text-slate-800', '🔊 학생 로그인 인사 음성'), h('p', 'text-xs text-slate-500', '학생이 아이디·비밀번호로 로그인하면 이 문구를 음성으로 읽어 줍니다. 문구 안의 {이름} 자리에는 그 학생의 이름이 "철수야"처럼 들어갑니다. ({이름만}은 "철수"처럼 호칭 없이 들어갑니다.)'));
+    g.append(h('h3', 'text-base font-bold text-slate-800', '🔊 학생 로그인 인사 음성'), h('p', 'text-xs text-slate-500', '학생이 아이디·비밀번호로 로그인하면 이 문구를 음성으로 읽어 줍니다. 문구 안의 {이름} 자리에는 그 학생의 이름이 "철수야"처럼 들어갑니다. ({이름만}은 "철수"처럼 호칭 없이 들어갑니다.) 영어로 쓴 부분은 영어 음성으로 자동으로 읽습니다.'));
     const on = h('input'); on.type = 'checkbox'; on.checked = S.hqGreetOn !== false; const ol = h('label', 'flex items-center gap-2 text-sm font-bold text-slate-700'); ol.append(on, document.createTextNode('로그인 인사 음성 사용'));
     const ta = h('textarea', 'w-full p-3 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-800'); ta.rows = 2; ta.maxLength = 100; ta.value = S.hqGreetText || GREET_DEF; ta.placeholder = GREET_DEF;
+    const sty = h('select', 'p-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold'); Object.entries(GREET_STYLES).forEach(([k, v]) => sty.append(new Option('말투: ' + v.name, k))); sty.value = S.hqGreetStyle || 'warm';
     const sm = h('div', 'text-xs text-slate-500', '');
     const upd = () => { sm.textContent = '미리보기(김철수 학생): ' + greetBuild(ta.value, '김철수'); }; ta.oninput = upd; upd();
-    g.append(ol, ta, sm, h('div', 'flex gap-2'));
+    g.append(ol, ta, sty, sm, h('div', 'flex gap-2'));
     const row = g.lastChild;
-    row.append(btn('🔊 미리 듣기', B2, async () => { unlockSound(); greetSpeak(greetBuild(ta.value, '김철수')); }), btn('저장', 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl', async () => {
-      const t = ta.value.trim().slice(0, 100); await db.collection('config').doc('main').set({ greetOn: on.checked, greetText: t }, { merge: true });
-      S.hqGreetOn = on.checked; S.hqGreetText = t; alert('저장되었습니다. 학생이 다음에 로그인할 때부터 적용됩니다.');
+    row.append(btn('🔊 미리 듣기', B2, async () => { unlockSound(); greetSpeak(greetBuild(ta.value, '김철수'), sty.value); }), btn('저장', 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl', async () => {
+      const t = ta.value.trim().slice(0, 100); await db.collection('config').doc('main').set({ greetOn: on.checked, greetText: t, greetStyle: sty.value }, { merge: true });
+      S.hqGreetOn = on.checked; S.hqGreetText = t; S.hqGreetStyle = sty.value; alert('저장되었습니다. 학생이 다음에 로그인할 때부터 적용됩니다.');
     }));
     v.append(g);
   }
