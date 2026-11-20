@@ -663,6 +663,13 @@ async function loadItems() {
 }
 async function renderContent() { toast('불러오는 중...'); if (S.folder === 'F') await ensureFFolders(); const ok = await loadItems(); toast(''); if (ok) drawContent(); }
 
+// 제목 찾기 도우미: 대소문자·완성형/조합형 글자를 구분하지 않고, 띄어쓰기로 나눈 글자가 모두 들어 있는 항목만 남김
+const nameKey = n => String(n || '').normalize('NFC').toLowerCase();
+function filterRows(rows, q) {
+  const terms = nameKey(q).split(/\s+/).filter(Boolean); let n = 0;
+  rows.forEach(r => { const on = terms.every(t => r.dataset.nm.includes(t)); r.style.display = on ? '' : 'none'; if (on) n++; });
+  return n;
+}
 function drawContent() {
   navPush();
   const f = FOLDERS.find(x => x.id === S.folder) || FOLDERS[0], edit = isEdit();
@@ -728,8 +735,17 @@ function drawContent() {
   const kids = visibleKids();
   if (edit && kids.length) list.append(h('div', 'text-[11px] text-slate-400 font-bold px-1', '↕ 항목을 끌어서 순서를 바꾸거나, 폴더 위(가운데)에 놓으면 그 폴더로 이동합니다. 위쪽 경로나 "상위 폴더로 이동"에 놓으면 그 위치로 이동합니다.'));
   if (!kids.length) { list.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', sharedScoped() && S.me.role !== 'super' ? '아직 본원에서 공유해 준 학습 자료가 없습니다.' : '등록된 학습 자료가 없습니다.')); return; }
+  // 제목으로 찾기: 이 폴더 안 목록에서 입력한 글자(띄어쓰기로 나누면 모두 들어간 것)가 이름에 있는 것만 보여 줌
+  const sKey = S.folder + '|' + (S.folderId || '') + '|' + S.tab, rowEls = [];
+  let sbox = null, sNone = null;
+  if (kids.length >= 4) {
+    sbox = h('input', 'w-full p-2.5 border border-slate-300 rounded-xl text-sm'); sbox.type = 'search'; sbox.placeholder = '🔍 이 폴더 안에서 제목으로 찾기 (' + kids.length + '개)'; sbox.setAttribute('aria-label', '제목으로 찾기');
+    sbox.value = S.listQ && S.listQ.key === sKey ? S.listQ.q : '';
+    list.append(sbox);
+  }
   kids.forEach(it => {
     const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap justify-between items-center gap-3 font-bold text-slate-700 text-sm');
+    row.dataset.nm = nameKey(it.name); rowEls.push(row);
     const l = h('div', 'flex items-center gap-2.5 flex-grow min-w-0');
     l.append(h('span', 'text-xl', it.type === 'folder' ? '📂' : it.htmlPage ? '🧩' : it.pdfUrl ? '📄' : '🔗'), h('span', 'text-base break-all', it.name));
     if (isA() && edit) l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (it.visible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'), it.visible ? '학생공개' : '비공개'));
@@ -753,6 +769,11 @@ function drawContent() {
     if (!edit && S.me.role === 'sub' && FOLDERS.some(f => f.kind === 'branch')) r.append(btn('📋 내 지점으로 복사', 'bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs px-2.5 py-2 rounded-xl font-bold', () => moveDialog(it, true)));
     row.append(r); if (edit) wireDrag(row, it); list.append(row);
   });
+  if (sbox) {
+    sNone = h('div', 'hidden text-center py-8 text-slate-400 font-medium text-sm', '찾는 제목이 없습니다.'); list.append(sNone);
+    const applyQ = () => { const q = sbox.value; S.listQ = { key: sKey, q }; const n = filterRows(rowEls, q); sNone.classList.toggle('hidden', n > 0); };
+    sbox.oninput = applyQ; if (sbox.value) applyQ();
+  }
 }
 
 /* ===== 지점별 공유 (B·C·D 폴더, 본원 관리자) ===== */
