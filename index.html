@@ -2461,7 +2461,7 @@ async function renderExamAdmin() {
 }
 async function evUsed(scopeKey, tkey, subj) {
   const s = await db.collection('hw').where('branchId', '==', EA.bid).get(), used = new Set();
-  s.docs.map(d => d.data()).filter(w => w.kind === 'exam' && w.scopeKey === scopeKey && w.targetKey === tkey && w.subj === subj).forEach(w => (w.keys || []).forEach(k => used.add(k)));
+  s.docs.map(d => d.data()).filter(w => w.kind === 'exam' && w.examKind === 'weekly' && w.scopeKey === scopeKey && w.targetKey === tkey && w.subj === subj).forEach(w => (w.keys || []).forEach(k => used.add(k)));
   return used;
 }
 async function evPrepare(cand) {
@@ -2478,6 +2478,7 @@ async function evPrepare(cand) {
     } catch (e) { bad.push(it.name + ' (읽기 오류)'); }
   }
   toast('');
+  if (EA.kind === 'monthly') return evPrepareMonthly(pool, bad, list.length, cand.length > 40);
   const t = evTarget(), scopeKey = EA.folder + '/' + (EA.path[EA.path.length - 1] || '*'), used = await evUsed(scopeKey, evTargetKey(t), EA.subj);
   const r = evDraw(pool, used, EA.subj, EV_N), d = new Date();
   EA.title = evScopeName() + ' ' + evKindName(EA.kind) + ' ' + (d.getMonth() + 1) + '/' + d.getDate();
@@ -2485,6 +2486,7 @@ async function evPrepare(cand) {
   await renderExamAdmin();
 }
 function evPreview(P) {
+  if (P.monthly) return evPreviewMonthly(P);
   const box = h('div', 'mt-3 p-4 bg-white border border-indigo-200 rounded-2xl shadow-sm'), cnt = {};
   P.r.picked.forEach(q => { const k = EA.subj === 'en' ? ({ wd: '단어', gs: '어법', vf: '동사형', od: '순서배열' })[q.kind] : (q.twin ? '쌍둥이' : '교과서'); cnt[k] = (cnt[k] || 0) + 1; });
   box.append(h('div', 'font-bold text-slate-800 text-sm', '뽑은 결과: ' + P.r.picked.length + '문항'), h('div', 'text-xs text-slate-600 mt-1', Object.entries(cnt).map(([k, n]) => k + ' ' + n).join(' · ') || '-'));
@@ -2499,18 +2501,90 @@ function evPreview(P) {
   box.append(row); return box;
 }
 async function evIssue(P) {
+  if (P.monthly) return evIssueMonthly(P);
   const t = evTarget(), title = (EA.title || '').trim(); if (!title) return alert('제목을 입력하세요.');
   const qs = P.r.picked, doc = { branchId: EA.bid, kind: 'exam', examKind: EA.kind, subj: EA.subj, title, target: t, targetKey: evTargetKey(t), scopeKey: P.scopeKey, folderName: evScopeName(), createdAt: Date.now(), qs, keys: qs.map(q => q.key) };
   if (JSON.stringify(doc).length > 900000) return alert('문제 자료가 너무 커서 저장할 수 없습니다. 그림이 많은 과입니다. "다시 뽑기"를 눌러 보세요.');
   if (!confirm('"' + title + '"을(를) ' + tgtText(t) + '에게 출제합니다. (' + qs.length + '문항)')) return;
   await db.collection('hw').add(doc); EA.prep = null; toast('출제했습니다.'); setTimeout(() => toast(''), 1500); await renderExamAdmin();
 }
+/* ===== 월말평가: 한 달 동안 틀린 문제(오답) 위주 → 모자라면 주간평가에 아직 안 낸 문제로 20문항 ===== */
+async function evPrepareMonthly(pool, bad, nCand, over) {
+  const t = evTarget(), studs = EA.roster.filter(r => tgtApplies(t, { uid: r.id, grade: r.grade }));
+  if (!studs.length) return alert('대상 학생이 없습니다.');
+  toast('학생별 오답을 모으는 중...');
+  const [hs, ds] = await Promise.all([db.collection('hw').where('branchId', '==', EA.bid).get(), db.collection('hwdone').where('branchId', '==', EA.bid).get()]);
+  toast('');
+  const weekly = hs.docs.map(d => d.data()).filter(w => w.kind === 'exam' && w.examKind === 'weekly' && w.subj === EA.subj), wq = {};
+  ds.docs.forEach(d => { if (d.id.startsWith('wq_')) wq[d.data().studentUid] = d.data().w || []; });
+  const scopeKey = EA.folder + '/' + (EA.path[EA.path.length - 1] || '*'), d0 = new Date();
+  EA.title = evScopeName() + ' ' + evKindName('monthly') + ' ' + (d0.getMonth() + 1) + '월';
+  const make = () => {
+    const byKey = new Map(pool.map(q => [q.key, q])), since = Date.now() - 30 * DAY_MS, plans = [];
+    studs.forEach(r => {
+      const usedW = new Set(); weekly.filter(w => tgtApplies(w.target, { uid: r.id, grade: r.grade })).forEach(w => (w.keys || []).forEach(k => usedW.add(k)));
+      const cnt = new Map();
+      (wq[r.id] || []).filter(e => e.t >= since).forEach(e => {
+        const ks = e.k[0] === '@' ? evMapAppWrong(e.itemId, EVC[e.itemId] || '', [e.k.slice(1)]) : [e.k];
+        ks.forEach(k => { if (byKey.has(k)) { const o = cnt.get(k) || { n: 0, t: 0 }; o.n++; o.t = Math.max(o.t, e.t); cnt.set(k, o); } });
+      });
+      const wrongs = []; let size = 0;
+      [...cnt.entries()].sort((a, b) => b[1].n - a[1].n || b[1].t - a[1].t).forEach(([k]) => { const q = byKey.get(k), sz = JSON.stringify(q).length; if (wrongs.length < EV_N && size + sz <= 700000) { wrongs.push(q); size += sz; } });
+      const have = new Set(wrongs.map(q => q.key)), fill = wrongs.length < EV_N ? evDraw(pool, new Set([...usedW, ...have]), EA.subj, EV_N - wrongs.length).picked.filter(q => size + JSON.stringify(q).length <= 700000) : [];
+      plans.push({ r, wrongs, fill, qs: evShuffle(wrongs.concat(fill)) });
+    });
+    return plans;
+  };
+  EA.prep = { monthly: true, plans: make(), bad, scopeKey, over, redo: async () => { EA.prep.plans = make(); await renderExamAdmin(); } };
+  await renderExamAdmin();
+}
+function evPreviewMonthly(P) {
+  const box = h('div', 'mt-3 p-4 bg-white border border-indigo-200 rounded-2xl shadow-sm'), tot = P.plans.reduce((n, x) => n + x.wrongs.length, 0);
+  box.append(h('div', 'font-bold text-slate-800 text-sm', '월말평가 · 대상 ' + P.plans.length + '명 · 오답 ' + tot + '문항 포함'),
+    h('div', 'text-[11px] text-slate-500 mt-1', '학생마다 최근 30일 동안 틀린 문제(선택한 과 안)를 먼저 넣고, 20문항이 안 되면 주간평가에 아직 안 낸 문제로 채웁니다. 학생마다 문제가 다릅니다.'));
+  P.plans.forEach(x => { const n = x.qs.length; box.append(h('div', 'text-xs py-0.5 ' + (n < EV_N ? 'text-rose-600 font-bold' : 'text-slate-600'), x.r.name + (x.r.grade ? ' (' + x.r.grade + ')' : '') + ' — 오답 ' + x.wrongs.length + ' + 새 문제 ' + x.fill.length + ' = ' + n + '문항' + (n < EV_N ? ' (문제 부족)' : ''))); });
+  if (P.over) box.append(h('div', 'text-[11px] text-amber-600 font-bold mt-1', '학습앱이 많아 앞의 40개만 읽었습니다.'));
+  if (P.bad.length) box.append(h('div', 'text-[11px] text-amber-600 font-bold mt-1', '문제를 뽑을 수 없는 학습앱: ' + P.bad.slice(0, 8).join(', ') + (P.bad.length > 8 ? ' 외 ' + (P.bad.length - 8) + '개' : '')));
+  const ti = h('input', 'w-full mt-3 p-2.5 border border-slate-300 rounded-xl text-sm font-bold'); ti.value = EA.title; ti.oninput = () => { EA.title = ti.value; }; box.append(ti);
+  const row = h('div', 'flex gap-2 mt-3'); row.append(btn('🎲 다시 뽑기', B2, async () => P.redo()));
+  if (P.plans.some(x => x.qs.length)) row.append(btn('📤 출제하기', B1, async () => evIssue(P)));
+  box.append(row); return box;
+}
+async function evIssueMonthly(P) {
+  const title = (EA.title || '').trim(); if (!title) return alert('제목을 입력하세요.');
+  const list = P.plans.filter(x => x.qs.length); if (!list.length) return alert('출제할 문제가 없습니다.');
+  if (!confirm('"' + title + '"을(를) ' + list.length + '명에게 출제합니다. (학생마다 문제가 다릅니다)')) return;
+  const batchId = 'b' + Date.now(), now = Date.now();
+  for (const x of list) {
+    const doc = { branchId: EA.bid, kind: 'exam', examKind: 'monthly', subj: EA.subj, title, target: { type: 'student', uid: x.r.id, name: x.r.name }, targetKey: 'student:' + x.r.id, scopeKey: P.scopeKey, folderName: evScopeName(), createdAt: now, qs: x.qs, keys: x.qs.map(q => q.key), batchId, wrongCount: x.wrongs.length, fillCount: x.fill.length };
+    if (JSON.stringify(doc).length > 900000) { alert(x.r.name + ' 학생의 문제 자료가 너무 커서 건너뜁니다.'); continue; }
+    await db.collection('hw').add(doc);
+  }
+  EA.prep = null; toast('출제했습니다.'); setTimeout(() => toast(''), 1500); await renderExamAdmin();
+}
+function evBatchCard(docs, dm) {
+  const w = docs[0], rows = docs.map(d => ({ d, x: dm[d.id + '_' + d.target.uid] })), got = rows.filter(r => r.x && r.x.examDone);
+  const avg = got.length ? Math.round(got.reduce((s, r) => s + (r.x.score || 0), 0) / got.length) : null;
+  const c = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl mb-2');
+  c.append(h('div', 'font-bold text-slate-800 text-sm break-all', '🗓️ ' + w.title), h('div', 'text-[11px] text-slate-400 mt-0.5', '학생별 문제 · 대상 ' + docs.length + '명 · ' + dayOf(w.createdAt) + ' · 완료 ' + got.length + ' / ' + docs.length + (avg != null ? ' · 평균 ' + avg + '점' : '')));
+  const det = h('div', 'hidden mt-2 text-xs text-slate-600');
+  rows.forEach(r => det.append(h('div', 'py-0.5 ' + (r.x && r.x.examDone ? '' : 'text-slate-400'), r.d.target.name + ' — ' + (r.x && r.x.examDone ? r.x.score + '점 (' + r.x.correct + '/' + r.x.total + ')' : '미응시') + ' · 오답 ' + (r.d.wrongCount || 0) + ' + 새 문제 ' + (r.d.fillCount || 0))));
+  const row = h('div', 'flex gap-2 mt-2');
+  row.append(btn('결과 보기', B2, async () => det.classList.toggle('hidden')), btn('삭제', 'bg-white border border-rose-300 text-rose-600 text-xs px-2.5 py-2 rounded-xl font-bold', async () => {
+    if (!confirm('"' + w.title + '" ' + docs.length + '명분을 모두 삭제할까요?\n삭제하면 학생 화면에서도 사라집니다.')) return;
+    for (const d of docs) await db.collection('hw').doc(d.id).delete();
+    await renderExamAdmin();
+  }));
+  c.append(row, det); return c;
+}
 async function evIssued(v) {
   const [hs, ds] = await Promise.all([db.collection('hw').where('branchId', '==', EA.bid).get(), db.collection('hwdone').where('branchId', '==', EA.bid).get()]);
   const exams = hs.docs.map(d => ({ id: d.id, ...d.data() })).filter(w => w.kind === 'exam').sort((a, b) => b.createdAt - a.createdAt), dm = {}; ds.docs.forEach(d => { dm[d.id] = d.data(); });
-  v.append(h('div', 'text-sm font-bold text-slate-600 mt-5 mb-2', '출제한 평가 ' + exams.length + '건'));
+  v.append(h('div', 'text-sm font-bold text-slate-600 mt-5 mb-2', '출제한 평가 ' + (exams.filter(w => !w.batchId).length + new Set(exams.filter(w => w.batchId).map(w => w.batchId)).size) + '건'));
+  const seenB = new Set();
   if (!exams.length) v.append(h('div', 'text-center py-6 text-slate-400 text-sm', '아직 출제한 평가가 없습니다.'));
   exams.forEach(w => {
+    if (w.batchId) { if (seenB.has(w.batchId)) return; seenB.add(w.batchId); return v.append(evBatchCard(exams.filter(x => x.batchId === w.batchId), dm)); }
     const tg = EA.roster.filter(r => tgtApplies(w.target, { uid: r.id, grade: r.grade })), got = tg.map(r => ({ r, d: dm[w.id + '_' + r.id] })).filter(x => x.d && x.d.examDone);
     const avg = got.length ? Math.round(got.reduce((s, x) => s + (x.d.score || 0), 0) / got.length) : null;
     const c = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl mb-2');
