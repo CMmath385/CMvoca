@@ -844,6 +844,38 @@ async function pdfPick(key, v) {
   const F = PL.f; F[key] = v; if (key === 'subject') { F.grade = ''; F.publisher = ''; } if (key === 'grade') F.publisher = '';
   toast('불러오는 중...'); await pdfCalcOpts(); await loadPdfFiles(); toast(''); drawPdfLib();
 }
+/* PDF 목록 선택: 체크 칸을 누른 채 위아래로 끌면 한꺼번에 선택됩니다(처음 칸이 꺼져 있었으면 선택, 켜져 있었으면 해제).
+   Shift를 누르고 칸을 누르면 직전에 누른 칸부터 그 칸까지 한꺼번에. 끌다가 화면 위·아래 끝으로 가면 목록이 저절로 넘어갑니다 */
+function pdfDragSelect(shown, rows, boxes, onChange) {
+  const sc = (() => { let e = rows[0] && rows[0].parentElement; while (e && e !== document.body) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight) return e; e = e.parentElement; } return null; })();
+  let drag = null, raf = 0;
+  const paint = (i, on) => { const it = shown[i]; if (on) PL.sel.add(it.id); else PL.sel.delete(it.id); boxes[i].checked = on; rows[i].classList.toggle('bg-indigo-50', on); rows[i].classList.toggle('bg-slate-50', !on); };
+  const range = (a, b, mode, orig) => { const lo = Math.min(a, b), hi = Math.max(a, b); for (let i = 0; i < shown.length; i++) paint(i, i >= lo && i <= hi ? mode : orig[i]); onChange(); };
+  const idxAt = (x, y) => { const el = document.elementFromPoint(x, y), r = el && el.closest ? el.closest('[data-pidx]') : null; return r ? +r.dataset.pidx : -1; };
+  const follow = () => { const j = idxAt(drag.x, drag.y); if (j >= 0 && j !== drag.cur) { drag.cur = j; range(drag.start, j, drag.mode, drag.orig); } };
+  const tick = () => {
+    if (!drag) return;
+    const r = sc ? sc.getBoundingClientRect() : { top: 0, bottom: window.innerHeight }, top = Math.max(r.top, 0), bot = Math.min(r.bottom, window.innerHeight);
+    const dy = drag.y < top + 110 ? -14 : drag.y > bot - 70 ? 14 : 0;
+    if (dy) { (sc || window).scrollBy(0, dy); follow(); }
+    raf = requestAnimationFrame(tick);
+  };
+  rows.forEach((row, i) => {
+    const hd = row.querySelector('[data-phandle]');
+    boxes[i].onchange = () => { paint(i, boxes[i].checked); PL.anchor = i; onChange(); }; // 키보드(스페이스)로 고를 때
+    paint(i, PL.sel.has(shown[i].id));
+    hd.onpointerdown = e => {
+      if (e.button) return; e.preventDefault();
+      const orig = shown.map(it => PL.sel.has(it.id));
+      if (e.shiftKey && PL.anchor != null && PL.anchor < shown.length) { range(PL.anchor, i, orig[PL.anchor], orig); PL.anchor = i; return; }
+      drag = { start: i, cur: i, mode: !orig[i], orig, x: e.clientX, y: e.clientY }; PL.anchor = i;
+      try { hd.setPointerCapture(e.pointerId); } catch (_) {}
+      range(i, i, drag.mode, orig); cancelAnimationFrame(raf); raf = requestAnimationFrame(tick);
+    };
+    hd.onpointermove = e => { if (!drag) return; drag.x = e.clientX; drag.y = e.clientY; follow(); };
+    hd.onpointerup = hd.onpointercancel = e => { drag = null; cancelAnimationFrame(raf); try { hd.releasePointerCapture(e.pointerId); } catch (_) {} };
+  });
+}
 function drawPdfLib() {
   const box = $('view-pdflib'); box.innerHTML = '';
   box.append(h('h2', 'text-xl font-bold text-slate-800 mb-1', '📚 PDF 자료실'));
@@ -870,20 +902,26 @@ function drawPdfLib() {
   }
   const list = items.filter(i => (!F.state || (F.state === 'unshared' ? !(i.shared || []).length : (i.shared || []).length > 0))
     && (!F.q || (i.name || '').includes(F.q) || (i.fileName || '').includes(F.q))).sort((a, b) => byName(a, b));
-  const tb = h('div', 'flex flex-wrap gap-2 mb-3 items-center'), all = h('input'); all.type = 'checkbox'; all.checked = list.length > 0 && list.every(i => PL.sel.has(i.id));
+  const tb = h('div', 'flex flex-wrap gap-2 mb-3 items-center sticky top-0 z-10 bg-white py-2 border-b border-slate-100'), all = h('input'); all.type = 'checkbox'; all.checked = list.length > 0 && list.every(i => PL.sel.has(i.id));
   all.onchange = () => { list.forEach(i => all.checked ? PL.sel.add(i.id) : PL.sel.delete(i.id)); drawPdfLib(); };
   const al = h('label', 'flex items-center gap-1.5 text-xs font-bold text-slate-600'); al.append(all, document.createTextNode('목록 전체 선택 (' + list.length + '개)'));
   const chosen = () => PL.items.filter(i => PL.sel.has(i.id));
-  tb.append(al, h('span', 'text-xs text-slate-500', '선택 ' + PL.sel.size + '개'),
+  const cnt = h('span', 'text-xs font-bold text-slate-500', '선택 ' + PL.sel.size + '개');
+  const refreshSel = () => { cnt.textContent = '선택 ' + PL.sel.size + '개'; all.checked = list.length > 0 && list.every(i => PL.sel.has(i.id)); };
+  tb.append(al, cnt, btn('선택 해제', B2, async () => { PL.sel.clear(); drawPdfLib(); }),
     btn('🔗 선택한 자료 일괄 공유', 'bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-2 rounded-xl font-bold', async () => { const c = chosen(); if (!c.length) return alert('공유할 자료를 먼저 선택하세요.'); await pdfShare(c); }),
     btn('📂 선택한 자료 이동', 'bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold', async () => { const c = chosen(); if (!c.length) return alert('이동할 자료를 먼저 선택하세요.'); await pdfMove(c); }));
   box.append(tb);
+  box.append(h('p', 'text-[11px] text-slate-500 mb-2', '💡 왼쪽 체크 칸을 누른 채 위아래로 끌면 한꺼번에 선택됩니다. Shift를 누르고 누르면 직전 칸부터 범위 선택. 고른 뒤 위의 「📂 선택한 자료 이동」으로 다른 폴더로 옮기세요.'));
   if (PL.more) box.append(h('div', 'mb-3 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2', '자료가 많아 400개까지만 불러왔습니다. 학년·출판사를 골라 좁혀 보세요.'));
   if (!list.length) { box.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', items.length ? '조건에 맞는 자료가 없습니다.' : '이 조건에 해당하는 자료가 없습니다.')); return; }
   const wrap = h('div', 'space-y-2'), shown = list.slice(0, 300);
-  shown.forEach(it => {
+  const rowEls = [], boxEls = [];
+  shown.forEach((it, ix) => {
     const row = h('div', 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center gap-2 text-sm font-bold text-slate-700'), c = h('input'); c.type = 'checkbox'; c.checked = PL.sel.has(it.id);
-    c.onchange = () => { c.checked ? PL.sel.add(it.id) : PL.sel.delete(it.id); drawPdfLib(); };
+    row.dataset.pidx = ix; c.style.pointerEvents = 'none'; c.style.width = c.style.height = '18px';
+    const hdl = h('div', 'w-10 h-10 -my-1 shrink-0 flex items-center justify-center cursor-pointer select-none rounded-lg hover:bg-slate-200'); hdl.dataset.phandle = '1'; hdl.style.touchAction = 'none'; hdl.title = '누른 채 끌면 여러 개 선택'; hdl.append(c);
+    rowEls.push(row); boxEls.push(c);
     const l = h('div', 'flex-grow min-w-0'); l.append(h('div', 'break-all', (isPdf(it) ? '📄 ' : '📊 ') + it.name));
     const sub = h('div', 'flex flex-wrap gap-1 mt-1'), tag = (t, cl) => sub.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + cl, t));
     if (it.grade) tag(it.grade, 'bg-sky-100 text-sky-700'); if (it.publisher) tag(it.publisher, 'bg-indigo-100 text-indigo-700');
@@ -891,9 +929,10 @@ function drawPdfLib() {
     l.append(sub);
     const r = h('div', 'flex flex-wrap gap-1.5');
     r.append(btn('열기·인쇄', B1, async () => { window.open(it.pdfUrl, '_blank', 'noopener'); }), btn('🔗 공유', 'bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs px-2.5 py-2 rounded-xl font-bold', () => pdfShare([it])), btn('✏️ 이름', B2, () => pdfRename(it)), btn('📂 이동', B2, () => pdfMove([it])));
-    row.append(c, l, r); wrap.append(row);
+    row.append(hdl, l, r); wrap.append(row);
   });
   box.append(wrap);
+  pdfDragSelect(shown, rowEls, boxEls, refreshSel);
   if (list.length > shown.length) box.append(h('div', 'text-center py-3 text-xs text-slate-400 font-bold', '위에서 ' + shown.length + '개만 보여 줍니다. 출판사를 골라 좁혀 보세요. (전체 ' + list.length + '개)'));
 }
 /* 올리기: 폴더 경로 → 과목/학년/출판사 */
