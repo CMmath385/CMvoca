@@ -2438,7 +2438,12 @@ async function evPrepare(cand) {
   const list = cand.slice(0, 40), pool = [], bad = []; let n = 0;
   for (const it of list) {
     toast('문제 읽는 중... ' + (++n) + ' / ' + list.length);
-    try { const qs = await evPoolOf(it.id, it.name); const useful = qs.filter(q => q.subj === EA.subj); if (useful.length) pool.push(...useful); else bad.push(it.name); } catch (_) { bad.push(it.name); }
+    try {
+      const qs = await evPoolOf(it.id, it.name), useful = qs.filter(q => q.subj === EA.subj);
+      if (useful.length) pool.push(...useful);
+      else if (qs.length) bad.push(it.name + ' (' + (EA.subj === 'en' ? '수학' : '영어') + ' 문제 ' + qs.length + '개 → 과목을 바꾸세요)');
+      else bad.push(it.name + (EVC[it.id] ? ' (문제 정보 없음)' : ' (자료를 읽지 못함)'));
+    } catch (e) { bad.push(it.name + ' (읽기 오류)'); }
   }
   toast('');
   const t = evTarget(), scopeKey = EA.folder + '/' + (EA.path[EA.path.length - 1] || '*'), used = await evUsed(scopeKey, evTargetKey(t), EA.subj);
@@ -2453,7 +2458,7 @@ function evPreview(P) {
   box.append(h('div', 'font-bold text-slate-800 text-sm', '뽑은 결과: ' + P.r.picked.length + '문항'), h('div', 'text-xs text-slate-600 mt-1', Object.entries(cnt).map(([k, n]) => k + ' ' + n).join(' · ') || '-'));
   box.append(h('div', 'text-[11px] text-slate-400 mt-1', '채점 가능한 문제 ' + P.pool.length + '개 중 이미 낸 문제 ' + P.pool.filter(q => P.used.has(q.key)).length + '개 제외, 남은 문제 ' + P.r.leftCount + '개'));
   if (P.over) box.append(h('div', 'text-[11px] text-amber-600 font-bold mt-1', '학습앱이 많아 앞의 40개만 읽었습니다.'));
-  if (P.bad.length) box.append(h('div', 'text-[11px] text-amber-600 font-bold mt-1', '문제를 읽지 못한 학습앱(채점 정보 없음): ' + P.bad.slice(0, 5).join(', ') + (P.bad.length > 5 ? ' 외 ' + (P.bad.length - 5) + '개' : '')));
+  if (P.bad.length) box.append(h('div', 'text-[11px] text-amber-600 font-bold mt-1', '문제를 뽑을 수 없는 학습앱: ' + P.bad.slice(0, 8).join(', ') + (P.bad.length > 8 ? ' 외 ' + (P.bad.length - 8) + '개' : '')));
   if (P.r.picked.length < EV_N) box.append(h('div', 'text-xs text-rose-600 font-bold mt-2', '낼 수 있는 문제가 ' + P.r.picked.length + '개뿐입니다. ' + (P.r.picked.length ? '이대로 출제하거나, 다른 과를 선택하세요.' : '출제할 수 없습니다.')));
   const ti = h('input', 'w-full mt-3 p-2.5 border border-slate-300 rounded-xl text-sm font-bold'); ti.value = EA.title; ti.oninput = () => { EA.title = ti.value; }; box.append(ti);
   const row = h('div', 'flex gap-2 mt-3');
