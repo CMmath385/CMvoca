@@ -91,6 +91,9 @@ body{font-family:'Pretendard',sans-serif}
       <section id="view-students" class="hidden"></section>
       <section id="view-history" class="hidden"></section>
       <section id="view-hw" class="hidden"></section>
+      <section id="view-wrong" class="hidden"></section>
+      <section id="view-weekly" class="hidden"></section>
+      <section id="view-monthly" class="hidden"></section>
       <section id="view-trash" class="hidden"></section>
       <section id="view-manage" class="hidden"></section>
       <section id="view-settings" class="hidden"></section>
@@ -328,7 +331,7 @@ async function openPendingCode() {
     S.folder = it.folder; S.folderId = it.parentId || null; S.fFiles = it.folder === 'F';
     if (it.branchId && S.me.role === 'super' && branchScoped()) S.viewBranch = it.branchId;
     S.tab = tabOf(it); buildSide(); S.view = 'content';
-    ['content', 'students', 'history', 'manage', 'settings', 'branches', 'pdflib', 'import', 'hw', 'trash'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== 'content'));
+    ['content', 'students', 'history', 'manage', 'settings', 'branches', 'pdflib', 'import', 'hw', 'wrong', 'weekly', 'monthly', 'trash'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== 'content'));
     try { await renderContent(); } catch (_) {}
   }
   qrOpenCard(it);
@@ -627,9 +630,10 @@ window.addEventListener('popstate', e => {
 function setView(v) {
   if (v === 'content' && S.folder === 'F' && !S.fFiles && S.me.role !== 'student') v = 'manage';
   S.view = v; navPush();
-  ['content', 'students', 'history', 'manage', 'settings', 'branches', 'pdflib', 'import', 'hw', 'trash'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== v));
+  ['content', 'students', 'history', 'manage', 'settings', 'branches', 'pdflib', 'import', 'hw', 'wrong', 'weekly', 'monthly', 'trash'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== v));
   $('side').parentElement.classList.toggle('hidden', v !== 'content' && v !== 'manage');
   const views = [['content', '📂 학습 자료실'], ['hw', '📝 숙제·알림장']];
+  if (S.me.role === 'student') views.push(['wrong', '🔁 오답문제'], ['weekly', '📅 주간평가'], ['monthly', '🗓️ 월말평가']);
   if (S.me.role !== 'student') views.push(['students', '👨‍🎓 학생 관리'], ['history', '📊 학습 이력']);
   if (S.me.role !== 'student') views.push(['settings', S.me.role === 'sub' ? '⚙️ 학원 설정' : '⚙️ 본원 로고']);
   if (S.me.role === 'super') views.push(['branches', '🏛️ 지점 관리'], ['pdflib', '📚 PDF 자료실'], ['import', '💾 백업·가져오기']);
@@ -637,7 +641,7 @@ function setView(v) {
   const nav = $('view-nav'); nav.innerHTML = '';
   nav.classList.toggle('hidden', views.length < 2);
   views.forEach(([id, label]) => nav.append(btn(label, 'flex-1 py-2 rounded-lg text-xs font-bold ' + ((v === id || (v === 'manage' && id === 'content')) ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'), () => setView(id))));
-  safe(async () => { if (v === 'content') await renderContent(); else if (v === 'students') await renderStudents(); else if (v === 'branches') await renderBranches(); else if (v === 'pdflib') await renderPdfLib(); else if (v === 'history') await renderHistory(); else if (v === 'manage') await renderManage(); else if (v === 'settings') renderSettings(); else if (v === 'hw') await renderHw(); else if (v === 'trash') await renderTrash(); });
+  safe(async () => { if (v === 'content') await renderContent(); else if (v === 'students') await renderStudents(); else if (v === 'branches') await renderBranches(); else if (v === 'pdflib') await renderPdfLib(); else if (v === 'history') await renderHistory(); else if (v === 'manage') await renderManage(); else if (v === 'settings') renderSettings(); else if (v === 'hw') await renderHw(); else if (v === 'wrong') await renderWrong(); else if (v === 'weekly') await renderEval('weekly'); else if (v === 'monthly') await renderEval('monthly'); else if (v === 'trash') await renderTrash(); });
 }
 
 /* ===== 학습 자료 ===== */
@@ -1890,8 +1894,18 @@ window.addEventListener('message', e => {
   if (pend && S.me && S.me.role === 'student') {
     db.collection('history').doc(pend.id).update({ ...(sc != null ? { score: sc } : {}), wrong, wrongCount: wrong.length, total: Number(r.total) || null }).catch(() => {});
     if (S.autoCorrect != null) saveCorrect(pend.id, S.autoCorrect);
+    saveWrongQ(pend.id, r);
   }
 });
+/* 문항 단위 오답 기록 — 틀린 문항을 번호/이름으로 따로 저장한다. (기존 wrong 이름 목록은 그대로. 따로 저장해서 규칙에 없어도 다른 기록은 영향 없음)
+   문항 고유 번호 = itemId + '#' + 이 값. 앱이 wrongQ(번호 배열)를 함께 보내면 그것을 먼저 쓴다. */
+function wrongKeys(r) {
+  const raw = Array.isArray(r.wrongQ) && r.wrongQ.length ? r.wrongQ : (Array.isArray(r.wrong) ? r.wrong : []);
+  return raw.map(x => { const v = x && typeof x === 'object' ? (x.id != null ? x.id : x.n != null ? x.n : x.type) : x; return String(v == null ? '' : v).trim().slice(0, 80); }).filter(Boolean).slice(0, 80);
+}
+function saveWrongQ(histId, r) {
+  try { if (!histId) return; db.collection('history').doc(histId).update({ wrongQ: wrongKeys(r) }).catch(() => {}); } catch (_) {}
+}
 /* 맞힌 문항 수 저장 — 따로 저장해서, Firestore 규칙에 correct가 아직 없어도 다른 학습 기록은 그대로 저장됨 */
 function saveCorrect(id, correct) { if (id && correct != null) db.collection('history').doc(id).update({ correct }).catch(() => {}); }
 S.zoom = 1;
@@ -2061,6 +2075,49 @@ async function renderTrash() {
     }));
     row.append(l, b); v.append(row);
   });
+}
+
+/* ===== 오답문제 · 주간평가 · 월말평가 (학생) ===== */
+const DAY_MS = 24 * 3600 * 1000;
+async function loadMyWrong(days) {
+  const since = Date.now() - days * DAY_MS;
+  const snap = await db.collection('history').where('studentUid', '==', S.me.uid).get();
+  const by = {};
+  snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.kind === 'study' && r.itemId && (r.ts || 0) >= since && (r.wrongQ || r.wrong || []).length)
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0)).forEach(r => {
+      const e = by[r.itemId] || (by[r.itemId] = { itemId: r.itemId, title: r.title, ts: r.ts, keys: new Set() });
+      (r.wrongQ || r.wrong || []).forEach(k => e.keys.add(String(k)));
+    });
+  return Object.values(by).sort((a, b) => b.ts - a.ts);
+}
+async function renderWrongList(v, title, days, emptyMsg) {
+  toast('불러오는 중...'); let list = [];
+  try { list = await loadMyWrong(days); } catch (e) { toast(''); v.append(h('div', 'text-center py-10 text-rose-500 text-sm font-bold', '오답을 불러오지 못했습니다.')); return; }
+  toast('');
+  v.append(h('div', 'text-sm font-bold text-slate-600 mt-4 mb-2', title + ' · 학습 ' + list.length + '개 · 틀린 문항 ' + list.reduce((n, e) => n + e.keys.size, 0) + '개'));
+  if (!list.length) return v.append(h('div', 'text-center py-8 text-slate-400 text-sm font-medium', emptyMsg));
+  list.forEach(e => {
+    const c = h('div', 'p-4 mb-2 rounded-xl bg-white border border-rose-200 shadow-sm');
+    const ks = [...e.keys];
+    c.append(h('div', 'font-bold text-slate-800 text-sm', e.title || e.itemId), h('div', 'text-xs text-rose-600 font-bold mt-1', '틀린 문항 ' + ks.length + '개 · ' + ks.slice(0, 6).join(', ') + (ks.length > 6 ? ' …' : '')), h('div', 'text-[11px] text-slate-400 mt-1', dayOf(e.ts)));
+    c.append(btn('이 학습 다시 풀기', 'mt-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold', async () => {
+      const d = await db.collection('items').doc(e.itemId).get();
+      if (!d.exists || d.data().deleted) return alert('자료를 찾을 수 없습니다. 선생님께 문의하세요.');
+      openItem({ id: d.id, ...d.data() });
+    }));
+    v.append(c);
+  });
+}
+async function renderWrong() {
+  const v = $('view-wrong'); v.innerHTML = '';
+  v.append(h('h2', 'text-lg font-bold text-slate-800 mb-1', '🔁 오답문제'), h('p', 'text-xs text-slate-500', '학습하다 틀린 문제를 모았습니다. 틀린 문제를 다시 풀어 보세요.'));
+  await renderWrongList(v, '주간오답 (최근 7일)', 7, '이번 주에 틀린 문제가 없습니다. 👏');
+  await renderWrongList(v, '월간오답 (최근 30일)', 30, '이번 달에 틀린 문제가 없습니다. 👏');
+}
+async function renderEval(kind) {
+  const v = $('view-' + kind); v.innerHTML = ''; const nm = kind === 'weekly' ? '주간평가' : '월말평가';
+  v.append(h('h2', 'text-lg font-bold text-slate-800 mb-1', (kind === 'weekly' ? '📅 ' : '🗓️ ') + nm));
+  v.append(h('div', 'text-center py-10 text-slate-400 text-sm font-medium', '출제된 ' + nm + '가 없습니다.'));
 }
 
 /* ===== 숙제·알림장 ===== */
