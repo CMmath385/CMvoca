@@ -765,6 +765,9 @@ function drawContent() {
     row.append(l);
     const r = h('div', 'flex flex-wrap items-center gap-1.5');
     if (it.type === 'folder') r.append(btn('열기', B1, () => { S.folderId = it.id; drawContent(); }));
+    if (it.type === 'folder' && S.me.role !== 'student' && S.folder !== 'F' && S.folder !== 'PDFLIB') r.append(
+      btn('📅 주간평가 출제', 'bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs px-2.5 py-2 rounded-xl font-bold', () => evJump(it, 'weekly')),
+      btn('🗓️ 월말평가 출제', 'bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs px-2.5 py-2 rounded-xl font-bold', () => evJump(it, 'monthly')));
     if (S.me.role !== 'student' && it.type !== 'folder') r.append(btn('📝 숙제', 'bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-2.5 py-2 rounded-xl font-bold', () => hwDialog(it)));
     if (it.linkUrl) r.append(btn('학습하기', B1, () => openLink(it)));
     if (it.htmlPage) r.append(btn('학습하기', B1, () => openHtml(it)));
@@ -2377,6 +2380,16 @@ async function startWrongSolve(list, nm) {
 }
 /* --- 선생님: 평가 출제 --- */
 const EA = { bid: null, folder: null, path: [], items: [], subj: 'en', kind: 'weekly', ttype: 'all', tval: '', roster: [], prep: null, title: '', busy: false };
+/* 학습 자료실의 폴더 줄에서 바로 출제 화면으로: 큰 폴더·과·평가 종류·과목을 미리 골라 둔다 */
+function evJump(it, kind) {
+  const ids = []; let c = it, n = 0; while (c && n++ < 30) { ids.unshift(c.id); c = c.parentId ? S.items.find(x => x.id === c.parentId) : null; }
+  EA.restored = true; EA.folder = S.folder; EA.path = ids; EA.kind = kind; EA.subj = S.folder === 'C' ? 'ma' : 'en'; EA.prep = null; EA.items = []; EA.itemsFor = '';
+  EA.bid = S.me.role === 'super' ? (S.viewBranch !== 'main' ? S.viewBranch : null) : S.me.branchId;
+  setView('exam');
+}
+const EVSAVE = 'evSel';
+function evRemember() { try { localStorage.setItem(EVSAVE, JSON.stringify({ bid: EA.bid, folder: EA.folder, path: EA.path, subj: EA.subj, kind: EA.kind, ttype: EA.ttype })); } catch (_) {} }
+function evRestore() { try { const o = JSON.parse(localStorage.getItem(EVSAVE) || 'null'); if (o) { if (S.me.role === 'super' && o.bid) EA.bid = o.bid; EA.folder = o.folder || EA.folder; EA.path = Array.isArray(o.path) ? o.path : []; EA.subj = o.subj || EA.subj; EA.kind = o.kind || EA.kind; EA.ttype = o.ttype || EA.ttype; } } catch (_) {} }
 const evFolderOpts = () => FOLDERS.filter(f => f.kind !== 'mgmt' && f.id !== 'PDFLIB');
 async function evLoadItems() {
   const f = EA.folder, kind = kindOf(f); let q = db.collection('items').where('folder', '==', f);
@@ -2392,6 +2405,7 @@ const evTargetKey = t => t.type + ':' + (t.grade || t.uid || '');
 async function renderExamAdmin() {
   const v = $('view-exam'); v.innerHTML = ''; const sup = S.me.role === 'super';
   if (sup && !S.branches.length) return v.append(h('div', 'text-center py-10 text-slate-400 text-sm', '등록된 지점이 없습니다.'));
+  if (!EA.restored) { EA.restored = true; evRestore(); }
   if (!EA.bid || (!sup && EA.bid !== S.me.branchId)) EA.bid = sup ? (S.viewBranch !== 'main' ? S.viewBranch : S.branches[0].id) : S.me.branchId;
   if (!EA.folder) EA.folder = (evFolderOpts().find(f => f.id === 'B') || evFolderOpts()[0] || {}).id;
   toast('불러오는 중...');
@@ -2400,6 +2414,7 @@ async function renderExamAdmin() {
     EA.roster = u.docs.map(d => ({ id: d.id, name: d.data().name, grade: d.data().grade || '' })).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     if (!EA.items.length || EA.itemsFor !== EA.bid + '|' + EA.folder) { await evLoadItems(); EA.itemsFor = EA.bid + '|' + EA.folder; }
   } finally { toast(''); }
+  EA.path = EA.path.filter((id, i) => EA.items.some(x => x.id === id && (x.parentId || null) === (i ? EA.path[i - 1] : null))); evRemember();
   const IN = 'p-2 border border-slate-300 rounded-xl text-xs font-bold bg-white', LB = 'text-xs font-bold text-slate-500 mt-3 mb-1';
   const mk = (opts, val, fn) => { const e = h('select', IN + ' w-full'); opts.forEach(([a, t]) => { const o = h('option', '', t); o.value = a; e.append(o); }); e.value = val; e.onchange = () => safe(async () => { await fn(e.value); }); return e; };
   v.append(h('h2', 'text-lg font-bold text-slate-800 mb-1', '📅 주간·월말평가 출제'), h('p', 'text-xs text-slate-500 mb-2', '과(폴더)를 고르면 그 안의 학습앱 문제에서 20문항을 랜덤으로 뽑습니다. 같은 과를 다시 출제하면 이미 낸 문제는 빠집니다.'));
@@ -2415,6 +2430,17 @@ async function renderExamAdmin() {
   }
   f.append(h('div', LB, '과목')); f.append(mk([['en', '영어 (단어·어법·동사형·순서배열)'], ['ma', '수학 (교과서 문제 → 쌍둥이)']], EA.subj, async x => { EA.subj = x; EA.prep = null; await renderExamAdmin(); }));
   f.append(h('div', LB, '큰 폴더')); f.append(mk(evFolderOpts().map(x => [x.id, x.name]), EA.folder, async x => { EA.folder = x; EA.path = []; EA.items = []; EA.prep = null; await renderExamAdmin(); }));
+  f.append(h('div', LB, '과 찾기 (이름을 치면 바로 고를 수 있어요)'));
+  const qi = h('input', IN + ' w-full'); qi.placeholder = '예: 4과, 공통영어2, 능률'; const qr = h('div', 'mt-1');
+  const pathOf = it => { const names = []; let c = it, n = 0; while (c && n++ < 20) { names.unshift(c.name); c = c.parentId ? EA.items.find(x => x.id === c.parentId) : null; } return names; };
+  const chainOf = it => { const ids = []; let c = it, n = 0; while (c && n++ < 20) { ids.unshift(c.id); c = c.parentId ? EA.items.find(x => x.id === c.parentId) : null; } return ids; };
+  qi.oninput = () => {
+    qr.innerHTML = ''; const t = qi.value.trim().toLowerCase(); if (!t) return;
+    const hits = EA.items.filter(i => i.type === 'folder' && i.name.toLowerCase().includes(t) && evDescend(i.id).length).slice(0, 12);
+    if (!hits.length) return qr.append(h('div', 'text-xs text-slate-400 p-1', '찾는 폴더가 없습니다.'));
+    hits.forEach(i => qr.append(btn(pathOf(i).join(' › ') + ' · 학습앱 ' + evDescend(i.id).length + '개', 'block w-full text-left p-2 mb-1 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 text-xs font-bold text-slate-700', async () => { EA.path = chainOf(i); EA.prep = null; await renderExamAdmin(); })));
+  };
+  f.append(qi, qr);
   f.append(h('div', LB, '과 (폴더를 차례로 고르세요)'));
   for (let lv = 0; lv <= EA.path.length; lv++) {
     const pid = lv === 0 ? null : EA.path[lv - 1], kids = evKids(pid).filter(i => i.type === 'folder'); if (!kids.length) break;
