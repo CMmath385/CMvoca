@@ -742,6 +742,8 @@ function drawContent() {
     list.append(upBtn);
   }
   const kids = visibleKids();
+  const evFolders = kids.filter(i => i.type === 'folder');
+  if (S.me.role !== 'student' && S.folder !== 'F' && S.folder !== 'PDFLIB' && evFolders.length) list.append(evBulkBar(evFolders));
   const hintEl = h('div', 'text-[11px] text-slate-400 font-bold px-1', '↕ 항목을 끌어서 순서를 바꾸거나, 폴더 위(가운데)에 놓으면 그 폴더로 이동합니다. 위쪽 경로나 "상위 폴더로 이동"에 놓으면 그 위치로 이동합니다.');
   if (edit && kids.length) list.append(hintEl);
   if (!kids.length) { list.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', sharedScoped() && S.me.role !== 'super' ? '아직 본원에서 공유해 준 학습 자료가 없습니다.' : '등록된 학습 자료가 없습니다.')); return; }
@@ -2377,25 +2379,46 @@ async function startWrongSolve(list, nm) {
   } });
 }
 /* --- 선생님: 평가 출제 --- */
-const EA = { bid: null, folder: null, path: [], items: [], subj: 'en', kind: 'weekly', ttype: 'all', tval: '', roster: [], prep: null, title: '', busy: false };
+const EA = { bid: null, folder: null, path: [], sel: null, n: 20, items: [], subj: 'en', kind: 'weekly', ttype: 'all', tval: '', roster: [], prep: null, title: '', busy: false };
 /* 학습 자료실의 폴더 줄에서 바로 출제 화면으로: 큰 폴더·과·평가 종류·과목을 미리 골라 둔다 */
-function evJump(it, kind) {
-  const ids = []; let c = it, n = 0; while (c && n++ < 30) { ids.unshift(c.id); c = c.parentId ? S.items.find(x => x.id === c.parentId) : null; }
-  EA.restored = true; EA.folder = S.folder; EA.path = ids; EA.kind = kind; EA.subj = S.folder === 'C' ? 'ma' : 'en'; EA.prep = null; EA.items = []; EA.itemsFor = '';
+function evJump(it, kind, n) {
+  const ids = []; let c = it, guard = 0; while (c && guard++ < 30) { ids.unshift(c.id); c = c.parentId ? S.items.find(x => x.id === c.parentId) : null; }
+  EA.restored = true; EA.folder = S.folder; EA.path = ids; EA.sel = null; EA.n = n || 20; EA.kind = kind; EA.subj = S.folder === 'C' ? 'ma' : 'en'; EA.prep = null; EA.items = []; EA.itemsFor = '';
   EA.bid = S.me.role === 'super' ? (S.viewBranch !== 'main' ? S.viewBranch : null) : S.me.branchId;
   setView('exam');
+}
+/* 한 페이지 위쪽: 이 페이지의 여러 과를 체크해서 한꺼번에 출제 */
+function evJumpMulti(ids, kind, n) {
+  const chain = []; let c = S.folderId ? S.items.find(x => x.id === S.folderId) : null, k = 0; while (c && k++ < 30) { chain.unshift(c.id); c = c.parentId ? S.items.find(x => x.id === c.parentId) : null; }
+  EA.restored = true; EA.folder = S.folder; EA.path = chain; EA.sel = ids; EA.n = n || 20; EA.kind = kind; EA.subj = S.folder === 'C' ? 'ma' : 'en'; EA.prep = null; EA.items = []; EA.itemsFor = '';
+  EA.bid = S.me.role === 'super' ? (S.viewBranch !== 'main' ? S.viewBranch : null) : S.me.branchId;
+  setView('exam');
+}
+function evBulkBar(folders) {
+  const box = h('div', 'p-3 bg-indigo-50 border border-indigo-200 rounded-xl mb-2'), on = new Set(folders.map(f => f.id)), boxes = [];
+  const mkCb = (label, cls) => { const lb = h('label', 'inline-flex items-center gap-1.5 cursor-pointer ' + cls), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true; lb.append(cb, document.createTextNode(label)); return [lb, cb]; };
+  const [allLb, all] = mkCb('📤 전체 평가 출제 · 전체 선택 (' + folders.length + '개 폴더)', 'text-sm font-bold text-indigo-900');
+  const chips = h('div', 'flex flex-wrap gap-x-4 gap-y-1 mt-2');
+  folders.forEach(f => { const [lb, cb] = mkCb(f.name, 'text-xs font-bold text-slate-700'); cb.onchange = () => { cb.checked ? on.add(f.id) : on.delete(f.id); all.checked = on.size === folders.length; }; boxes.push(cb); chips.append(lb); });
+  all.onchange = () => { boxes.forEach((cb, i) => { cb.checked = all.checked; all.checked ? on.add(folders[i].id) : on.delete(folders[i].id); }); };
+  const ns = h('select', 'p-2 border border-slate-300 rounded-xl text-xs font-bold bg-white'); [20, 25, 30, 35, 40].forEach(n => { const o = h('option', '', '문제 수 ' + n + '문항'); o.value = n; ns.append(o); });
+  const go = k => { if (!on.size) return alert('과를 한 개 이상 체크하세요.'); evJumpMulti(folders.filter(f => on.has(f.id)).map(f => f.id), k, +ns.value); };
+  const row = h('div', 'flex flex-wrap items-center gap-2 mt-2');
+  row.append(ns, btn('📅 주간평가 출제', B1, async () => go('weekly')), btn('🗓️ 월말평가 출제', B1, async () => go('monthly')));
+  box.append(allLb, chips, row); return box;
 }
 /* 폴더 줄의 [출제하기]를 누르면 주간/월말을 고르게 한다 */
 function evAsk(it) {
   const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4'), c = h('div', 'bg-white rounded-2xl shadow-2xl max-w-xs w-full p-5 space-y-2.5');
-  const go = k => { ov.remove(); evJump(it, k); };
+  const ns = h('select', 'w-full p-2 border border-slate-300 rounded-xl text-sm font-bold bg-white'); [20, 25, 30, 35, 40].forEach(n => { const o = h('option', '', '문제 수 ' + n + '문항'); o.value = n; ns.append(o); });
+  const go = k => { const n = +ns.value; ov.remove(); evJump(it, k, n); };
   c.append(h('h3', 'text-base font-bold text-slate-800', '어떤 평가를 출제할까요?'), h('div', 'text-xs text-slate-500 font-bold break-all', '📁 ' + it.name),
-    btn('📅 주간평가', B1 + ' w-full !py-3 text-sm', async () => go('weekly')), btn('🗓️ 월말평가', B1 + ' w-full !py-3 text-sm', async () => go('monthly')), btn('취소', B2 + ' w-full', async () => ov.remove()));
+    ns, btn('📅 주간평가', B1 + ' w-full !py-3 text-sm', async () => go('weekly')), btn('🗓️ 월말평가', B1 + ' w-full !py-3 text-sm', async () => go('monthly')), btn('취소', B2 + ' w-full', async () => ov.remove()));
   ov.append(c); ov.onclick = e => { if (e.target === ov) ov.remove(); }; document.body.append(ov);
 }
 const EVSAVE = 'evSel';
-function evRemember() { try { localStorage.setItem(EVSAVE, JSON.stringify({ bid: EA.bid, folder: EA.folder, path: EA.path, subj: EA.subj, kind: EA.kind, ttype: EA.ttype })); } catch (_) {} }
-function evRestore() { try { const o = JSON.parse(localStorage.getItem(EVSAVE) || 'null'); if (o) { if (S.me.role === 'super' && o.bid) EA.bid = o.bid; EA.folder = o.folder || EA.folder; EA.path = Array.isArray(o.path) ? o.path : []; EA.subj = o.subj || EA.subj; EA.kind = o.kind || EA.kind; EA.ttype = o.ttype || EA.ttype; } } catch (_) {} }
+function evRemember() { try { localStorage.setItem(EVSAVE, JSON.stringify({ bid: EA.bid, folder: EA.folder, path: EA.path, sel: EA.sel, n: EA.n, subj: EA.subj, kind: EA.kind, ttype: EA.ttype })); } catch (_) {} }
+function evRestore() { try { const o = JSON.parse(localStorage.getItem(EVSAVE) || 'null'); if (o) { if (S.me.role === 'super' && o.bid) EA.bid = o.bid; EA.folder = o.folder || EA.folder; EA.path = Array.isArray(o.path) ? o.path : []; EA.sel = Array.isArray(o.sel) ? o.sel : null; EA.n = o.n >= 20 && o.n <= 40 ? o.n : 20; EA.subj = o.subj || EA.subj; EA.kind = o.kind || EA.kind; EA.ttype = o.ttype || EA.ttype; } } catch (_) {} }
 const evFolderOpts = () => FOLDERS.filter(f => f.kind !== 'mgmt' && f.id !== 'PDFLIB');
 async function evLoadItems() {
   const f = EA.folder, kind = kindOf(f); let q = db.collection('items').where('folder', '==', f);
@@ -2405,7 +2428,10 @@ async function evLoadItems() {
 }
 const evKids = pid => EA.items.filter(i => (i.parentId || null) === (pid || null));
 function evDescend(pid) { const out = []; (function go(p) { evKids(p).forEach(i => { if (i.type === 'folder') go(i.id); else if (i.htmlPage) out.push(i); }); })(pid); return out; }
-const evScopeName = () => EA.path.length ? (EA.items.find(i => i.id === EA.path[EA.path.length - 1]) || {}).name || '' : (FOLDERS.find(f => f.id === EA.folder) || {}).name || '';
+const evSel = () => Array.isArray(EA.sel) ? EA.sel.filter(id => EA.items.some(x => x.id === id)) : (EA.path.length ? [EA.path[EA.path.length - 1]] : []);
+function evCand() { const ids = evSel(); if (!Array.isArray(EA.sel) && !ids.length) return evDescend(null); const seen = new Set(), out = []; ids.forEach(id => evDescend(id).forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); out.push(i); } })); return out; }
+const evScopeName0 = () => EA.path.length ? (EA.items.find(i => i.id === EA.path[EA.path.length - 1]) || {}).name || '' : (FOLDERS.find(f => f.id === EA.folder) || {}).name || '';
+const evScopeName = () => { const ids = evSel(); if (ids.length) { const ns = ids.map(id => (EA.items.find(i => i.id === id) || {}).name || ''); return ns.length > 3 ? ns.slice(0, 3).join('·') + ' 외 ' + (ns.length - 3) : ns.join('·'); } return (FOLDERS.find(f => f.id === EA.folder) || {}).name || ''; };
 const evTarget = () => EA.ttype === 'all' ? { type: 'all' } : EA.ttype === 'grade' ? { type: 'grade', grade: EA.tval } : (r => ({ type: 'student', uid: EA.tval, name: r ? r.name : '' }))(EA.roster.find(x => x.id === EA.tval));
 const evTargetKey = t => t.type + ':' + (t.grade || t.uid || '');
 async function renderExamAdmin() {
@@ -2416,8 +2442,10 @@ async function renderExamAdmin() {
   if (!EA.folder) EA.folder = (evFolderOpts().find(f => f.id === 'B') || evFolderOpts()[0] || {}).id;
   toast('불러오는 중...');
   try {
-    const u = await db.collection('users').where('branchId', '==', EA.bid).where('role', '==', 'student').get();
-    EA.roster = u.docs.map(d => ({ id: d.id, name: d.data().name, grade: d.data().grade || '' })).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    if (EA.rosterFor !== EA.bid) {
+      const u = await db.collection('users').where('branchId', '==', EA.bid).where('role', '==', 'student').get();
+      EA.roster = u.docs.map(d => ({ id: d.id, name: d.data().name, grade: d.data().grade || '' })).sort((a, b) => a.name.localeCompare(b.name, 'ko')); EA.rosterFor = EA.bid;
+    }
     if (!EA.items.length || EA.itemsFor !== EA.bid + '|' + EA.folder) { await evLoadItems(); EA.itemsFor = EA.bid + '|' + EA.folder; }
   } finally { toast(''); }
   EA.path = EA.path.filter((id, i) => EA.items.some(x => x.id === id && (x.parentId || null) === (i ? EA.path[i - 1] : null))); evRemember();
@@ -2425,7 +2453,7 @@ async function renderExamAdmin() {
   const mk = (opts, val, fn) => { const e = h('select', IN + ' w-full'); opts.forEach(([a, t]) => { const o = h('option', '', t); o.value = a; e.append(o); }); e.value = val; e.onchange = () => safe(async () => { await fn(e.value); }); return e; };
   v.append(h('h2', 'text-lg font-bold text-slate-800 mb-1', '📅 주간·월말평가 출제'), h('p', 'text-xs text-slate-500 mb-2', '과(폴더)를 고르면 그 안의 학습앱 문제에서 20문항을 랜덤으로 뽑습니다. 같은 과를 다시 출제하면 이미 낸 문제는 빠집니다.'));
   const f = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-2xl');
-  if (sup) { f.append(h('div', LB, '지점')); f.append(mk(S.branches.map(b => [b.id, b.academyName]), EA.bid, async x => { EA.bid = x; EA.folder = null; EA.path = []; EA.items = []; EA.prep = null; EA.tval = ''; await renderExamAdmin(); })); }
+  if (sup) { f.append(h('div', LB, '지점')); f.append(mk(S.branches.map(b => [b.id, b.academyName]), EA.bid, async x => { EA.bid = x; EA.folder = null; EA.path = []; EA.sel = null; EA.items = []; EA.prep = null; EA.tval = ''; await renderExamAdmin(); })); }
   f.append(h('div', LB, '평가 종류')); f.append(mk([['weekly', '주간평가'], ['monthly', '월말평가']], EA.kind, async x => { EA.kind = x; EA.prep = null; await renderExamAdmin(); }));
   f.append(h('div', LB, '대상'));
   f.append(mk([['all', '전체 학생'], ['grade', '학년 선택'], ['student', '학생 선택']], EA.ttype, async x => { EA.ttype = x; EA.tval = ''; EA.prep = null; await renderExamAdmin(); }));
@@ -2435,7 +2463,7 @@ async function renderExamAdmin() {
     else { if (!opts.some(o => o[0] === EA.tval)) EA.tval = opts[0][0]; f.append(mk(opts, EA.tval, async x => { EA.tval = x; EA.prep = null; await renderExamAdmin(); })); }
   }
   f.append(h('div', LB, '과목')); f.append(mk([['en', '영어 (단어·어법·동사형·순서배열)'], ['ma', '수학 (교과서 문제 → 쌍둥이)']], EA.subj, async x => { EA.subj = x; EA.prep = null; await renderExamAdmin(); }));
-  f.append(h('div', LB, '큰 폴더')); f.append(mk(evFolderOpts().map(x => [x.id, x.name]), EA.folder, async x => { EA.folder = x; EA.path = []; EA.items = []; EA.prep = null; await renderExamAdmin(); }));
+  f.append(h('div', LB, '큰 폴더')); f.append(mk(evFolderOpts().map(x => [x.id, x.name]), EA.folder, async x => { EA.folder = x; EA.path = []; EA.sel = null; EA.items = []; EA.prep = null; await renderExamAdmin(); }));
   f.append(h('div', LB, '과 찾기 (이름을 치면 바로 고를 수 있어요)'));
   const qi = h('input', IN + ' w-full'); qi.placeholder = '예: 4과, 공통영어2, 능률'; const qr = h('div', 'mt-1');
   const pathOf = it => { const names = []; let c = it, n = 0; while (c && n++ < 20) { names.unshift(c.name); c = c.parentId ? EA.items.find(x => x.id === c.parentId) : null; } return names; };
@@ -2444,15 +2472,26 @@ async function renderExamAdmin() {
     qr.innerHTML = ''; const t = qi.value.trim().toLowerCase(); if (!t) return;
     const hits = EA.items.filter(i => i.type === 'folder' && i.name.toLowerCase().includes(t) && evDescend(i.id).length).slice(0, 12);
     if (!hits.length) return qr.append(h('div', 'text-xs text-slate-400 p-1', '찾는 폴더가 없습니다.'));
-    hits.forEach(i => qr.append(btn(pathOf(i).join(' › ') + ' · 학습앱 ' + evDescend(i.id).length + '개', 'block w-full text-left p-2 mb-1 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 text-xs font-bold text-slate-700', async () => { EA.path = chainOf(i); EA.prep = null; await renderExamAdmin(); })));
+    hits.forEach(i => qr.append(btn(pathOf(i).join(' › ') + ' · 학습앱 ' + evDescend(i.id).length + '개', 'block w-full text-left p-2 mb-1 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 text-xs font-bold text-slate-700', async () => { EA.path = chainOf(i); EA.sel = null; EA.prep = null; await renderExamAdmin(); })));
   };
   f.append(qi, qr);
   f.append(h('div', LB, '과 (폴더를 차례로 고르세요)'));
   for (let lv = 0; lv <= EA.path.length; lv++) {
     const pid = lv === 0 ? null : EA.path[lv - 1], kids = evKids(pid).filter(i => i.type === 'folder'); if (!kids.length) break;
-    const sel = mk([['', lv === 0 ? '— 전체 —' : '— 이 폴더 전체 —']].concat(kids.map(k => [k.id, k.name])), EA.path[lv] || '', async x => { EA.path = EA.path.slice(0, lv); if (x) EA.path.push(x); EA.prep = null; await renderExamAdmin(); }); sel.classList.add('mb-1'); f.append(sel);
+    const sel = mk([['', lv === 0 ? '— 전체 —' : '— 이 폴더 전체 —']].concat(kids.map(k => [k.id, k.name])), EA.path[lv] || '', async x => { EA.path = EA.path.slice(0, lv); if (x) EA.path.push(x); EA.sel = null; EA.prep = null; await renderExamAdmin(); }); sel.classList.add('mb-1'); f.append(sel);
   }
-  const cand = evDescend(EA.path.length ? EA.path[EA.path.length - 1] : null);
+  const selIds = evSel(), lvParent = Array.isArray(EA.sel) && EA.sel.length ? ((EA.items.find(x => x.id === EA.sel[0]) || {}).parentId || null) : (EA.path.length >= 2 ? EA.path[EA.path.length - 2] : null);
+  const sibs = (Array.isArray(EA.sel) && EA.sel.length) || EA.path.length ? evKids(lvParent).filter(i => i.type === 'folder' && evDescend(i.id).length) : [];
+  if (sibs.length >= 2) {
+    const sb = h('div', 'mt-2 p-3 bg-white border border-slate-200 rounded-xl'), on = new Set(selIds);
+    const chk = (checked, label, fn, cls) => { const lb = h('label', 'inline-flex items-center gap-1.5 text-xs font-bold cursor-pointer ' + cls), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = checked; cb.onchange = () => safe(async () => fn(cb.checked)); lb.append(cb, document.createTextNode(label)); return lb; };
+    sb.append(h('div', 'text-xs font-bold text-slate-500 mb-1', '함께 낼 과 선택 (체크한 과에서 합쳐서 뽑습니다)'));
+    sb.append(chk(sibs.every(i => on.has(i.id)), '전체 선택 (' + sibs.length + '개)', async c => { EA.sel = c ? sibs.map(i => i.id) : []; EA.prep = null; await renderExamAdmin(); }, 'text-indigo-700 mr-3'));
+    sibs.forEach(i => sb.append(chk(on.has(i.id), i.name, async c => { c ? on.add(i.id) : on.delete(i.id); EA.sel = sibs.filter(x => on.has(x.id)).map(x => x.id); EA.prep = null; await renderExamAdmin(); }, 'text-slate-700 mr-3')));
+    f.append(sb);
+  }
+  const cand = evCand();
+  f.append(h('div', LB, '문제 수 (20~40문항)')); f.append(mk([20, 25, 30, 35, 40].map(n => [String(n), n + '문항']), String(EA.n), async x => { EA.n = +x; EA.prep = null; await renderExamAdmin(); }));
   f.append(h('div', 'text-xs text-slate-500 mt-2 font-bold', '선택한 과: ' + (evScopeName() || '-') + ' · 학습앱 ' + cand.length + '개'));
   f.append(btn('🎲 문제 뽑아 보기', B1 + ' mt-3', async () => evPrepare(cand)));
   v.append(f);
@@ -2461,12 +2500,12 @@ async function renderExamAdmin() {
 }
 async function evUsed(scopeKey, tkey, subj) {
   const s = await db.collection('hw').where('branchId', '==', EA.bid).get(), used = new Set();
-  s.docs.map(d => d.data()).filter(w => w.kind === 'exam' && w.examKind === 'weekly' && w.scopeKey === scopeKey && w.targetKey === tkey && w.subj === subj).forEach(w => (w.keys || []).forEach(k => used.add(k)));
+  s.docs.map(d => d.data()).filter(w => w.kind === 'exam' && w.examKind === 'weekly' && w.targetKey === tkey && w.subj === subj).forEach(w => (w.keys || []).forEach(k => used.add(k)));
   return used;
 }
 async function evPrepare(cand) {
   if (EA.ttype !== 'all' && !EA.tval) return alert('대상을 선택하세요.');
-  if (!cand.length) return alert('이 과에는 학습앱이 없습니다.');
+  if (!cand.length) return alert(Array.isArray(EA.sel) && !EA.sel.length ? '과를 한 개 이상 체크하세요.' : '이 과에는 학습앱이 없습니다.');
   const list = cand.slice(0, 40), pool = [], bad = []; let n = 0;
   for (const it of list) {
     toast('문제 읽는 중... ' + (++n) + ' / ' + list.length);
@@ -2479,8 +2518,8 @@ async function evPrepare(cand) {
   }
   toast('');
   if (EA.kind === 'monthly') return evPrepareMonthly(pool, bad, list.length, cand.length > 40);
-  const t = evTarget(), scopeKey = EA.folder + '/' + (EA.path[EA.path.length - 1] || '*'), used = await evUsed(scopeKey, evTargetKey(t), EA.subj);
-  const r = evDraw(pool, used, EA.subj, EV_N), d = new Date();
+  const t = evTarget(), scopeKey = EA.folder + '/' + (evSel().slice().sort().join('+') || '*'), used = await evUsed(scopeKey, evTargetKey(t), EA.subj);
+  const r = evDraw(pool, used, EA.subj, EA.n), d = new Date();
   EA.title = evScopeName() + ' ' + evKindName(EA.kind) + ' ' + (d.getMonth() + 1) + '/' + d.getDate();
   EA.prep = { pool, used, r, bad, scopeKey, cand: list.length, over: cand.length > 40 };
   await renderExamAdmin();
@@ -2493,10 +2532,10 @@ function evPreview(P) {
   box.append(h('div', 'text-[11px] text-slate-400 mt-1', '채점 가능한 문제 ' + P.pool.length + '개 중 이미 낸 문제 ' + P.pool.filter(q => P.used.has(q.key)).length + '개 제외, 남은 문제 ' + P.r.leftCount + '개'));
   if (P.over) box.append(h('div', 'text-[11px] text-amber-600 font-bold mt-1', '학습앱이 많아 앞의 40개만 읽었습니다.'));
   if (P.bad.length) box.append(h('div', 'text-[11px] text-amber-600 font-bold mt-1', '문제를 뽑을 수 없는 학습앱: ' + P.bad.slice(0, 8).join(', ') + (P.bad.length > 8 ? ' 외 ' + (P.bad.length - 8) + '개' : '')));
-  if (P.r.picked.length < EV_N) box.append(h('div', 'text-xs text-rose-600 font-bold mt-2', '낼 수 있는 문제가 ' + P.r.picked.length + '개뿐입니다. ' + (P.r.picked.length ? '이대로 출제하거나, 다른 과를 선택하세요.' : '출제할 수 없습니다.')));
+  if (P.r.picked.length < EA.n) box.append(h('div', 'text-xs text-rose-600 font-bold mt-2', '낼 수 있는 문제가 ' + P.r.picked.length + '개뿐입니다. ' + (P.r.picked.length ? '이대로 출제하거나, 다른 과를 선택하세요.' : '출제할 수 없습니다.')));
   const ti = h('input', 'w-full mt-3 p-2.5 border border-slate-300 rounded-xl text-sm font-bold'); ti.value = EA.title; ti.oninput = () => { EA.title = ti.value; }; box.append(ti);
   const row = h('div', 'flex gap-2 mt-3');
-  row.append(btn('🎲 다시 뽑기', B2, async () => { const r = evDraw(P.pool, P.used, EA.subj, EV_N); P.r = r; await renderExamAdmin(); }));
+  row.append(btn('🎲 다시 뽑기', B2, async () => { const r = evDraw(P.pool, P.used, EA.subj, EA.n); P.r = r; await renderExamAdmin(); }));
   if (P.r.picked.length) row.append(btn('📤 출제하기', B1, async () => evIssue(P)));
   box.append(row); return box;
 }
@@ -2517,7 +2556,7 @@ async function evPrepareMonthly(pool, bad, nCand, over) {
   toast('');
   const weekly = hs.docs.map(d => d.data()).filter(w => w.kind === 'exam' && w.examKind === 'weekly' && w.subj === EA.subj), wq = {};
   ds.docs.forEach(d => { if (d.id.startsWith('wq_')) wq[d.data().studentUid] = d.data().w || []; });
-  const scopeKey = EA.folder + '/' + (EA.path[EA.path.length - 1] || '*'), d0 = new Date();
+  const scopeKey = EA.folder + '/' + (evSel().slice().sort().join('+') || '*'), d0 = new Date();
   EA.title = evScopeName() + ' ' + evKindName('monthly') + ' ' + (d0.getMonth() + 1) + '월';
   const make = () => {
     const byKey = new Map(pool.map(q => [q.key, q])), since = Date.now() - 30 * DAY_MS, plans = [];
@@ -2529,8 +2568,8 @@ async function evPrepareMonthly(pool, bad, nCand, over) {
         ks.forEach(k => { if (byKey.has(k)) { const o = cnt.get(k) || { n: 0, t: 0 }; o.n++; o.t = Math.max(o.t, e.t); cnt.set(k, o); } });
       });
       const wrongs = []; let size = 0;
-      [...cnt.entries()].sort((a, b) => b[1].n - a[1].n || b[1].t - a[1].t).forEach(([k]) => { const q = byKey.get(k), sz = JSON.stringify(q).length; if (wrongs.length < EV_N && size + sz <= 700000) { wrongs.push(q); size += sz; } });
-      const have = new Set(wrongs.map(q => q.key)), fill = wrongs.length < EV_N ? evDraw(pool, new Set([...usedW, ...have]), EA.subj, EV_N - wrongs.length).picked.filter(q => size + JSON.stringify(q).length <= 700000) : [];
+      [...cnt.entries()].sort((a, b) => b[1].n - a[1].n || b[1].t - a[1].t).forEach(([k]) => { const q = byKey.get(k), sz = JSON.stringify(q).length; if (wrongs.length < EA.n && size + sz <= 700000) { wrongs.push(q); size += sz; } });
+      const have = new Set(wrongs.map(q => q.key)), fill = wrongs.length < EA.n ? evDraw(pool, new Set([...usedW, ...have]), EA.subj, EA.n - wrongs.length).picked.filter(q => size + JSON.stringify(q).length <= 700000) : [];
       plans.push({ r, wrongs, fill, qs: evShuffle(wrongs.concat(fill)) });
     });
     return plans;
@@ -2542,7 +2581,7 @@ function evPreviewMonthly(P) {
   const box = h('div', 'mt-3 p-4 bg-white border border-indigo-200 rounded-2xl shadow-sm'), tot = P.plans.reduce((n, x) => n + x.wrongs.length, 0);
   box.append(h('div', 'font-bold text-slate-800 text-sm', '월말평가 · 대상 ' + P.plans.length + '명 · 오답 ' + tot + '문항 포함'),
     h('div', 'text-[11px] text-slate-500 mt-1', '학생마다 최근 30일 동안 틀린 문제(선택한 과 안)를 먼저 넣고, 20문항이 안 되면 주간평가에 아직 안 낸 문제로 채웁니다. 학생마다 문제가 다릅니다.'));
-  P.plans.forEach(x => { const n = x.qs.length; box.append(h('div', 'text-xs py-0.5 ' + (n < EV_N ? 'text-rose-600 font-bold' : 'text-slate-600'), x.r.name + (x.r.grade ? ' (' + x.r.grade + ')' : '') + ' — 오답 ' + x.wrongs.length + ' + 새 문제 ' + x.fill.length + ' = ' + n + '문항' + (n < EV_N ? ' (문제 부족)' : ''))); });
+  P.plans.forEach(x => { const n = x.qs.length; box.append(h('div', 'text-xs py-0.5 ' + (n < EA.n ? 'text-rose-600 font-bold' : 'text-slate-600'), x.r.name + (x.r.grade ? ' (' + x.r.grade + ')' : '') + ' — 오답 ' + x.wrongs.length + ' + 새 문제 ' + x.fill.length + ' = ' + n + '문항' + (n < EA.n ? ' (문제 부족)' : ''))); });
   if (P.over) box.append(h('div', 'text-[11px] text-amber-600 font-bold mt-1', '학습앱이 많아 앞의 40개만 읽었습니다.'));
   if (P.bad.length) box.append(h('div', 'text-[11px] text-amber-600 font-bold mt-1', '문제를 뽑을 수 없는 학습앱: ' + P.bad.slice(0, 8).join(', ') + (P.bad.length > 8 ? ' 외 ' + (P.bad.length - 8) + '개' : '')));
   const ti = h('input', 'w-full mt-3 p-2.5 border border-slate-300 rounded-xl text-sm font-bold'); ti.value = EA.title; ti.oninput = () => { EA.title = ti.value; }; box.append(ti);
