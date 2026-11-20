@@ -2214,7 +2214,11 @@ async function evPoolOf(itemId, name) {
 }
 /* --- 학생 오답 저장소: hwdone 문서 'wq_내ID' (Firestore 규칙이 허용하는 곳) --- */
 const wqRef = () => db.collection('hwdone').doc('wq_' + S.me.uid);
-async function wqLoad() { const d = await wqRef().get(); return d.exists ? (d.data().w || []) : []; }
+/* 없는 문서를 get()으로 읽으면 Firestore 규칙(resource.data 검사)에서 막히므로, 내 문서만 조회하는 쿼리로 읽는다 */
+async function wqLoad() {
+  const snap = await db.collection('hwdone').where('studentUid', '==', S.me.uid).get(), id = 'wq_' + S.me.uid, d = snap.docs.find(x => x.id === id);
+  return d ? (d.data().w || []) : [];
+}
 async function wqSave(list) {
   const cut = Date.now() - 35 * DAY_MS; list = list.filter(e => e.t >= cut).slice(-400);
   await wqRef().set({ hwId: 'wq', kind: 'wq', branchId: S.me.branchId, studentUid: S.me.uid, studentName: S.me.name, w: list }, { merge: true });
