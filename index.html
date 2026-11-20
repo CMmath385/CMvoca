@@ -201,6 +201,8 @@ const configured = !FB.apiKey.startsWith('YOUR');
 if (configured) firebase.initializeApp(FB);
 const auth = configured ? firebase.auth() : null;
 const db = configured ? firebase.firestore() : null;
+// 학원·와이파이·보안 프로그램이 실시간 연결을 막아 "client is offline" 오류가 나는 곳에서도 되도록, 막히면 자동으로 다른 연결 방식(롱폴링)으로 바꿈
+if (db) { try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (_) {} }
 const st = configured ? firebase.storage() : null;
 if (st) { st.setMaxUploadRetryTime(30000); st.setMaxOperationRetryTime(30000); } // 업로드가 무한 대기하지 않고 오류를 보여주도록
 // 관리자 로그인 상태를 유지한 채 새 계정을 만들기 위한 보조 앱
@@ -212,7 +214,7 @@ function h(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.cl
 function btn(txt, cls, fn) { const b = h('button', cls, txt); b.onclick = () => safe(fn); return b; }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const toast = m => { const t = $('toast'); t.textContent = m; t.classList.toggle('hidden', !m); };
-const safe = async f => { try { await f(); } catch (e) { toast(''); alert(e.message || '오류가 발생했습니다.'); } };
+const safe = async f => { try { await f(); } catch (e) { toast(''); const m = e.message || '오류가 발생했습니다.'; alert(/client is offline/i.test(m) ? '서버에 연결하지 못했습니다.\n인터넷 연결(와이파이·VPN·보안 프로그램)을 확인하고 새로고침(Ctrl+Shift+R) 후 다시 해 주세요.' : m); } };
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ko', { numeric: true });
 const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
 const B1 = 'bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-bold shadow-sm transition';
