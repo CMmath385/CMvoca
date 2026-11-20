@@ -765,9 +765,7 @@ function drawContent() {
     row.append(l);
     const r = h('div', 'flex flex-wrap items-center gap-1.5');
     if (it.type === 'folder') r.append(btn('열기', B1, () => { S.folderId = it.id; drawContent(); }));
-    if (it.type === 'folder' && S.me.role !== 'student' && S.folder !== 'F' && S.folder !== 'PDFLIB') r.append(
-      btn('📅 주간평가 출제', 'bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs px-2.5 py-2 rounded-xl font-bold', () => evJump(it, 'weekly')),
-      btn('🗓️ 월말평가 출제', 'bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs px-2.5 py-2 rounded-xl font-bold', () => evJump(it, 'monthly')));
+    if (it.type === 'folder' && S.me.role !== 'student' && S.folder !== 'F' && S.folder !== 'PDFLIB') r.append(btn('📤 출제하기', 'bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs px-2.5 py-2 rounded-xl font-bold', () => evAsk(it)));
     if (S.me.role !== 'student' && it.type !== 'folder') r.append(btn('📝 숙제', 'bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-2.5 py-2 rounded-xl font-bold', () => hwDialog(it)));
     if (it.linkUrl) r.append(btn('학습하기', B1, () => openLink(it)));
     if (it.htmlPage) r.append(btn('학습하기', B1, () => openHtml(it)));
@@ -2386,6 +2384,14 @@ function evJump(it, kind) {
   EA.restored = true; EA.folder = S.folder; EA.path = ids; EA.kind = kind; EA.subj = S.folder === 'C' ? 'ma' : 'en'; EA.prep = null; EA.items = []; EA.itemsFor = '';
   EA.bid = S.me.role === 'super' ? (S.viewBranch !== 'main' ? S.viewBranch : null) : S.me.branchId;
   setView('exam');
+}
+/* 폴더 줄의 [출제하기]를 누르면 주간/월말을 고르게 한다 */
+function evAsk(it) {
+  const ov = h('div', 'fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4'), c = h('div', 'bg-white rounded-2xl shadow-2xl max-w-xs w-full p-5 space-y-2.5');
+  const go = k => { ov.remove(); evJump(it, k); };
+  c.append(h('h3', 'text-base font-bold text-slate-800', '어떤 평가를 출제할까요?'), h('div', 'text-xs text-slate-500 font-bold break-all', '📁 ' + it.name),
+    btn('📅 주간평가', B1 + ' w-full !py-3 text-sm', async () => go('weekly')), btn('🗓️ 월말평가', B1 + ' w-full !py-3 text-sm', async () => go('monthly')), btn('취소', B2 + ' w-full', async () => ov.remove()));
+  ov.append(c); ov.onclick = e => { if (e.target === ov) ov.remove(); }; document.body.append(ov);
 }
 const EVSAVE = 'evSel';
 function evRemember() { try { localStorage.setItem(EVSAVE, JSON.stringify({ bid: EA.bid, folder: EA.folder, path: EA.path, subj: EA.subj, kind: EA.kind, ttype: EA.ttype })); } catch (_) {} }
