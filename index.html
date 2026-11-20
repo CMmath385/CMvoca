@@ -665,10 +665,14 @@ async function renderContent() { toast('불러오는 중...'); if (S.folder === 
 
 // 제목 찾기 도우미: 대소문자·완성형/조합형 글자를 구분하지 않고, 띄어쓰기로 나눈 글자가 모두 들어 있는 항목만 남김
 const nameKey = n => String(n || '').normalize('NFC').toLowerCase();
-function filterRows(rows, q) {
-  const terms = nameKey(q).split(/\s+/).filter(Boolean); let n = 0;
-  rows.forEach(r => { const on = terms.every(t => r.dataset.nm.includes(t)); r.style.display = on ? '' : 'none'; if (on) n++; });
-  return n;
+// 단원번호는 U01·u1·01·1·1단원·01과처럼 어떻게 써도 U01 같은 이름을 찾음 (U10·U11은 1로 찾지 않음)
+function termMatch(nm, t) {
+  const m = /^u?0*(\d{1,4})(단원|과|강|회)?$/.exec(t);
+  if (!m) return nm.includes(t);
+  const n = String(+m[1]);
+  if (nm.includes(t) && (m[2] || n.length >= 3)) return true; // "1회"·연도처럼 글자 그대로 들어 있으면 통과
+  if (m[2] === '회') return new RegExp('(?:^|[^0-9])0*' + n + '회').test(nm);
+  return new RegExp('(?:^|[^a-z0-9])u0*' + n + '(?!\\d)|(?:^|[^0-9])0*' + n + '\\s*(?:단원|과|강)').test(nm);
 }
 function drawContent() {
   navPush();
@@ -733,23 +737,24 @@ function drawContent() {
     list.append(upBtn);
   }
   const kids = visibleKids();
-  if (edit && kids.length) list.append(h('div', 'text-[11px] text-slate-400 font-bold px-1', '↕ 항목을 끌어서 순서를 바꾸거나, 폴더 위(가운데)에 놓으면 그 폴더로 이동합니다. 위쪽 경로나 "상위 폴더로 이동"에 놓으면 그 위치로 이동합니다.'));
+  const hintEl = h('div', 'text-[11px] text-slate-400 font-bold px-1', '↕ 항목을 끌어서 순서를 바꾸거나, 폴더 위(가운데)에 놓으면 그 폴더로 이동합니다. 위쪽 경로나 "상위 폴더로 이동"에 놓으면 그 위치로 이동합니다.');
+  if (edit && kids.length) list.append(hintEl);
   if (!kids.length) { list.append(h('div', 'text-center py-12 text-slate-400 font-medium text-sm', sharedScoped() && S.me.role !== 'super' ? '아직 본원에서 공유해 준 학습 자료가 없습니다.' : '등록된 학습 자료가 없습니다.')); return; }
-  // 제목으로 찾기: 이 폴더 안 목록에서 입력한 글자(띄어쓰기로 나누면 모두 들어간 것)가 이름에 있는 것만 보여 줌
-  const sKey = S.folder + '|' + (S.folderId || '') + '|' + S.tab, rowEls = [];
-  let sbox = null, sNone = null;
-  if (kids.length >= 4) {
-    sbox = h('input', 'w-full p-2.5 border border-slate-300 rounded-xl text-sm'); sbox.type = 'search'; sbox.placeholder = '🔍 이 폴더 안에서 제목으로 찾기 (' + kids.length + '개)'; sbox.setAttribute('aria-label', '제목으로 찾기');
+  // 제목·단원명·단원번호로 찾기: 이 큰 폴더 안(하위 폴더 전체)의 자료를, 셋 중 하나만 입력해도 찾아 줌. 띄어쓰기로 나누면 모두 들어간 것만
+  const sKey = S.folder + '|' + (S.folderId || ''), rowEls = [];
+  let sbox = null;
+  if (S.items.length >= 4) {
+    sbox = h('input', 'w-full p-2.5 border border-slate-300 rounded-xl text-sm'); sbox.type = 'search'; sbox.placeholder = '🔍 제목·단원명·단원번호로 찾기 (예: U01, 3단원, 제망매가)'; sbox.setAttribute('aria-label', '제목·단원명·단원번호로 찾기');
     sbox.value = S.listQ && S.listQ.key === sKey ? S.listQ.q : '';
     list.append(sbox);
   }
-  kids.forEach(it => {
+  const mkRow = (it, sub) => {
     const row = h('div', 'p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap justify-between items-center gap-3 font-bold text-slate-700 text-sm');
-    row.dataset.nm = nameKey(it.name); rowEls.push(row);
     const l = h('div', 'flex items-center gap-2.5 flex-grow min-w-0');
     l.append(h('span', 'text-xl', it.type === 'folder' ? '📂' : it.htmlPage ? '🧩' : it.pdfUrl ? '📄' : '🔗'), h('span', 'text-base break-all', it.name));
     if (isA() && edit) l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (it.visible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'), it.visible ? '학생공개' : '비공개'));
     if (sharedScoped() && S.me.role === 'super') { const n = (it.shared || []).length; l.append(h('span', 'text-[10px] px-1.5 py-0.5 rounded font-bold ' + (n ? 'bg-violet-100 text-violet-700' : 'bg-slate-200 text-slate-500'), n ? '공유 ' + n + '개 지점' : '미공유')); }
+    if (sub) { l.classList.add('flex-wrap'); l.append(h('span', 'basis-full text-[11px] text-slate-400 font-medium pl-9 break-all', '📁 ' + sub + (TABS.some(t => t[0] === tabOf(it)) ? ' · ' + TABS.find(t => t[0] === tabOf(it))[1] : ''))); }
     if (it.type === 'folder') { l.classList.add('cursor-pointer'); l.onclick = () => { S.folderId = it.id; drawContent(); }; }
     else if (it.htmlPage || it.linkUrl || it.pdfUrl) { l.classList.add('cursor-pointer'); l.title = '눌러서 열기'; l.onclick = () => { unlockSound(); openItem(it); }; } // 이름을 눌러도 학습이 열림
     row.append(l);
@@ -767,11 +772,27 @@ function drawContent() {
       r.append(btn('📂 이동', B2, () => moveDialog(it)), btn('📋 복사', B2, () => moveDialog(it, true)), btn('✏️', B2, () => renameItem(it)), btn('🗑', B2, () => deleteItem(it)));
     }
     if (!edit && S.me.role === 'sub' && FOLDERS.some(f => f.kind === 'branch')) r.append(btn('📋 내 지점으로 복사', 'bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs px-2.5 py-2 rounded-xl font-bold', () => moveDialog(it, true)));
-    row.append(r); if (edit) wireDrag(row, it); list.append(row);
-  });
+    row.append(r); return row;
+  };
+  kids.forEach(it => { const row = mkRow(it); rowEls.push(row); if (edit) wireDrag(row, it); list.append(row); });
   if (sbox) {
-    sNone = h('div', 'hidden text-center py-8 text-slate-400 font-medium text-sm', '찾는 제목이 없습니다.'); list.append(sNone);
-    const applyQ = () => { const q = sbox.value; S.listQ = { key: sKey, q }; const n = filterRows(rowEls, q); sNone.classList.toggle('hidden', n > 0); };
+    const resBox = h('div', 'space-y-3 hidden'); list.append(resBox);
+    let idx = null;
+    const build = () => { // 자료마다 이름 + 위 폴더 이름(단원명 등)을 한 줄로 만들어 둠
+      const byId = new Map(S.items.map(i => [i.id, i]));
+      idx = S.items.map(it => { const names = []; let q = it.parentId ? byId.get(it.parentId) : null, n = 0; while (q && n++ < 50) { names.unshift(q.name); q = q.parentId ? byId.get(q.parentId) : null; } return { it, own: nameKey(it.name), key: nameKey([it.name].concat(names).join(' ')), sub: names.join(' › ') }; });
+    };
+    const applyQ = () => {
+      const q = sbox.value; S.listQ = { key: sKey, q };
+      const terms = nameKey(q).split(/\s+/).filter(Boolean), on = terms.length > 0;
+      rowEls.forEach(r => { r.style.display = on ? 'none' : ''; }); hintEl.style.display = on ? 'none' : '';
+      resBox.classList.toggle('hidden', !on); resBox.innerHTML = ''; if (!on) return;
+      if (!idx) build();
+      const hit = idx.filter(x => terms.every(t => termMatch(x.key, t))).sort((a, b) => ((a.it.type === 'folder' && terms.every(t => termMatch(a.own, t))) ? 0 : 1) - ((b.it.type === 'folder' && terms.every(t => termMatch(b.own, t))) ? 0 : 1) || byName(a.it, b.it)), LIM = 200;
+      resBox.append(h('div', 'text-xs font-bold text-indigo-700 px-1', '🔍 찾은 자료 ' + hit.length + '개' + (hit.length > LIM ? ' (처음 ' + LIM + '개만 보여 줍니다. 더 자세히 입력해 보세요)' : '')));
+      if (!hit.length) { resBox.append(h('div', 'text-center py-8 text-slate-400 font-medium text-sm', '찾는 자료가 없습니다. 제목·단원명·단원번호 중 하나를 다시 입력해 보세요.')); return; }
+      hit.slice(0, LIM).forEach(x => resBox.append(mkRow(x.it, x.sub)));
+    };
     sbox.oninput = applyQ; if (sbox.value) applyQ();
   }
 }
