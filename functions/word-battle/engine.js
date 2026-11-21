@@ -18,13 +18,14 @@ const DEFAULT_CONFIG = {
 const clone = o => JSON.parse(JSON.stringify(o));
 const fail = (room, reason) => ({ room, ok: false, reason });
 
+/** 새 참가자 점수 상태 */
+const newPlayer = character => ({ score: 0, roundScore: [0, 0, 0], correct: 0, wrong: 0, noAnswer: 0, correctMs: 0, character, baseCharacter: character });
+
 /** 새 방 상태. players: [{uid, character}] */
 function createRoom(players, config) {
   const cfg = { ...DEFAULT_CONFIG, ...(config || {}) };
   const p = {};
-  players.forEach(x => {
-    p[x.uid] = { score: 0, roundScore: [0, 0, 0], correct: 0, wrong: 0, noAnswer: 0, correctMs: 0, character: x.character, baseCharacter: x.character };
-  });
+  players.forEach(x => { p[x.uid] = newPlayer(x.character); });
   return { cfg, players: p, q: null, swap: null };
 }
 
@@ -134,4 +135,4 @@ function revertCharacters(room) {
 /** 경기 최종 점수 → 교환 가능 포인트 (0 이하면 적립 없음) */
 function pointsFor(score, rate) { return Math.max(0, Math.floor(score * (rate === undefined ? 1 : rate))); }
 
-module.exports = { DEFAULT_CONFIG, createRoom, openQuestion, submitAnswer, closeByTimeout, ranking, openSwap, useSwap, revertCharacters, pointsFor };
+module.exports = { DEFAULT_CONFIG, newPlayer, createRoom, openQuestion, submitAnswer, closeByTimeout, ranking, openSwap, useSwap, revertCharacters, pointsFor };
