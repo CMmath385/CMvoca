@@ -634,6 +634,7 @@ function setView(v) {
   ['content', 'students', 'history', 'manage', 'settings', 'branches', 'pdflib', 'import', 'hw', 'wrong', 'weekly', 'monthly', 'exam', 'trash'].forEach(x => $('view-' + x).classList.toggle('hidden', x !== v));
   $('side').parentElement.classList.toggle('hidden', v !== 'content' && v !== 'manage');
   const views = [['content', '📂 학습 자료실'], ['hw', '📝 숙제·알림장']];
+  if (S.me.role === 'student') views.splice(1, 0, ['wordbattle', '⚔️ WORD BATTLE']); // 별도 페이지(/word-battle/)로 이동
   if (S.me.role === 'student') views.push(['wrong', '🔁 오답문제'], ['weekly', '📅 주간평가'], ['monthly', '🗓️ 월말평가']);
   if (S.me.role !== 'student') views.push(['students', '👨‍🎓 학생 관리'], ['history', '📊 학습 이력']);
   if (S.me.role !== 'student') views.push(['settings', S.me.role === 'sub' ? '⚙️ 학원 설정' : '⚙️ 본원 로고']);
@@ -641,7 +642,7 @@ function setView(v) {
   if (S.me.role !== 'student') views.push(['trash', '🗑 휴지통']);
   const nav = $('view-nav'); nav.innerHTML = '';
   nav.classList.toggle('hidden', views.length < 2);
-  views.forEach(([id, label]) => nav.append(btn(label, 'flex-1 py-2 rounded-lg text-xs font-bold ' + ((v === id || ((v === 'manage' || v === 'exam') && id === 'content')) ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'), () => setView(id))));
+  views.forEach(([id, label]) => nav.append(btn(label, 'flex-1 py-2 rounded-lg text-xs font-bold ' + ((v === id || ((v === 'manage' || v === 'exam') && id === 'content')) ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'), () => id === 'wordbattle' ? (location.href = 'word-battle/') : setView(id))));
   safe(async () => { if (v === 'content') await renderContent(); else if (v === 'students') await renderStudents(); else if (v === 'branches') await renderBranches(); else if (v === 'pdflib') await renderPdfLib(); else if (v === 'history') await renderHistory(); else if (v === 'manage') await renderManage(); else if (v === 'settings') renderSettings(); else if (v === 'hw') await renderHw(); else if (v === 'wrong') await renderWrong(); else if (v === 'weekly') await renderEval('weekly'); else if (v === 'monthly') await renderEval('monthly'); else if (v === 'exam') await renderExamAdmin(); else if (v === 'trash') await renderTrash(); });
 }
 
