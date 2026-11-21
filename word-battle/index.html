@@ -125,7 +125,7 @@ function waiting(r){
   <div class="muted" style="text-align:center;margin-top:12px">친구에게 이 코드를 알려 주세요</div><div class="code-big">${r.code}</div>
   <div class="card">${r.playerUids.map(u=>{const p=r.players[u];return `<div class="pl"><img src="${img(p.character)}" alt=""><span class="n">${p.character}${u===S.uid?' (나)':''}</span>${u===r.hostUid?'<span class="tag host">방장</span>':`<span class="tag ${p.ready?'go':''}">${p.ready?'준비 완료':'대기'}</span>`}</div>`}).join('')}</div>
   <div class="card"><div class="muted" style="margin-bottom:8px">캐릭터 바꾸기</div>${charPick(r)}</div>${errBox()}
-  ${host?`<button class="btn" ${r.playerUids.length>=2&&others.every(u=>r.players[u].ready)?'':'disabled'} onclick="start()">게임 시작</button>`:`<button class="btn" onclick="ready(${!me.ready})">${me.ready?'준비 취소':'준비 완료'}</button>`}
+  ${host?`<div class="muted" style="text-align:center">${r.playerUids.length<2?'친구가 2명 이상 들어와야 시작할 수 있어요':(others.every(u=>r.players[u].ready)?'모두 준비됐어요!':'모두 준비를 누르면 시작할 수 있어요')}</div><button class="btn" ${r.playerUids.length>=2&&others.every(u=>r.players[u].ready)?'':'disabled'} onclick="start()">게임 시작</button>`:`<button class="btn" onclick="ready(${!me.ready})">${me.ready?'준비 취소':'준비 완료'}</button>`}
   <button class="btn ghost" onclick="leave()">나가기</button>`;
 }
 function scoreBar(r){
