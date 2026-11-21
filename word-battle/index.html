@@ -90,6 +90,7 @@ function lobby(){
   if(S.step==='rank')return rankView();
   if(S.step==='shop')return shopView();
   return `<h1>⚔️ WORD <b>BATTLE</b></h1><div class="sub">친구들과 실시간 단어 대결 (2~4명)</div>
+  <div class="muted" style="margin:-8px 0 10px">로그인: <b>${esc(S.name||'')}</b></div>
   <div class="card"><div class="muted" style="margin-bottom:8px">내 캐릭터</div>${charPick(null)}</div>
   <button class="btn" onclick="S.step='pick';loadCat()">방 만들기</button>
   <div class="row"><button class="btn ghost" onclick="openRank('week')">🏆 랭킹</button><button class="btn ghost" onclick="openShop()">🎁 포인트·상품</button></div>
@@ -211,7 +212,7 @@ function shopView(){
   <div class="muted" style="text-align:center;margin:8px">교환하면 우리 지점 선생님이 확인하고 나눠 줘요</div><button class="btn ghost" onclick="S.step=null;render()">뒤로</button>`;
 }
 function redeem(id,name,pts){if(!confirm(name+' 교환할까요? ('+pts+'P 사용)'))return;run(async()=>{await api('wbRedeem',{productId:id});await openShop()})}
-auth.onAuthStateChanged(u=>{S.uid=u?u.uid:null;render()});
+auth.onAuthStateChanged(async u=>{S.uid=u?u.uid:null;S.name='';render();if(u){try{const d=await db.doc('users/'+u.uid).get();S.name=(d.data()||{}).name||u.email||'';render()}catch(e){S.name=u.email||'';render()}}});
 </script>
 </body>
 </html>
