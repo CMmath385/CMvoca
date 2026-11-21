@@ -19,6 +19,7 @@ const { extractWordData } = require('./word-battle/extract');
 const { buildWordCatalog, collectApps, SCOPE } = require('./word-battle/catalog');
 const RK = require('./word-battle/ranking');
 const RW = require('./word-battle/rewards');
+const CT = require('./word-battle/control');
 
 const OPTS = { region: 'asia-northeast3', maxInstances: 20 };
 const call = fn => onCall(OPTS, async req => {
@@ -36,6 +37,12 @@ async function loadMe(uid) {
   return { uid, role: u.role, branchId: u.role === 'sub' ? uid : (u.branchId || null) };
 }
 const needPlayer = me => { if (me.role === 'sub') throw new HttpsError('permission-denied', '학생 계정(또는 관리자 시험용)만 참여할 수 있습니다.'); };
+/** 선생님이 배틀을 닫아 두면 새 방 만들기·들어가기를 막는다 (이미 시작한 경기는 계속) */
+async function needOpen(me) {
+  const c = await db.doc('wb_settings/control').get();
+  const r = CT.isBattleOpen(c.data(), me.branchId, me.role);
+  if (!r.open) throw new HttpsError('failed-precondition', 'BATTLE_CLOSED');
+}
 const fail = r => { throw new HttpsError('failed-precondition', r || 'FAILED'); };
 
 /* ----- 단어 목록 ----- */
@@ -44,7 +51,7 @@ async function loadCatalog(me) {
   const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   return buildWordCatalog({ role: me.role, branchId: me.branchId }, items, SCOPE);
 }
-exports.wbListWords = call(async (_d, me) => { needPlayer(me); return await loadCatalog(me); });
+exports.wbListWords = call(async (_d, me) => { needPlayer(me); await needOpen(me); return await loadCatalog(me); });
 
 /* ----- 방 저장 도구 ----- */
 const roomRef = id => db.doc('wb_rooms/' + id), secRef = id => db.doc('wb_secrets/' + id);
@@ -92,7 +99,7 @@ const inRoom = (room, uid) => { if (!room.players[uid] || room.players[uid].left
 
 /* ----- 방 만들기 ----- */
 exports.wbCreateRoom = call(async (d, me) => {
-  needPlayer(me);
+  needPlayer(me); await needOpen(me);
   const ids = Array.isArray(d.itemIds) ? [...new Set(d.itemIds.map(String))].slice(0, 60) : [];
   if (!ids.length) throw new HttpsError('invalid-argument', '단어를 고르세요.');
   const cat = await loadCatalog(me);
@@ -122,7 +129,7 @@ exports.wbCreateRoom = call(async (d, me) => {
 
 /* ----- 참가·준비·시작·나가기 ----- */
 exports.wbJoinRoom = call(async (d, me) => {
-  needPlayer(me);
+  needPlayer(me); await needOpen(me);
   const code = String(d.code || '').trim().toUpperCase();
   const c = await db.doc('wb_codes/' + code).get();
   if (!c.exists) throw new HttpsError('not-found', '방 코드를 찾을 수 없습니다.');
@@ -273,5 +280,16 @@ exports.wbSetMissions = call(async (d, me) => {
   needSuper(me);
   const list = (Array.isArray(d.list) ? d.list : []).map(x => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 40);
   await db.doc('wb_settings/main').set({ missions: list }, { merge: true });
+  return { ok: true };
+});
+
+/** 배틀 열기·닫기: 지점 선생님은 우리 지점, 본원은 전체 또는 지점별 */
+exports.wbSetOpen = call(async (d, me) => {
+  needStaff(me);
+  const open = !!d.open;
+  if (d.scope === 'all') { needSuper(me); await db.doc('wb_settings/control').set({ all: open, updatedAt: FV.serverTimestamp(), updatedBy: me.uid }, { merge: true }); return { ok: true }; }
+  const bid = me.role === 'sub' ? me.uid : String(d.branchId || '');
+  if (!bid) throw new HttpsError('invalid-argument', '지점을 골라 주세요.');
+  await db.doc('wb_settings/control').set({ branches: { [bid]: open }, updatedAt: FV.serverTimestamp(), updatedBy: me.uid }, { merge: true });
   return { ok: true };
 });
