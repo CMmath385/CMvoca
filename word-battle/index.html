@@ -87,9 +87,12 @@ function render(){
 const errBox=()=>`<div class="err">${esc(S.err)}</div>`;
 function lobby(){
   if(S.step==='pick')return picker();
+  if(S.step==='rank')return rankView();
+  if(S.step==='shop')return shopView();
   return `<h1>⚔️ WORD <b>BATTLE</b></h1><div class="sub">친구들과 실시간 단어 대결 (2~4명)</div>
   <div class="card"><div class="muted" style="margin-bottom:8px">내 캐릭터</div>${charPick(null)}</div>
   <button class="btn" onclick="S.step='pick';loadCat()">방 만들기</button>
+  <div class="row"><button class="btn ghost" onclick="openRank('week')">🏆 랭킹</button><button class="btn ghost" onclick="openShop()">🎁 포인트·상품</button></div>
   <div class="card"><div class="muted" style="margin-bottom:8px">방 코드로 들어가기</div><input id="jc" class="code" maxlength="6" placeholder="ABC234"><button class="btn" onclick="join()">들어가기</button></div>${errBox()}`;
 }
 function charPick(room){
@@ -186,6 +189,28 @@ function drive(){
     raf=requestAnimationFrame(loop);
   };loop();
 }
+
+/* ----- 랭킹 ----- */
+async function openRank(p){S.step='rank';S.rank=null;S.rankP=p;render();try{S.rank=await api('wbRanking',{period:p})}catch(e){S.err=say(e)}render()}
+function rankView(){
+  const tabs=`<div class="row"><button class="btn ${S.rankP==='week'?'':'ghost'}" onclick="openRank('week')">이번 주</button><button class="btn ${S.rankP==='month'?'':'ghost'}" onclick="openRank('month')">이번 달</button></div>`;
+  let body='<div class="muted" style="padding:30px;text-align:center">불러오는 중…</div>';
+  if(S.rank)body=S.rank.list.length?`<div class="card">${S.rank.list.map(x=>`<div class="rk ${x.me?'me':''}"><div class="no">${x.rank}</div><img src="${img(x.character)}" alt=""><div class="grow"><b>${x.me?'나':(x.name?esc(x.name):'')}</b><div class="muted">승 ${x.wins} · 정답률 ${x.accuracy}% · ${x.plays}판</div></div><b style="font-size:20px">${x.total}</b></div>`).join('')}</div>`:'<div class="card muted" style="text-align:center">아직 기록이 없어요. 첫 대결을 해 보세요!</div>';
+  return `<h1>🏆 랭킹</h1><div class="sub">지점 상관없이 모두 함께 · 총점 순</div>${tabs}${body}${errBox()}<button class="btn ghost" onclick="S.step=null;render()">뒤로</button>`;
+}
+/* ----- 포인트·상품 ----- */
+async function openShop(){S.step='shop';S.shop=null;render();try{const [me,pr]=await Promise.all([api('wbMe'),api('wbProducts')]);S.shop={me,products:pr.products}}catch(e){S.err=say(e)}render()}
+const ST={REQUESTED:'승인 대기',APPROVED:'승인됨 · 지급 준비',PAID:'지급 완료',REJECTED:'거절됨 (포인트 환불)'};
+function shopView(){
+  if(!S.shop)return `<div class="muted" style="padding:40px;text-align:center">불러오는 중…${errBox()}</div>`;
+  const {me,products}=S.shop;
+  return `<h1>🎁 포인트·상품</h1><div class="card" style="text-align:center"><div class="muted">내 포인트</div><div class="big" style="margin:6px 0;color:var(--gold)">${me.balance}P</div></div>
+  ${me.missions.filter(m=>m.status==='ISSUED').map(m=>`<div class="card" style="border-color:var(--gold)"><b>📝 미션</b><div style="margin-top:6px">${esc(m.text)}</div></div>`).join('')}
+  <div class="card">${products.length?products.map(p=>`<div class="pl"><span class="n">${esc(p.name)}<div class="muted">${p.points}P</div></span><button class="tag ${me.balance>=p.points?'go':''}" style="border:0;min-height:36px;padding:0 14px;font-weight:800" ${me.balance>=p.points?'':'disabled'} onclick="redeem('${p.id}','${esc(p.name)}',${p.points})">교환</button></div>`).join(''):'<div class="muted">준비 중이에요</div>'}</div>
+  ${me.redeems.length?`<div class="card"><div class="muted" style="margin-bottom:6px">내 교환 내역</div>${me.redeems.map(r=>`<div class="pl"><span class="n">${esc(r.name)}</span><span class="tag ${r.status==='PAID'?'go':''}">${ST[r.status]||r.status}</span></div>`).join('')}</div>`:''}${errBox()}
+  <div class="muted" style="text-align:center;margin:8px">교환하면 우리 지점 선생님이 확인하고 나눠 줘요</div><button class="btn ghost" onclick="S.step=null;render()">뒤로</button>`;
+}
+function redeem(id,name,pts){if(!confirm(name+' 교환할까요? ('+pts+'P 사용)'))return;run(async()=>{await api('wbRedeem',{productId:id});await openShop()})}
 auth.onAuthStateChanged(u=>{S.uid=u?u.uid:null;render()});
 </script>
 </body>
