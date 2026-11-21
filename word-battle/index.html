@@ -64,7 +64,7 @@ const img=c=>`../assets/word-battle/characters/${CH[c]||'geomeuni'}.png`;
 const $=id=>document.getElementById(id);const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const S={uid:null,roomId:null,room:null,unsub:null,pick:'검은이',cat:null,sel:new Set(),open:new Set(),err:'',busy:false,tickFor:null,myAns:null,qid:null,skew:0,swapTarget:null};
 const api=(n,d)=>fns.httpsCallable(n)(d||{}).then(r=>r.data);
-const MSG={FULL:'방이 가득 찼어요',CHARACTER_TAKEN:'이미 다른 친구가 고른 캐릭터예요',NOT_FOUND:'방을 찾을 수 없어요',NOT_READY:'모두 준비해야 시작할 수 있어요',NEED_MORE_PLAYERS:'2명 이상 필요해요',EXPIRED:'시간이 지난 방이에요',NOT_WAITING:'이미 시작한 방이에요',ALREADY_IN:'이미 들어와 있어요'};
+const MSG={BATTLE_CLOSED:'지금은 배틀이 닫혀 있어요. 선생님이 열면 할 수 있어요.',FULL:'방이 가득 찼어요',CHARACTER_TAKEN:'이미 다른 친구가 고른 캐릭터예요',NOT_FOUND:'방을 찾을 수 없어요',NOT_READY:'모두 준비해야 시작할 수 있어요',NEED_MORE_PLAYERS:'2명 이상 필요해요',EXPIRED:'시간이 지난 방이에요',NOT_WAITING:'이미 시작한 방이에요',ALREADY_IN:'이미 들어와 있어요'};
 const say=e=>{const m=(e&&e.message)||String(e);return MSG[m]||m};
 async function run(fn){if(S.busy)return;S.busy=true;S.err='';try{await fn()}catch(e){S.err=say(e)}S.busy=false;render()}
 
