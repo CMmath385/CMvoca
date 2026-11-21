@@ -42,24 +42,24 @@
     // 상품 목록·게임 설정: 로그인한 등록 사용자는 읽기, 본원만 수정 (기존 config 와 같은 방식)
     match /wb_products/{id} {
       allow read: if isSuper() || registered();
-      allow write: if isSuper();
+      allow write: if false;  // 상품은 관리 화면 → 서버 함수가 저장
     }
     match /wb_settings/{id} {
       allow read: if isSuper() || registered();
-      allow write: if isSuper();
+      allow write: if false;
     }
 
     // 상품 교환 신청·미션권: 본인·같은 지점 선생님·본원은 읽기, 신청·승인은 서버 함수만
     match /wb_redeems/{id} {
       allow read: if isSuper()
         || wbBranchStaff(resource.data)
-        || (signedin() && resource.data.studentUid == request.auth.uid);
+        || (signedin() && resource.data.uid == request.auth.uid);
       allow write: if false;
     }
     match /wb_missions/{id} {
       allow read: if isSuper()
         || wbBranchStaff(resource.data)
-        || (signedin() && resource.data.studentUid == request.auth.uid);
+        || (signedin() && resource.data.uid == request.auth.uid);
       allow write: if false;
     }
 

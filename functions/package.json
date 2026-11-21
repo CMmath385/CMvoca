@@ -2,7 +2,7 @@
   "name": "cmvoca-functions",
   "private": true,
   "description": "CMVOCA WORD BATTLE 서버 함수",
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "main": "index.js",
   "scripts": { "test": "node word-battle/test/engine.test.js && node word-battle/test/flow.test.js && node word-battle/test/catalog.test.js && node word-battle/test/ranking.test.js && node word-battle/test/rewards.test.js && node word-battle/test/run-sample.js" },
   "dependencies": {
