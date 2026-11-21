@@ -20,20 +20,13 @@
         || (isSub() && request.auth.uid in resource.data.branchIds)
         || (signedin() && request.auth.uid in resource.data.playerUids);
       allow write: if false;
-
-      // 참가자별 점수·상태 (화면에는 닉네임·캐릭터만 쓴다. 실명은 저장하지 않는다)
-      match /players/{uid} {
-        allow read: if isSuper()
-          || (signedin() && request.auth.uid in get(/databases/$(database)/documents/wb_rooms/$(roomId)).data.playerUids)
-          || (isSub() && request.auth.uid in get(/databases/$(database)/documents/wb_rooms/$(roomId)).data.branchIds);
-        allow write: if false;
-      }
+      // 참가자 점수·캐릭터는 방 문서 안(players)에 들어 있어 따로 규칙이 필요 없다. 정답은 wb_secrets(규칙 없음=차단)에만 있다.
     }
 
     // 누적 성적(랭킹용): 지점이 달라도 모든 등록 사용자가 읽는다.
     //   그래서 이 문서에는 닉네임·캐릭터·점수·승수만 넣고 실명·연락처는 절대 넣지 않는다.
     //   (지점 선생님이 자기 학생의 실명 기록을 볼 때는 users 문서와 서버 함수를 쓴다)
-    match /wb_stats/{uid} {
+    match /wb_stats/{statId} {  // 문서 번호 = 방번호_uid
       allow read: if isSuper() || registered();
       allow write: if false;
     }
