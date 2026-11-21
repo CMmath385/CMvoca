@@ -17,6 +17,8 @@ const F = require('./word-battle/flow');
 const { buildMatch } = require('./word-battle/questions');
 const { extractWordData } = require('./word-battle/extract');
 const { buildWordCatalog, collectApps, SCOPE } = require('./word-battle/catalog');
+const RK = require('./word-battle/ranking');
+const RW = require('./word-battle/rewards');
 
 const OPTS = { region: 'asia-northeast3', maxInstances: 20 };
 const call = fn => onCall(OPTS, async req => {
@@ -62,8 +64,18 @@ async function mutate(roomId, fn) {
     if (out.changed) {
       let r = out.room;
       const eff = F.finalizeEffects(r);
+      let mission = null;
       if (eff) {
+        const lastUid = RW.lastPlace(r.result);
+        if (lastUid) { // 읽기는 모든 쓰기보다 먼저
+          const [st, lm] = await Promise.all([tx.get(db.doc('wb_settings/main')), tx.get(db.doc('wb_missionlast/' + lastUid))]);
+          mission = { uid: lastUid, text: RW.pickMission((st.data() || {}).missions, (lm.data() || {}).text, Math.random) };
+        }
         r = { ...r, finalized: true };
+        if (mission) {
+          tx.set(db.doc(`wb_missions/${roomId}_${mission.uid}`), { uid: mission.uid, branchId: r.players[mission.uid].branchId, roomId, text: mission.text, status: 'PROPOSED', createdAt: FV.serverTimestamp() });
+          tx.set(db.doc('wb_missionlast/' + mission.uid), { text: mission.text });
+        }
         for (const e of eff) {
           tx.set(db.doc(`wb_stats/${roomId}_${e.uid}`), { ...e, roomId, at: FV.serverTimestamp(), finishedAt: Date.now() });
           if (e.points > 0) tx.set(db.doc('wb_points/' + e.uid), { uid: e.uid, branchId: e.branchId, balance: FV.increment(e.points), earned: FV.increment(e.points), updatedAt: FV.serverTimestamp() }, { merge: true });
@@ -138,3 +150,128 @@ exports.wbTick = call(async (d, me) => mutate(d.roomId, (room, secret) => {
   return r.ok ? { room: r.room, changed: true } : { changed: false };
 }));
 exports.wbUseSwap = call(async (d, me) => mutate(d.roomId, room => { inRoom(room, me.uid); return lift(F.useSwap(room, me.uid, String(d.targetUid || ''), Date.now())); }));
+
+/* ================= 랭킹·포인트·상품·미션 ================= */
+const isStaff = me => me.role === 'sub' || me.role === 'super';
+const needStaff = me => { if (!isStaff(me)) throw new HttpsError('permission-denied', '선생님만 쓸 수 있어요.'); };
+const needSuper = me => { if (me.role !== 'super') throw new HttpsError('permission-denied', '본원만 쓸 수 있어요.'); };
+const ts = v => (v && v.toMillis ? v.toMillis() : null);
+const pack = d => { const x = d.data(); Object.keys(x).forEach(k => { if (x[k] && x[k].toMillis) x[k] = x[k].toMillis(); }); return { id: d.id, ...x }; };
+const newest = (a, n) => a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0)).slice(0, n);
+const branchOk = (me, branchId) => me.role === 'super' || branchId === me.branchId;
+
+/** 주간·월간 랭킹: 순위·캐릭터·성적만. 실명은 선생님·본원에게만 */
+exports.wbRanking = call(async (d, me) => {
+  const period = d.period === 'month' ? 'month' : 'week';
+  const from = RK.periodStart(period, Date.now());
+  const snap = await db.collection('wb_stats').where('finishedAt', '>=', from).limit(5000).get();
+  const list = RK.buildRanking(snap.docs.map(x => x.data()), 50);
+  let names = {};
+  if (isStaff(me)) {
+    const us = await Promise.all(list.map(x => db.doc('users/' + x.uid).get()));
+    us.forEach((u, i) => { const v = u.data() || {}; if (me.role === 'super' || v.branchId === me.branchId) names[list[i].uid] = v.name || ''; });
+  }
+  return { period, from, list: list.map(x => ({ rank: x.rank, character: x.character, total: x.total, wins: x.wins, accuracy: x.accuracy, plays: x.plays, me: x.uid === me.uid, name: names[x.uid] || undefined })) };
+});
+
+exports.wbMe = call(async (_d, me) => {
+  const [p, r, m] = await Promise.all([
+    db.doc('wb_points/' + me.uid).get(),
+    db.collection('wb_redeems').where('uid', '==', me.uid).limit(60).get(),
+    db.collection('wb_missions').where('uid', '==', me.uid).limit(30).get()]);
+  return { balance: (p.data() || {}).balance || 0, redeems: newest(r.docs.map(pack), 20), missions: newest(m.docs.map(pack).filter(x => x.status !== 'PROPOSED' && x.status !== 'REJECTED'), 10) };
+});
+
+exports.wbProducts = call(async (_d, me) => {
+  const s = await db.collection('wb_products').get();
+  return { products: s.docs.map(pack).filter(p => me.role === 'super' || p.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0) || (a.points || 0) - (b.points || 0)) };
+});
+
+/** 교환 신청: 포인트를 먼저 묶어 두고(차감) 지점 선생님이 승인·지급한다. 거절하면 돌려준다 */
+exports.wbRedeem = call(async (d, me) => {
+  needPlayer(me); if (me.role === 'super') throw new HttpsError('permission-denied', '학생만 교환할 수 있어요.');
+  return db.runTransaction(async tx => {
+    const [ps, pr] = await Promise.all([tx.get(db.doc('wb_points/' + me.uid)), tx.get(db.doc('wb_products/' + String(d.productId || '_')))]);
+    const prod = pr.exists ? pr.data() : null, chk = RW.canRequest(prod, (ps.data() || {}).balance);
+    if (!chk.ok) throw new HttpsError('failed-precondition', chk.reason);
+    const ref = db.collection('wb_redeems').doc();
+    tx.set(ref, { uid: me.uid, branchId: me.branchId, productId: pr.id, name: prod.name, points: chk.cost, won: prod.won || 0, status: 'REQUESTED', month: RW.monthKey(Date.now()), createdAt: FV.serverTimestamp() });
+    tx.set(db.doc('wb_points/' + me.uid), { balance: FV.increment(-chk.cost), spent: FV.increment(chk.cost), updatedAt: FV.serverTimestamp() }, { merge: true });
+    return { ok: true, id: ref.id };
+  });
+});
+
+/** 선생님·본원 관리 화면 자료: 교환 신청, 미션 제안, 이번 달 예산 */
+exports.wbAdminData = call(async (_d, me) => {
+  needStaff(me);
+  const month = RW.monthKey(Date.now()), bid = me.role === 'sub' ? me.uid : null;
+  let rq = db.collection('wb_redeems').orderBy('createdAt', 'desc').limit(100), mq = db.collection('wb_missions').orderBy('createdAt', 'desc').limit(60);
+  if (bid) { rq = db.collection('wb_redeems').where('branchId', '==', bid).limit(200); mq = db.collection('wb_missions').where('branchId', '==', bid).limit(100); }
+  const [r, m, b, st] = await Promise.all([rq.get(), mq.get(), bid ? db.doc(`wb_budgets/${bid}_${month}`).get() : db.collection('wb_budgets').where('month', '==', month).get(), db.doc('wb_settings/main').get()]);
+  const reds = newest(r.docs.map(pack), 100), miss = newest(m.docs.map(pack), 60);
+  const uids = [...new Set([...reds, ...miss].map(x => x.uid))], us = await Promise.all(uids.map(u => db.doc('users/' + u).get())), nm = {};
+  us.forEach(u => { nm[u.id] = (u.data() || {}).name || ''; });
+  const withName = x => ({ ...x, studentName: nm[x.uid] || '' });
+  return { month, redeems: reds.map(withName), missions: miss.map(withName), budgets: bid ? [b.exists ? b.data() : { limit: null, used: 0 }] : b.docs.map(pack), missionList: (st.data() || {}).missions || RW.DEFAULT_MISSIONS };
+});
+
+/** 교환 처리: approve(예산 확인) → paid(지급 완료) / reject(포인트 돌려줌) */
+exports.wbRedeemDecide = call(async (d, me) => {
+  needStaff(me);
+  return db.runTransaction(async tx => {
+    const ref = db.doc('wb_redeems/' + String(d.id || '_')), s = await tx.get(ref);
+    if (!s.exists) throw new HttpsError('not-found', '신청을 찾을 수 없어요.');
+    const x = s.data(); if (!branchOk(me, x.branchId)) throw new HttpsError('permission-denied', '다른 지점 학생이에요.');
+    const bref = db.doc(`wb_budgets/${x.branchId}_${x.month}`), b = await tx.get(bref);
+    if (d.action === 'approve') {
+      if (x.status !== 'REQUESTED') throw new HttpsError('failed-precondition', '이미 처리했어요.');
+      const c = RW.canApprove(b.data(), x.won || 0); if (!c.ok) throw new HttpsError('failed-precondition', c.reason);
+      tx.set(bref, { branchId: x.branchId, month: x.month, used: FV.increment(x.won || 0) }, { merge: true });
+      tx.update(ref, { status: 'APPROVED', decidedBy: me.uid, decidedAt: FV.serverTimestamp() });
+    } else if (d.action === 'paid') {
+      if (x.status !== 'APPROVED') throw new HttpsError('failed-precondition', '먼저 승인해 주세요.');
+      tx.update(ref, { status: 'PAID', paidAt: FV.serverTimestamp() });
+    } else if (d.action === 'reject') {
+      if (!['REQUESTED', 'APPROVED'].includes(x.status)) throw new HttpsError('failed-precondition', '이미 처리했어요.');
+      if (x.status === 'APPROVED') tx.set(bref, { used: FV.increment(-(x.won || 0)) }, { merge: true });
+      tx.set(db.doc('wb_points/' + x.uid), { balance: FV.increment(x.points), spent: FV.increment(-x.points), updatedAt: FV.serverTimestamp() }, { merge: true });
+      tx.update(ref, { status: 'REJECTED', decidedBy: me.uid, decidedAt: FV.serverTimestamp(), note: String(d.note || '').slice(0, 100) });
+    } else throw new HttpsError('invalid-argument', '알 수 없는 처리예요.');
+    return { ok: true };
+  });
+});
+
+/** 꼴찌 미션: 선생님이 승인해야 학생에게 보이고, 하고 나면 완료 처리 */
+exports.wbMissionDecide = call(async (d, me) => {
+  needStaff(me);
+  const ref = db.doc('wb_missions/' + String(d.id || '_')), s = await ref.get();
+  if (!s.exists) throw new HttpsError('not-found', '미션을 찾을 수 없어요.');
+  const x = s.data(); if (!branchOk(me, x.branchId)) throw new HttpsError('permission-denied', '다른 지점 학생이에요.');
+  const next = { approve: 'ISSUED', reject: 'REJECTED', done: 'DONE' }[d.action]; if (!next) throw new HttpsError('invalid-argument', '알 수 없는 처리예요.');
+  if (next === 'DONE' ? x.status !== 'ISSUED' : x.status !== 'PROPOSED') throw new HttpsError('failed-precondition', '이미 처리했어요.');
+  await ref.update({ status: next, decidedBy: me.uid, decidedAt: FV.serverTimestamp(), ...(d.text && next === 'ISSUED' ? { text: String(d.text).slice(0, 120) } : {}) });
+  return { ok: true };
+});
+
+/* 본원 설정 */
+exports.wbSaveProduct = call(async (d, me) => {
+  needSuper(me);
+  const name = String(d.name || '').trim().slice(0, 40), points = Math.floor(Number(d.points)), won = Math.floor(Number(d.won) || 0);
+  if (!name || !(points > 0)) throw new HttpsError('invalid-argument', '이름과 포인트를 확인해 주세요.');
+  const ref = d.id ? db.doc('wb_products/' + String(d.id)) : db.collection('wb_products').doc();
+  await ref.set({ name, points, won, active: d.active !== false, order: Math.floor(Number(d.order) || 0) }, { merge: true });
+  return { ok: true, id: ref.id };
+});
+exports.wbSetBudget = call(async (d, me) => {
+  needSuper(me);
+  const month = /^\d{4}-\d{2}$/.test(d.month) ? d.month : RW.monthKey(Date.now()), limit = d.limit === null || d.limit === '' ? null : Math.floor(Number(d.limit));
+  if (!d.branchId || (limit !== null && !(limit >= 0))) throw new HttpsError('invalid-argument', '지점과 금액을 확인해 주세요.');
+  await db.doc(`wb_budgets/${d.branchId}_${month}`).set({ branchId: String(d.branchId), month, limit }, { merge: true });
+  return { ok: true };
+});
+exports.wbSetMissions = call(async (d, me) => {
+  needSuper(me);
+  const list = (Array.isArray(d.list) ? d.list : []).map(x => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 40);
+  await db.doc('wb_settings/main').set({ missions: list }, { merge: true });
+  return { ok: true };
+});

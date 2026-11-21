@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WORD BATTLE 관리</title>
+<style>
+:root{--bg:#0b1226;--bg2:#131c3a;--card:#1a2547;--line:#2b3866;--red:#ff2d4a;--glow:0 0 14px rgba(255,45,74,.65);--tx:#f2f5ff;--tx2:#9aa7d0;--ok:#2fe08a;--no:#ff5c6c;--gold:#ffd24a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font-family:Pretendard,'Noto Sans KR',system-ui,sans-serif;word-break:keep-all}
+body{background:radial-gradient(1200px 600px at 50% -10%,#1c2a5c 0,var(--bg) 60%)}
+#app{max-width:520px;margin:0 auto;min-height:100%;padding:16px 16px 40px}
+h1{font-size:22px;margin:6px 0 2px;letter-spacing:.5px}h1 b{color:var(--red);text-shadow:var(--glow)}
+.sub{color:var(--tx2);font-size:13px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+.btn{display:block;width:100%;min-height:48px;border:0;border-radius:999px;background:var(--red);color:#fff;font-size:16px;font-weight:800;box-shadow:var(--glow);cursor:pointer;margin:8px 0}
+.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:none;color:var(--tx)}
+.btn:disabled{opacity:.4;box-shadow:none}
+input.code{width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--tx);font-size:22px;text-align:center;letter-spacing:6px;text-transform:uppercase}
+.row{display:flex;gap:8px;align-items:center}.grow{flex:1}
+.muted{color:var(--tx2);font-size:13px}.err{color:var(--no);font-size:14px;min-height:20px;margin:4px 0}
+.chars{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ch{background:var(--bg2);border:2px solid var(--line);border-radius:14px;padding:6px 2px;text-align:center;font-size:12px;cursor:pointer}
+.ch img{width:100%;height:84px;object-fit:contain;display:block}.ch.sel{border-color:var(--red);box-shadow:var(--glow)}.ch.off{opacity:.3;pointer-events:none}
+.pl{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}.pl:last-child{border:0}
+.pl img{width:44px;height:44px;object-fit:contain}.pl .n{flex:1;font-weight:700}.tag{font-size:11px;border-radius:99px;padding:2px 8px;background:var(--bg2);color:var(--tx2)}.tag.go{background:var(--ok);color:#052}.tag.host{background:var(--gold);color:#431}
+.node{border:1px solid var(--line);border-radius:12px;margin:6px 0;background:var(--bg2)}
+.node>.hd{display:flex;align-items:center;gap:8px;padding:12px;cursor:pointer;font-weight:700}
+.node .bd{padding:0 8px 8px 14px}.cb{width:20px;height:20px;accent-color:var(--red)}
+.code-big{font-size:34px;letter-spacing:8px;font-weight:900;color:var(--gold);text-align:center;margin:4px 0}
+.top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--tx2)}
+.bar{height:8px;background:var(--bg2);border-radius:99px;overflow:hidden;margin:8px 0}.bar i{display:block;height:100%;background:var(--red);box-shadow:var(--glow);transition:width .2s linear}
+.q{font-size:30px;font-weight:900;text-align:center;margin:22px 0 6px;word-break:break-word}.pos{text-align:center;color:var(--tx2);font-size:13px}
+.opt{display:flex;gap:10px;align-items:center;width:100%;min-height:56px;margin:8px 0;padding:10px 14px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--tx);font-size:17px;text-align:left;cursor:pointer}
+.opt b{width:26px;height:26px;border-radius:50%;background:var(--bg2);display:grid;place-items:center;font-size:13px;flex:none}
+.opt.right{border-color:var(--ok);background:#0f3b2a}.opt.wrong{border-color:var(--no);background:#40161d}.opt.mine{border-color:var(--gold)}.opt:disabled{cursor:default}
+.spell{width:100%;min-height:56px;border-radius:14px;border:2px solid var(--line);background:var(--bg2);color:var(--tx);font-size:22px;text-align:center}
+.score{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.sc{background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center;padding:6px 2px;font-size:12px}.sc img{width:100%;height:46px;object-fit:contain}.sc .v{font-size:17px;font-weight:900}.sc.me{border-color:var(--red)}.sc.lead .v{color:var(--gold)}
+.banner{text-align:center;font-size:15px;min-height:22px;margin:6px 0;font-weight:700}.banner.ok{color:var(--ok)}.banner.no{color:var(--no)}
+.rk{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.rk .no{width:30px;font-size:22px;font-weight:900;text-align:center}.rk img{width:56px;height:56px;object-fit:contain}.rk.me{background:rgba(255,45,74,.12);border-radius:10px}
+.big{font-size:28px;font-weight:900;text-align:center;margin:20px 0}
+
+#app{max-width:760px}.pl .n small{display:block;color:var(--tx2);font-weight:400}
+.mini{min-height:36px;border:0;border-radius:999px;padding:0 14px;font-weight:800;cursor:pointer;color:#fff;background:var(--red)}.mini.g{background:var(--ok);color:#052}.mini.x{background:var(--bg2);color:var(--tx)}
+input.t{width:100%;min-height:40px;border-radius:10px;border:1px solid var(--line);background:var(--bg2);color:var(--tx);padding:0 10px;font-size:15px;margin:4px 0}
+textarea.t{width:100%;min-height:110px;border-radius:10px;border:1px solid var(--line);background:var(--bg2);color:var(--tx);padding:8px;font-size:14px}
+</style></head><body><div id="app"><div class="muted" style="padding:40px;text-align:center">불러오는 중…</div></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+<script>
+const FB = {
+  apiKey: 'AIzaSyDtXLBEPEa89bst8lJWJ8ayCUJgyaf7PS4',
+  authDomain: 'cm-academy-8387b.firebaseapp.com',
+  projectId: 'cm-academy-8387b',
+  storageBucket: 'cm-academy-8387b.firebasestorage.app',
+  messagingSenderId: '371199594988',
+  appId: '1:371199594988:web:a74f2bd1cc853d15d4f0c9'
+};
+firebase.initializeApp(FB);
+const auth=firebase.auth(),db=firebase.firestore(),fns=firebase.app().functions('asia-northeast3');
+const $=id=>document.getElementById(id),esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=(n,d)=>fns.httpsCallable(n)(d||{}).then(r=>r.data);
+const S={role:null,data:null,products:null,err:'',tab:'red',busy:false};
+const ST={REQUESTED:'승인 대기',APPROVED:'승인됨',PAID:'지급 완료',REJECTED:'거절'},MS={PROPOSED:'제안됨',ISSUED:'발행됨',DONE:'완료',REJECTED:'거절'};
+const won=n=>(n||0).toLocaleString()+'원';
+async function load(){try{S.data=await api('wbAdminData');if(S.role==='super'){S.products=(await api('wbProducts')).products;S.branches=await loadBranches()}}catch(e){S.err=e.message}render()}
+async function loadBranches(){try{const s=await db.collection('branches').get();return s.docs.map(d=>({id:d.id,name:d.data().academyName||d.data().name||d.id}))}catch(e){return []}}
+async function act(fn){if(S.busy)return;S.busy=true;S.err='';try{await fn();await load()}catch(e){S.err=e.message;render()}S.busy=false}
+const redeem=(id,action)=>act(()=>api('wbRedeemDecide',{id,action}));
+const mission=(id,action,text)=>act(()=>api('wbMissionDecide',{id,action,text}));
+function render(){
+  const A=$('app');
+  if(!S.role)return A.innerHTML='<h1>WORD <b>BATTLE</b> 관리</h1><p class="sub">선생님 계정으로 로그인한 뒤 열어 주세요.</p>';
+  if(!S.data)return A.innerHTML='<div class="muted" style="padding:40px;text-align:center">불러오는 중…<div class="err">'+esc(S.err)+'</div></div>';
+  const d=S.data,sup=S.role==='super';
+  const tab=(k,t)=>`<button class="btn ${S.tab===k?'':'ghost'}" style="margin:2px" onclick="S.tab='${k}';render()">${t}</button>`;
+  let body='';
+  if(S.tab==='red')body=`<div class="card">${d.redeems.length?d.redeems.map(r=>`<div class="pl"><span class="n">${esc(r.studentName)||'학생'} · ${esc(r.name)}<small>${r.points}P · ${won(r.won)} · ${esc(r.month)}${sup&&r.branchId?' · '+esc(r.branchId.slice(0,6)):''}</small></span><span class="tag ${r.status==='PAID'?'go':''}">${ST[r.status]||r.status}</span>
+    ${r.status==='REQUESTED'?`<button class="mini g" onclick="redeem('${r.id}','approve')">승인</button><button class="mini x" onclick="redeem('${r.id}','reject')">거절</button>`:''}
+    ${r.status==='APPROVED'?`<button class="mini g" onclick="redeem('${r.id}','paid')">지급 완료</button><button class="mini x" onclick="redeem('${r.id}','reject')">취소</button>`:''}</div>`).join(''):'<div class="muted">교환 신청이 없어요</div>'}</div>
+    <div class="card"><div class="muted">이번 달(${d.month}) 지급 예산</div>${d.budgets.map(b=>`<div class="pl"><span class="n">${esc(b.branchId?(S.branches||[]).find(x=>x.id===b.branchId)?.name||b.branchId:'우리 지점')}</span><span>${won(b.used)} / ${b.limit==null?'제한 없음':won(b.limit)}</span></div>`).join('')||'<div class="muted">설정 없음 (제한 없음)</div>'}</div>`;
+  if(S.tab==='mis')body=`<div class="card">${d.missions.length?d.missions.map(m=>`<div class="pl"><span class="n">${esc(m.studentName)||'학생'}<small><input class="t" id="mt-${m.id}" value="${esc(m.text)}" ${m.status==='PROPOSED'?'':'disabled'}></small></span><span class="tag">${MS[m.status]||m.status}</span>
+    ${m.status==='PROPOSED'?`<button class="mini g" onclick="mission('${m.id}','approve',document.getElementById('mt-${m.id}').value)">발행</button><button class="mini x" onclick="mission('${m.id}','reject')">취소</button>`:''}${m.status==='ISSUED'?`<button class="mini g" onclick="mission('${m.id}','done')">완료</button>`:''}</div>`).join(''):'<div class="muted">꼴찌 미션 제안이 아직 없어요</div>'}</div><div class="muted">미션은 선생님이 발행해야 학생에게 보여요. 같은 미션은 연속으로 제안되지 않아요.</div>`;
+  if(S.tab==='set'&&sup)body=`<div class="card"><b>상품 (포인트 · 원 금액)</b>${(S.products||[]).map(p=>`<div class="pl"><span class="n">${esc(p.name)}<small>${p.points}P · ${won(p.won)}${p.active===false?' · 숨김':''}</small></span><button class="mini x" onclick="editProduct('${p.id}')">수정</button></div>`).join('')}
+    <input class="t" id="pn" placeholder="상품 이름 (예: GS 5,000원권)"><div class="row"><input class="t" id="pp" type="number" placeholder="교환 포인트"><input class="t" id="pw" type="number" placeholder="금액(원)"></div><input type="hidden" id="pid"><button class="btn" onclick="saveProduct()">상품 저장</button></div>
+    <div class="card"><b>지점 월 예산 (${d.month})</b>${(S.branches||[]).map(b=>{const x=d.budgets.find(y=>y.branchId===b.id)||{};return `<div class="pl"><span class="n">${esc(b.name)}<small>사용 ${won(x.used)}</small></span><input class="t" style="width:120px" id="bg-${b.id}" type="number" placeholder="제한 없음" value="${x.limit==null?'':x.limit}"><button class="mini" onclick="saveBudget('${b.id}')">저장</button></div>`}).join('')}</div>
+    <div class="card"><b>꼴찌 미션 목록 (한 줄에 하나)</b><textarea class="t" id="ml">${esc(d.missionList.join('\n'))}</textarea><button class="btn" onclick="saveMissions()">미션 목록 저장</button></div>`;
+  A.innerHTML=`<h1>WORD <b>BATTLE</b> 관리</h1><div class="sub">${sup?'본원':'우리 지점'}</div><div class="row">${tab('red','🎁 교환 신청')}${tab('mis','📝 미션')}${sup?tab('set','⚙️ 설정'):''}</div><div class="err">${esc(S.err)}</div>${body}<a class="btn ghost" style="text-align:center;line-height:48px;text-decoration:none" href="../">CMVOCA로 돌아가기</a>`;
+}
+function editProduct(id){const p=S.products.find(x=>x.id===id);$('pid').value=id;$('pn').value=p.name;$('pp').value=p.points;$('pw').value=p.won||0;$('pn').focus()}
+const saveProduct=()=>act(()=>api('wbSaveProduct',{id:$('pid').value||undefined,name:$('pn').value,points:$('pp').value,won:$('pw').value}));
+const saveBudget=b=>act(()=>api('wbSetBudget',{branchId:b,month:S.data.month,limit:$('bg-'+b).value===''?null:$('bg-'+b).value}));
+const saveMissions=()=>act(()=>api('wbSetMissions',{list:$('ml').value.split('\n')}));
+auth.onAuthStateChanged(async u=>{if(!u){S.role=null;return render()}try{const d=await db.doc('users/'+u.uid).get();const r=(d.data()||{}).role;S.role=(r==='sub'||r==='super')?r:null}catch(e){S.role=null}render();if(S.role)load()});
+</script></body></html>
