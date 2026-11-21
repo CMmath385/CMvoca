@@ -1,0 +1,85 @@
+// =====================================================================
+// WORD BATTLE (wb_) Firestore 규칙 — 추가분
+// 사용법: 기존 규칙의 맨 아래, 마지막 `}` 두 줄 바로 위
+//         ("위에 적지 않은 컬렉션은 모두 차단" 주석 위)에 이 내용을 그대로 붙여 넣는다.
+//         기존 규칙(users, items, pages, history …)은 한 글자도 바꾸지 않는다.
+// 원칙: 화면(학생·선생님)은 "읽기"만 한다. 모든 쓰기는 Cloud Functions(서버)가 한다.
+//       정답·채점 정보(wb_secrets)는 화면에서 읽을 수 없다 (규칙을 아예 만들지 않아 기본 차단).
+// 주의: 아직 Firebase 에뮬레이터로 검사하기 전의 초안이다. 배포 전에 반드시 검사한다.
+// =====================================================================
+
+    // ───────── WORD BATTLE: 공통 ─────────
+    // 같은 지점 선생님(sub)인지 (지점 문서 번호 = 지점 선생님 uid)
+    function wbBranchStaff(d) { return isSub() && d.branchId == request.auth.uid; }
+
+    // 경기방: 다른 지점 학생끼리도 한 방에서 한다.
+    //   읽기: 그 방의 참가자 · 참가 학생이 속한 지점의 선생님(branchIds 에 자기 uid) · 본원
+    //   방 코드로 들어오기·방 만들기는 서버 함수가 처리한다 (지점 제한 없음).
+    match /wb_rooms/{roomId} {
+      allow read: if isSuper()
+        || (isSub() && request.auth.uid in resource.data.branchIds)
+        || (signedin() && request.auth.uid in resource.data.playerUids);
+      allow write: if false;
+
+      // 참가자별 점수·상태 (화면에는 닉네임·캐릭터만 쓴다. 실명은 저장하지 않는다)
+      match /players/{uid} {
+        allow read: if isSuper()
+          || (signedin() && request.auth.uid in get(/databases/$(database)/documents/wb_rooms/$(roomId)).data.playerUids)
+          || (isSub() && request.auth.uid in get(/databases/$(database)/documents/wb_rooms/$(roomId)).data.branchIds);
+        allow write: if false;
+      }
+    }
+
+    // 누적 성적(랭킹용): 지점이 달라도 모든 등록 사용자가 읽는다.
+    //   그래서 이 문서에는 닉네임·캐릭터·점수·승수만 넣고 실명·연락처는 절대 넣지 않는다.
+    //   (지점 선생님이 자기 학생의 실명 기록을 볼 때는 users 문서와 서버 함수를 쓴다)
+    match /wb_stats/{uid} {
+      allow read: if isSuper() || registered();
+      allow write: if false;
+    }
+
+    // 교환 가능 포인트: 본인·같은 지점 선생님·본원
+    match /wb_points/{uid} {
+      allow read: if isSuper()
+        || (signedin() && request.auth.uid == uid)
+        || wbBranchStaff(resource.data);
+      allow write: if false;
+    }
+
+    // 상품 목록·게임 설정: 로그인한 등록 사용자는 읽기, 본원만 수정 (기존 config 와 같은 방식)
+    match /wb_products/{id} {
+      allow read: if isSuper() || registered();
+      allow write: if isSuper();
+    }
+    match /wb_settings/{id} {
+      allow read: if isSuper() || registered();
+      allow write: if isSuper();
+    }
+
+    // 상품 교환 신청·미션권: 본인·같은 지점 선생님·본원은 읽기, 신청·승인은 서버 함수만
+    match /wb_redeems/{id} {
+      allow read: if isSuper()
+        || wbBranchStaff(resource.data)
+        || (signedin() && resource.data.studentUid == request.auth.uid);
+      allow write: if false;
+    }
+    match /wb_missions/{id} {
+      allow read: if isSuper()
+        || wbBranchStaff(resource.data)
+        || (signedin() && resource.data.studentUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // 지점별 월 상품 지급 예산·지급 현황: 해당 지점 선생님과 본원만 읽기 (문서 번호 = 지점 uid + 월, 예: {지점uid}_2026-11)
+    match /wb_budgets/{id} {
+      allow read: if isSuper() || wbBranchStaff(resource.data);
+      allow write: if false;
+    }
+
+    // 부정 이용 기록: 지점 선생님·본원만
+    match /wb_flags/{id} {
+      allow read: if isSuper() || wbBranchStaff(resource.data);
+      allow write: if false;
+    }
+
+    // wb_secrets(정답·채점)·wb_answers(제출 원본)는 규칙을 만들지 않는다 → 화면에서 읽기·쓰기 불가
