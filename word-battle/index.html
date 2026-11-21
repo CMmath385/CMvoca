@@ -68,6 +68,17 @@ const MSG={FULL:'방이 가득 찼어요',CHARACTER_TAKEN:'이미 다른 친구�
 const say=e=>{const m=(e&&e.message)||String(e);return MSG[m]||m};
 async function run(fn){if(S.busy)return;S.busy=true;S.err='';try{await fn()}catch(e){S.err=say(e)}S.busy=false;render()}
 
+
+/* ----- 내가 들어가 있던 방으로 돌아가기 (새로고침·창 다시 열기·"이미 들어와 있어요") ----- */
+async function resume(){
+  if(!S.uid||S.roomId)return false;
+  try{
+    const sn=await db.collection('wb_rooms').where('playerUids','array-contains',S.uid).get();
+    const live=sn.docs.map(d=>d.data()).filter(r=>['WAITING','IN_PROGRESS','ROUND_RESULT','SWAP_TICKET'].includes(r.status)&&r.players[S.uid]&&!r.players[S.uid].left).sort((a,b)=>b.createdAt-a.createdAt);
+    if(live[0]){watch(live[0].id);return true}
+  }catch(e){}
+  return false;
+}
 /* ----- 방 구독 ----- */
 function watch(id){S.roomId=id;if(S.unsub)S.unsub();S.unsub=db.doc('wb_rooms/'+id).onSnapshot(s=>{S.room=s.exists?s.data():null;if(S.room&&S.room.q&&S.qid!==S.room.cur.id){S.qid=S.room.cur.id;S.myAns=null}render()},e=>{S.err='방을 읽을 수 없어요';render()})}
 function leaveLocal(){if(S.unsub)S.unsub();S.unsub=null;S.roomId=null;S.room=null;S.err=''}
@@ -115,7 +126,7 @@ function picker(){
   ${errBox()}<button class="btn" ${S.sel.size?'':'disabled'} onclick="create()">선택한 ${S.sel.size}개로 방 만들기</button><button class="btn ghost" onclick="S.step=null;render()">뒤로</button>`;
 }
 function create(){run(async()=>{const d=await api('wbCreateRoom',{itemIds:[...S.sel],character:S.pick});S.step=null;watch(d.roomId)})}
-function join(){const c=($('jc').value||'').trim();if(c.length<6){S.err='방 코드 6자리를 넣어 주세요';return render()}run(async()=>{const d=await api('wbJoinRoom',{code:c,character:S.pick});watch(d.roomId)})}
+function join(){const c=($('jc').value||'').trim();if(c.length<6){S.err='방 코드 6자리를 넣어 주세요';return render()}run(async()=>{try{const d=await api('wbJoinRoom',{code:c,character:S.pick});watch(d.roomId)}catch(e){if(e&&e.message==='ALREADY_IN'&&await resume())return;throw e}})}
 function setChar(c){run(()=>api('wbSetCharacter',{roomId:S.roomId,character:c}))}
 function ready(v){run(()=>api('wbReady',{roomId:S.roomId,ready:v}))}
 function start(){run(()=>api('wbStart',{roomId:S.roomId}))}
@@ -212,7 +223,7 @@ function shopView(){
   <div class="muted" style="text-align:center;margin:8px">교환하면 우리 지점 선생님이 확인하고 나눠 줘요</div><button class="btn ghost" onclick="S.step=null;render()">뒤로</button>`;
 }
 function redeem(id,name,pts){if(!confirm(name+' 교환할까요? ('+pts+'P 사용)'))return;run(async()=>{await api('wbRedeem',{productId:id});await openShop()})}
-auth.onAuthStateChanged(async u=>{S.uid=u?u.uid:null;S.name='';render();if(u){try{const d=await db.doc('users/'+u.uid).get();S.name=(d.data()||{}).name||u.email||'';render()}catch(e){S.name=u.email||'';render()}}});
+auth.onAuthStateChanged(async u=>{S.uid=u?u.uid:null;S.name='';render();if(u){try{const d=await db.doc('users/'+u.uid).get();S.name=(d.data()||{}).name||u.email||'';render()}catch(e){S.name=u.email||'';render()}await resume()}});
 </script>
 </body>
 </html>
