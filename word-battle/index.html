@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CMVOCA WORD BATTLE</title>
+<style>
+:root{--bg:#0b1226;--bg2:#131c3a;--card:#1a2547;--line:#2b3866;--red:#ff2d4a;--glow:0 0 14px rgba(255,45,74,.65);--tx:#f2f5ff;--tx2:#9aa7d0;--ok:#2fe08a;--no:#ff5c6c;--gold:#ffd24a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font-family:Pretendard,'Noto Sans KR',system-ui,sans-serif;word-break:keep-all}
+body{background:radial-gradient(1200px 600px at 50% -10%,#1c2a5c 0,var(--bg) 60%)}
+#app{max-width:520px;margin:0 auto;min-height:100%;padding:16px 16px 40px}
+h1{font-size:22px;margin:6px 0 2px;letter-spacing:.5px}h1 b{color:var(--red);text-shadow:var(--glow)}
+.sub{color:var(--tx2);font-size:13px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+.btn{display:block;width:100%;min-height:48px;border:0;border-radius:999px;background:var(--red);color:#fff;font-size:16px;font-weight:800;box-shadow:var(--glow);cursor:pointer;margin:8px 0}
+.btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:none;color:var(--tx)}
+.btn:disabled{opacity:.4;box-shadow:none}
+input.code{width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--tx);font-size:22px;text-align:center;letter-spacing:6px;text-transform:uppercase}
+.row{display:flex;gap:8px;align-items:center}.grow{flex:1}
+.muted{color:var(--tx2);font-size:13px}.err{color:var(--no);font-size:14px;min-height:20px;margin:4px 0}
+.chars{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ch{background:var(--bg2);border:2px solid var(--line);border-radius:14px;padding:6px 2px;text-align:center;font-size:12px;cursor:pointer}
+.ch img{width:100%;height:84px;object-fit:contain;display:block}.ch.sel{border-color:var(--red);box-shadow:var(--glow)}.ch.off{opacity:.3;pointer-events:none}
+.pl{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}.pl:last-child{border:0}
+.pl img{width:44px;height:44px;object-fit:contain}.pl .n{flex:1;font-weight:700}.tag{font-size:11px;border-radius:99px;padding:2px 8px;background:var(--bg2);color:var(--tx2)}.tag.go{background:var(--ok);color:#052}.tag.host{background:var(--gold);color:#431}
+.node{border:1px solid var(--line);border-radius:12px;margin:6px 0;background:var(--bg2)}
+.node>.hd{display:flex;align-items:center;gap:8px;padding:12px;cursor:pointer;font-weight:700}
+.node .bd{padding:0 8px 8px 14px}.cb{width:20px;height:20px;accent-color:var(--red)}
+.code-big{font-size:34px;letter-spacing:8px;font-weight:900;color:var(--gold);text-align:center;margin:4px 0}
+.top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--tx2)}
+.bar{height:8px;background:var(--bg2);border-radius:99px;overflow:hidden;margin:8px 0}.bar i{display:block;height:100%;background:var(--red);box-shadow:var(--glow);transition:width .2s linear}
+.q{font-size:30px;font-weight:900;text-align:center;margin:22px 0 6px;word-break:break-word}.pos{text-align:center;color:var(--tx2);font-size:13px}
+.opt{display:flex;gap:10px;align-items:center;width:100%;min-height:56px;margin:8px 0;padding:10px 14px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--tx);font-size:17px;text-align:left;cursor:pointer}
+.opt b{width:26px;height:26px;border-radius:50%;background:var(--bg2);display:grid;place-items:center;font-size:13px;flex:none}
+.opt.right{border-color:var(--ok);background:#0f3b2a}.opt.wrong{border-color:var(--no);background:#40161d}.opt.mine{border-color:var(--gold)}.opt:disabled{cursor:default}
+.spell{width:100%;min-height:56px;border-radius:14px;border:2px solid var(--line);background:var(--bg2);color:var(--tx);font-size:22px;text-align:center}
+.score{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.sc{background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center;padding:6px 2px;font-size:12px}.sc img{width:100%;height:46px;object-fit:contain}.sc .v{font-size:17px;font-weight:900}.sc.me{border-color:var(--red)}.sc.lead .v{color:var(--gold)}
+.banner{text-align:center;font-size:15px;min-height:22px;margin:6px 0;font-weight:700}.banner.ok{color:var(--ok)}.banner.no{color:var(--no)}
+.rk{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.rk .no{width:30px;font-size:22px;font-weight:900;text-align:center}.rk img{width:56px;height:56px;object-fit:contain}.rk.me{background:rgba(255,45,74,.12);border-radius:10px}
+.big{font-size:28px;font-weight:900;text-align:center;margin:20px 0}
+</style>
+</head>
+<body>
+<div id="app"><div class="muted" style="padding:40px;text-align:center">불러오는 중…</div></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+<script>
+const FB = {
+  apiKey: 'AIzaSyDtXLBEPEa89bst8lJWJ8ayCUJgyaf7PS4',
+  authDomain: 'cm-academy-8387b.firebaseapp.com',
+  projectId: 'cm-academy-8387b',
+  storageBucket: 'cm-academy-8387b.firebasestorage.app',
+  messagingSenderId: '371199594988',
+  appId: '1:371199594988:web:a74f2bd1cc853d15d4f0c9'
+};
+firebase.initializeApp(FB);
+const auth=firebase.auth(),db=firebase.firestore(),fns=firebase.app().functions('asia-northeast3');
+const CH={'검은이':'geomeuni','말티즈':'maltese','다람쥐':'squirrel','핵잼이':'haekjaemi'},CHARS=Object.keys(CH);
+const img=c=>`../assets/word-battle/characters/${CH[c]||'geomeuni'}.png`;
+const $=id=>document.getElementById(id);const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const S={uid:null,roomId:null,room:null,unsub:null,pick:'검은이',cat:null,sel:new Set(),open:new Set(),err:'',busy:false,tickFor:null,myAns:null,qid:null,skew:0,swapTarget:null};
+const api=(n,d)=>fns.httpsCallable(n)(d||{}).then(r=>r.data);
+const MSG={FULL:'방이 가득 찼어요',CHARACTER_TAKEN:'이미 다른 친구가 고른 캐릭터예요',NOT_FOUND:'방을 찾을 수 없어요',NOT_READY:'모두 준비해야 시작할 수 있어요',NEED_MORE_PLAYERS:'2명 이상 필요해요',EXPIRED:'시간이 지난 방이에요',NOT_WAITING:'이미 시작한 방이에요',ALREADY_IN:'이미 들어와 있어요'};
+const say=e=>{const m=(e&&e.message)||String(e);return MSG[m]||m};
+async function run(fn){if(S.busy)return;S.busy=true;S.err='';try{await fn()}catch(e){S.err=say(e)}S.busy=false;render()}
+
+/* ----- 방 구독 ----- */
+function watch(id){S.roomId=id;if(S.unsub)S.unsub();S.unsub=db.doc('wb_rooms/'+id).onSnapshot(s=>{S.room=s.exists?s.data():null;if(S.room&&S.room.q&&S.qid!==S.room.cur.id){S.qid=S.room.cur.id;S.myAns=null}render()},e=>{S.err='방을 읽을 수 없어요';render()})}
+function leaveLocal(){if(S.unsub)S.unsub();S.unsub=null;S.roomId=null;S.room=null;S.err=''}
+const now=()=>Date.now()+S.skew;
+
+/* ----- 화면 ----- */
+function render(){
+  const A=$('app');
+  if(!S.uid){A.innerHTML='<h1>CM<b>VOCA</b> WORD BATTLE</h1><p class="sub">먼저 CMVOCA 앱에서 로그인해 주세요.</p><a class="btn" style="text-align:center;line-height:48px;text-decoration:none" href="../">CMVOCA로 가기</a>';return}
+  const r=S.room;
+  if(!S.roomId)return A.innerHTML=lobby();
+  if(!r)return A.innerHTML='<div class="muted" style="padding:40px;text-align:center">방을 불러오는 중…</div>';
+  const f={WAITING:waiting,IN_PROGRESS:battle,ROUND_RESULT:roundResult,SWAP_TICKET:swapView,COMPLETED:final,CANCELLED:cancelled}[r.status];
+  A.innerHTML=f(r);
+  drive();
+}
+const errBox=()=>`<div class="err">${esc(S.err)}</div>`;
+function lobby(){
+  if(S.step==='pick')return picker();
+  return `<h1>⚔️ WORD <b>BATTLE</b></h1><div class="sub">친구들과 실시간 단어 대결 (2~4명)</div>
+  <div class="card"><div class="muted" style="margin-bottom:8px">내 캐릭터</div>${charPick(null)}</div>
+  <button class="btn" onclick="S.step='pick';loadCat()">방 만들기</button>
+  <div class="card"><div class="muted" style="margin-bottom:8px">방 코드로 들어가기</div><input id="jc" class="code" maxlength="6" placeholder="ABC234"><button class="btn" onclick="join()">들어가기</button></div>${errBox()}`;
+}
+function charPick(room){
+  return `<div class="chars">${CHARS.map(c=>{const taken=room&&Object.values(room.players).some(p=>p.baseCharacter===c&&p!==room.players[S.uid]);const mine=room?room.players[S.uid]&&room.players[S.uid].baseCharacter===c:S.pick===c;return `<div class="ch ${mine?'sel':''} ${taken?'off':''}" onclick="${room?`setChar('${c}')`:`S.pick='${c}';render()`}"><img src="${img(c)}" alt=""><div>${c}</div></div>`}).join('')}</div>`;
+}
+async function loadCat(){render();if(S.cat)return;try{S.cat=await api('wbListWords')}catch(e){S.err=say(e)}render()}
+function node(n,depth){const ids=allIds(n),on=ids.length&&ids.every(i=>S.sel.has(i)),key=n._k;
+  const kids=(n.children||[]).map(c=>node(c,depth+1)).join('');const apps=(n.apps||[]).map(a=>`<div class="hd" style="font-weight:500"><input class="cb" type="checkbox" ${S.sel.has(a.itemId)?'checked':''} onchange="tog('${a.itemId}')"><span>${esc(a.name)}</span></div>`).join('');
+  const open=S.open.has(key);
+  return `<div class="node"><div class="hd"><input class="cb" type="checkbox" ${on?'checked':''} onchange="togNode('${esc(key)}',this.checked)"><span class="grow" onclick="S.open.has('${esc(key)}')?S.open.delete('${esc(key)}'):S.open.add('${esc(key)}');render()">${esc(n.name||n.grade)} <span class="muted">${ids.length}</span></span><span onclick="S.open.has('${esc(key)}')?S.open.delete('${esc(key)}'):S.open.add('${esc(key)}');render()">${open?'▲':'▼'}</span></div>${open?`<div class="bd">${kids}${apps}</div>`:''}</div>`}
+const idx=new Map();function allIds(n){return [...(n.apps||[]).map(a=>a.itemId),...(n.children||[]).flatMap(allIds)]}
+function indexCat(){idx.clear();let cnt=0;(S.cat?S.cat.grades:[]).forEach(g=>{const walk=(n,p)=>{const k='k'+(++cnt);n._k=k;idx.set(k,n);(n.children||[]).forEach(c=>walk(c,p+1))};g.name=g.grade;walk(g,0)})}
+function togNode(k,on){const n=idx.get(k);if(!n)return;allIds(n).forEach(i=>on?S.sel.add(i):S.sel.delete(i));render()}
+function tog(i){S.sel.has(i)?S.sel.delete(i):S.sel.add(i);render()}
+function picker(){
+  if(!S.cat)return `<div class="muted" style="padding:40px;text-align:center">단어 목록을 불러오는 중…${errBox()}</div>`;
+  indexCat();
+  return `<h1>단어 고르기</h1><div class="sub">학년 → 교재 → 과를 골라요 (여러 개 가능)</div>${S.cat.grades.length?S.cat.grades.map(g=>node(g,0)).join(''):'<div class="card muted">볼 수 있는 단어가 없어요</div>'}
+  ${errBox()}<button class="btn" ${S.sel.size?'':'disabled'} onclick="create()">선택한 ${S.sel.size}개로 방 만들기</button><button class="btn ghost" onclick="S.step=null;render()">뒤로</button>`;
+}
+function create(){run(async()=>{const d=await api('wbCreateRoom',{itemIds:[...S.sel],character:S.pick});S.step=null;watch(d.roomId)})}
+function join(){const c=($('jc').value||'').trim();if(c.length<6){S.err='방 코드 6자리를 넣어 주세요';return render()}run(async()=>{const d=await api('wbJoinRoom',{code:c,character:S.pick});watch(d.roomId)})}
+function setChar(c){run(()=>api('wbSetCharacter',{roomId:S.roomId,character:c}))}
+function ready(v){run(()=>api('wbReady',{roomId:S.roomId,ready:v}))}
+function start(){run(()=>api('wbStart',{roomId:S.roomId}))}
+function leave(){run(async()=>{try{await api('wbLeave',{roomId:S.roomId})}catch(_){}leaveLocal()})}
+function waiting(r){
+  const me=r.players[S.uid],host=r.hostUid===S.uid,others=r.playerUids.filter(u=>u!==r.hostUid);
+  return `<div class="top"><span>${esc(r.words.title)} · 단어 ${r.words.count}개</span><span>${r.playerUids.length}/4</span></div>
+  <div class="muted" style="text-align:center;margin-top:12px">친구에게 이 코드를 알려 주세요</div><div class="code-big">${r.code}</div>
+  <div class="card">${r.playerUids.map(u=>{const p=r.players[u];return `<div class="pl"><img src="${img(p.character)}" alt=""><span class="n">${p.character}${u===S.uid?' (나)':''}</span>${u===r.hostUid?'<span class="tag host">방장</span>':`<span class="tag ${p.ready?'go':''}">${p.ready?'준비 완료':'대기'}</span>`}</div>`}).join('')}</div>
+  <div class="card"><div class="muted" style="margin-bottom:8px">캐릭터 바꾸기</div>${charPick(r)}</div>${errBox()}
+  ${host?`<button class="btn" ${r.playerUids.length>=2&&others.every(u=>r.players[u].ready)?'':'disabled'} onclick="start()">게임 시작</button>`:`<button class="btn" onclick="ready(${!me.ready})">${me.ready?'준비 취소':'준비 완료'}</button>`}
+  <button class="btn ghost" onclick="leave()">나가기</button>`;
+}
+function scoreBar(r){
+  const lead=Math.max(...r.playerUids.map(u=>r.players[u].score));
+  return `<div class="score">${r.playerUids.map(u=>{const p=r.players[u];return `<div class="sc ${u===S.uid?'me':''} ${p.score===lead&&lead>0?'lead':''}"><img src="${img(p.character)}" alt=""><div class="v">${p.score}</div></div>`}).join('')}</div>`;
+}
+const RN=['① 영어 → 우리말','② 우리말 → 영어','③ 우리말 → 철자 쓰기'];
+function battle(r){
+  const q=r.cur,Q=r.q,closed=Q.closed,rev=r.reveal,done=Q.answered[S.uid];
+  let body='',banner='';
+  if(q.type==='spell'){
+    const hint=(q.letters||[]).map(n=>'□'.repeat(n)).join('  ');
+    body=`<div class="q">${esc(q.prompt)}</div><div class="pos">${esc(q.pos||'')} · ${hint}</div>`+
+      (closed?`<div class="big" style="color:var(--gold)">${esc(rev.word.en||rev.word)}</div>`:`<input id="sp" class="spell" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="영어로 쓰세요" ${done?'disabled':''} onkeydown="if(event.key==='Enter')sendSpell()"><button class="btn" ${done?'disabled':''} onclick="sendSpell()">제출</button>`);
+  }else{
+    body=`<div class="q">${esc(q.prompt)}</div><div class="pos">${esc(q.pos||'')}</div>`+q.options.map((o,i)=>{let c='';if(closed&&rev){if(i===rev.answerIndex)c='right';else if(S.myAns===i)c='wrong'}else if(S.myAns===i)c='mine';return `<button class="opt ${c}" ${closed||done?'disabled':''} onclick="sendChoice(${i})"><b>${i+1}</b><span>${esc(o)}</span></button>`}).join('');
+  }
+  if(closed){banner=Q.winnerUid?(Q.winnerUid===S.uid?'<div class="banner ok">정답! 🎉 +'+[10,10,20][r.round-1]+'</div>':`<div class="banner no">${r.players[Q.winnerUid].character} 이(가) 먼저 맞혔어요</div>`):'<div class="banner no">아무도 못 맞혔어요</div>'}
+  else if(done&&done.ok===false)banner='<div class="banner no">오답 −5 (이번 문제는 끝!)</div>';else if(done)banner='<div class="banner">제출 완료 · 다른 친구를 기다려요</div>';
+  const total=r.timing.limitMs[r.round-1],left=closed?0:Math.max(0,Q.deadlineAt-now());
+  return `<div class="top"><span>${RN[r.round-1]}</span><span>${q.no} / ${r.perRound[r.round-1]||r.perRound}</span><span id="tl">${Math.ceil(left/1000)}초</span></div>
+  <div class="bar"><i id="tb" style="width:${closed?0:left/total*100}%"></i></div>${scoreBar(r)}${body}<div id="bn">${banner}</div>${errBox()}`;
+}
+function sendChoice(i){if(S.myAns!==null)return;S.myAns=i;render();api('wbSubmit',{roomId:S.roomId,qid:S.room.cur.id,answer:i}).catch(e=>{S.err=say(e);render()})}
+function sendSpell(){const v=($('sp').value||'').trim();if(!v||S.myAns!==null)return;S.myAns=v;render();api('wbSubmit',{roomId:S.roomId,qid:S.room.cur.id,answer:v}).catch(e=>{S.err=say(e);render()})}
+function roundResult(r){
+  const rk=r.playerUids.map(u=>({u,p:r.players[u]})).sort((a,b)=>b.p.score-a.p.score);
+  return `<h1 style="text-align:center">라운드 ${r.round} 끝!</h1><div class="sub" style="text-align:center">지금까지 누적 점수</div><div class="card">${rk.map((x,i)=>`<div class="rk ${x.u===S.uid?'me':''}"><div class="no">${i+1}</div><img src="${img(x.p.character)}" alt=""><div class="grow"><b>${x.p.character}${x.u===S.uid?' (나)':''}</b></div><b style="font-size:20px">${x.p.score}</b></div>`).join('')}</div><div class="muted" style="text-align:center">잠시 후 다음 단계로 넘어가요…</div>`;
+}
+function swapView(r){
+  const w=r.swap,hold=w&&w.holderUid===S.uid;
+  if(!w)return '<div class="big">준비 중…</div>';
+  if(w.used)return `<div class="big">🔄 ${r.players[w.holderUid].character} ↔ ${r.players[w.targetUid].character}</div><div class="muted" style="text-align:center">이번 라운드에서만 바뀌어요!</div>`;
+  if(hold)return `<h1 style="text-align:center">🏆 캐릭터 교환권!</h1><div class="sub" style="text-align:center">1등만 쓸 수 있어요. 바꿀 친구를 고르세요 (<span id="tl">${Math.max(0,Math.ceil((w.deadlineAt-now())/1000))}</span>초)</div>
+  <div class="card">${r.playerUids.filter(u=>u!==S.uid).map(u=>`<div class="pl" onclick="useSwap('${u}')" style="cursor:pointer"><img src="${img(r.players[u].character)}" alt=""><span class="n">${r.players[u].character}</span><span class="tag go">바꾸기</span></div>`).join('')}</div><div class="muted" style="text-align:center">안 쓰면 시간이 지나 자동으로 넘어가요</div>${errBox()}`;
+  return `<div class="big">🏆 ${r.players[w.holderUid].character} 이(가)<br>교환권을 쓰는 중…</div><div class="muted" style="text-align:center">누구와 바꿀지 고르고 있어요</div>`;
+}
+function useSwap(t){run(()=>api('wbUseSwap',{roomId:S.roomId,targetUid:t}))}
+function final(r){
+  const mine=r.result.find(x=>x.uid===S.uid);
+  return `<h1 style="text-align:center">🏁 최종 결과</h1><div class="card">${r.result.map(x=>`<div class="rk ${x.uid===S.uid?'me':''}"><div class="no">${x.rank}</div><img src="${img(x.character)}" alt=""><div class="grow"><b>${x.character}${x.uid===S.uid?' (나)':''}</b><div class="muted">정답 ${x.correct} · 오답 ${x.wrong} · 무응답 ${x.noAnswer}</div></div><div style="text-align:right"><b style="font-size:20px">${x.score}</b><div class="muted">+${x.points}P</div></div></div>`).join('')}</div>
+  ${mine?`<div class="card" style="text-align:center">내 포인트 <b style="color:var(--gold);font-size:22px">+${mine.points}P</b><div class="muted">쿠폰 교환은 곧 열려요</div></div>`:''}<button class="btn" onclick="leaveLocal();render()">처음으로</button>`;
+}
+function cancelled(){return `<h1 style="text-align:center">방이 닫혔어요</h1><div class="sub" style="text-align:center">사람이 부족하거나 시간이 지났어요.</div><button class="btn" onclick="leaveLocal();render()">처음으로</button>`}
+
+/* ----- 시간 구동: 화면이 시간이 되면 서버에 한 단계 진행을 요청 (여러 명이 불러도 한 번만 반영) ----- */
+let raf=null;
+function drive(){
+  const r=S.room;if(!r)return;
+  if(raf)cancelAnimationFrame(raf);
+  const loop=()=>{
+    const r=S.room;if(!r||!S.roomId)return;
+    let at=null;
+    if(r.status==='IN_PROGRESS')at=r.q.closed?r.nextAt:r.q.deadlineAt;
+    else if(r.status==='ROUND_RESULT')at=r.nextAt;
+    else if(r.status==='SWAP_TICKET')at=r.swap&&r.swap.used?r.nextAt:r.swap&&r.swap.deadlineAt;
+    else if(r.status==='WAITING')at=r.expiresAt;
+    if(r.status==='IN_PROGRESS'&&!r.q.closed){const l=Math.max(0,at-now()),t=$('tl'),b=$('tb');if(t)t.textContent=Math.ceil(l/1000)+'초';if(b)b.style.width=(l/r.timing.limitMs[r.round-1]*100)+'%'}
+    if(r.status==='SWAP_TICKET'&&!r.swap.used){const t=$('tl');if(t)t.textContent=Math.max(0,Math.ceil((at-now())/1000))}
+    if(at&&now()>=at+150){const key=r.id+'|'+r.status+'|'+r.qIndex+'|'+at;if(S.tickFor!==key){S.tickFor=key;setTimeout(()=>{api('wbTick',{roomId:S.roomId}).catch(()=>{});setTimeout(()=>{if(S.tickFor===key)S.tickFor=null},1500)},Math.random()*400)}}
+    raf=requestAnimationFrame(loop);
+  };loop();
+}
+auth.onAuthStateChanged(u=>{S.uid=u?u.uid:null;render()});
+</script>
+</body>
+</html>
