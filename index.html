@@ -186,7 +186,8 @@ function allowFilterItems(items, folder, allow) {
   });
   return items.filter(i => show.has(i.id));
 }
-const sideFolders = () => FOLDERS.filter(f => !S.me || ((f.kind !== 'mgmt' || S.me.role !== 'student') && !(f.id === 'PDFLIB' && S.me.role === 'student') && !(S.me.role === 'student' && allowOn(S.me) && !allowRootSet(S.me).has(f.id))));
+// F(학원관리) 폴더는 목록에서 숨김: 학원관리는 머리글의 "학원관리" 버튼(/admin/)으로 (폴더·데이터는 지우지 않음)
+const sideFolders = () => FOLDERS.filter(f => !S.me || (f.kind !== 'mgmt' && !(f.id === 'PDFLIB' && S.me.role === 'student') && !(S.me.role === 'student' && allowOn(S.me) && !allowRootSet(S.me).has(f.id))));
 const firstFolder = () => {
   if (S.me && S.me.role === 'student' && allowOn(S.me)) { const v = sideFolders(); if (v.length) return (v.find(f => f.id === 'B') || v.find(f => f.kind !== 'mgmt') || v[0]).id; }
   return (FOLDERS.find(f => f.id === 'B') || FOLDERS.find(f => f.kind !== 'mgmt') || FOLDERS[0]).id;
