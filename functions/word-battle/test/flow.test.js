@@ -81,7 +81,7 @@ t('아무도 안 풀면: 문제마다 전원 −2, 끝까지 진행, 포인트 0
 t('전원 오답이면 시간을 기다리지 않고 정답 공개', () => {
   const { room, secret } = newRoom(2); let r = F.startGame(room, secret, 'P0', T0 + 100).room;
   r = F.submit(r, secret, 'P0', r.cur.id, answerFor(secret, 0, false), T0 + 200).room;
-  const x = F.submit(r, secret, 'P1', r.cur.id, answerFor(secret, 0, false), T0 + 300); assert(x.ok && x.room.q.closed && x.room.reveal.kind === 'choice' && x.room.nextAt === T0 + 300 + 3000);
+  const x = F.submit(r, secret, 'P1', r.cur.id, answerFor(secret, 0, false), T0 + 300); assert(x.ok && x.room.q.closed && x.room.reveal.kind === 'choice' && x.room.nextAt === T0 + 300 + F.DEFAULT_TIMING.revealMs);
 });
 t('동시에 같은 시각 정답 2명: 먼저 처리된 1명만 득점, 두 번째는 CLOSED', () => {
   const { room, secret } = newRoom(3); const r = F.startGame(room, secret, 'P0', T0 + 100).room;
@@ -99,8 +99,8 @@ t('tick 은 여러 번(여러 명이) 불러도 한 단계만 반영 — 같은 
 });
 t('오래 멈춰 있다가 tick 이 와도 정답 공개 시간은 그때부터 보장 → 그다음 tick 에서 다음 문제', () => {
   const { room, secret } = newRoom(2); const r = F.startGame(room, secret, 'P0', T0 + 100).room;
-  const late = T0 + 100 + 60000, t1 = F.tick(r, secret, late); assert(t1.ok && t1.room.q.closed && t1.room.qIndex === 0 && t1.room.nextAt === late + 3000);
-  const t2 = F.tick(t1.room, secret, late + 3000); assert(t2.ok && t2.room.qIndex === 1 && !t2.room.q.closed);
+  const late = T0 + 100 + 60000, t1 = F.tick(r, secret, late); assert(t1.ok && t1.room.q.closed && t1.room.qIndex === 0 && t1.room.nextAt === late + F.DEFAULT_TIMING.revealMs);
+  const t2 = F.tick(t1.room, secret, late + F.DEFAULT_TIMING.revealMs); assert(t2.ok && t2.room.qIndex === 1 && !t2.room.q.closed);
 });
 t('학생 화면용 방 정보: 문제가 열려 있는 동안 남의 정답·오답 여부가 안 보임', () => {
   const { room, secret } = newRoom(3); let r = F.startGame(room, secret, 'P0', T0 + 100).room;

@@ -13,7 +13,7 @@ const { grade } = require('./questions');
 
 const CHARACTERS = ['검은이', '말티즈', '다람쥐', '핵잼이'];
 const ROOM_MAX = 4, ROOM_MIN = 2;
-const DEFAULT_TIMING = { limitMs: [15000, 15000, 25000], revealMs: 3000, roundResultMs: 5000, swapMs: 10000, swapAnimMs: 1500, waitingTtlMs: 30 * 60 * 1000 };
+const DEFAULT_TIMING = { limitMs: [15000, 15000, 25000], revealMs: 1500, roundResultMs: 5000, swapMs: 10000, swapAnimMs: 1500, waitingTtlMs: 30 * 60 * 1000 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const no = (room, reason) => ({ ok: false, room, reason });
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // 헷갈리는 글자(0 O 1 I L) 제외

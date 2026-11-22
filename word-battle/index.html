@@ -203,7 +203,7 @@ function drive(){
     else if(r.status==='WAITING')at=r.expiresAt;
     if(r.status==='IN_PROGRESS'&&!r.q.closed){const l=Math.max(0,at-now()),t=$('tl'),b=$('tb');if(t)t.textContent=Math.ceil(l/1000)+'초';if(b)b.style.width=(l/r.timing.limitMs[r.round-1]*100)+'%'}
     if(r.status==='SWAP_TICKET'&&!r.swap.used){const t=$('tl');if(t)t.textContent=Math.max(0,Math.ceil((at-now())/1000))}
-    if(at&&now()>=at+150){const key=r.id+'|'+r.status+'|'+r.qIndex+'|'+at;if(S.tickFor!==key){S.tickFor=key;setTimeout(()=>{api('wbTick',{roomId:S.roomId}).catch(()=>{});setTimeout(()=>{if(S.tickFor===key)S.tickFor=null},1500)},Math.random()*400)}}
+    if(at&&now()>=at+80){const key=r.id+'|'+r.status+'|'+r.qIndex+'|'+at;if(S.tickFor!==key){S.tickFor=key;setTimeout(()=>{api('wbTick',{roomId:S.roomId}).catch(()=>{});setTimeout(()=>{if(S.tickFor===key)S.tickFor=null},1500)},Math.random()*120)}}
     raf=requestAnimationFrame(loop);
   };loop();
 }
