@@ -993,8 +993,8 @@ async function pickPdfLinks(it) {
 const AL_TYPE = /(앱학습|강의영상|본책|워크북|테스트|정답지|정답|해설|학습지|개념|영상|앱)/g;
 const alNorm = n => String(n || '').normalize('NFC').toLowerCase().replace(/\.(pdf|pptx?|html?)$/i, '');
 const AL_SUBJ = ['국어', '수학', '영어', '과학', '사회', '한국사'];
-// 학습 종류: 앱 이름·PDF 이름에서 찾음 (위에서부터 먼저 맞는 것). "문법 개념"은 개념, "구문워크북"은 구문
-const AL_KIND = [['개념', /개념|본책|concept/], ['구문', /구문/], ['문법', /문법|어법|grammar/], ['단어', /단어|어휘|voca|word/], ['본문', /본문|분석지|지문|해석|passage|reading/], ['내신', /내신|동형|모의고사|시험지|기출|예상문제/]];
+// 학습 종류: 앱 이름·PDF 이름에서 찾음 (위에서부터 먼저 맞는 것). "본문개념"은 본문, "문법 개념"은 개념, "구문워크북"은 구문
+const AL_KIND = [['본문', /본문\s?개념/], ['개념', /개념|본책|concept/], ['구문', /구문/], ['문법', /문법|어법|grammar/], ['단어', /단어|어휘|voca|word/], ['본문', /본문|분석지|지문|해석|passage|reading/], ['내신', /내신|동형|모의고사|시험지|기출|예상문제/]];
 const alTag = k => [k.subj, k.lv, k.book, k.pub || k.code, k.unit != null ? k.unit + '과·단원' : '', k.kind].filter(Boolean).join(' · ') || '분류 정보 없음';
 const alKind = n => { n = alNorm(n).replace(/_/g, ' ').replace(/\bcm\s?[가-힣a-z]+/g, ' '); return (AL_KIND.find(([, re]) => re.test(n)) || [''])[0]; }; // 교재 이름(CM구문 등)은 종류에서 뺌
 function alKeys(name, path, meta) { // meta: PDF 자료실 파일의 과목·학년·출판사 (subj·grade·publisher)
@@ -1121,7 +1121,8 @@ async function pdfAutoLink(scope, opts) {
     let why = '';
     if (!pick.length) { // 왜 못 찾았나: 같은 과·단원 PDF 중 가장 비슷한 것과 다른 점
       if (a.k.unit == null) why = '앱 이름에서 과·단원 번호를 못 읽음';
-      else { const near = (byUnit.get(a.k.unit) || []).map(x => ({ x, sc: [...a.k.words].filter(w => x.k.words.has(w)).length })).sort((u, v) => v.sc - u.sc)[0];
+      else { const agree = k => ['subj', 'lv', 'book', 'pub', 'code', 'kind'].filter(f => a.k[f] && k[f] && a.k[f] === k[f]).length * 10 - ['subj', 'lv', 'book', 'pub', 'kind'].filter(f => a.k[f] && k[f] && a.k[f] !== k[f]).length * 10; // 맞는 항목이 많은 PDF가 '가장 가까운 PDF'
+        const near = (byUnit.get(a.k.unit) || []).map(x => ({ x, sc: agree(x.k) + [...a.k.words].filter(w => x.k.words.has(w)).length })).sort((u, v) => v.sc - u.sc)[0];
         if (!near) why = '같은 과·단원(' + a.k.unit + ') PDF가 없음';
         else { const k = near.x.k, d = []; if (a.k.subj && k.subj && a.k.subj !== k.subj) d.push('과목 ' + a.k.subj + '≠' + k.subj); if (a.k.lv && k.lv && a.k.lv !== k.lv) d.push('학년·레벨 ' + a.k.lv + '≠' + k.lv); if (a.k.code && k.code && a.k.code !== k.code) d.push('교재 ' + a.k.code + '≠' + k.code); if (!(a.k.code && k.code) && a.k.pub && k.pub && a.k.pub !== k.pub) d.push('출판사 ' + a.k.pub + '≠' + k.pub); if (a.k.kind && k.kind && a.k.kind !== k.kind) d.push('종류 ' + a.k.kind + '≠' + k.kind); if (!d.length) d.push('이름이 비슷하지 않음');
           why = '가장 가까운 PDF: ' + near.x.p.name + ' (' + alTag(k) + ') — 다른 점: ' + d.join(', '); } }
