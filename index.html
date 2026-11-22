@@ -1181,10 +1181,14 @@ async function pdfAutoLink(scope, opts) {
   const shL = h('label', 'flex items-center gap-2 text-xs font-bold text-slate-700 pt-3'), shC = h('input'); shC.type = 'checkbox'; shC.checked = true;
   shL.append(shC, document.createTextNode('연결한 PDF를 그 앱이 공유된 지점에도 공유 (지점 원장·강사가 열 수 있게. PDF 자료실의 다른 공유는 그대로)')); bx.append(shL);
   const row = h('div', 'flex flex-wrap items-center gap-2 pt-3');
-  row.append(info, h('span', 'flex-grow'), btn('💾 CSV로 받기', 'bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-2.5 rounded-xl font-bold', async () => {
+  row.append(info, h('span', 'flex-grow'), btn('💾 앱 목록 CSV', 'bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-2.5 rounded-xl font-bold', async () => {
     const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
     const lines = [['결과', '앱', '앱 위치', '읽은 분류', '못 찾은 까닭', '연결할 PDF', '이미 연결된 PDF'].map(q).join(',')].concat(rows.map(r => [{ sure: '확실', check: '검토 필요', none: '못 찾음' }[r.cls], r.a.it.name, r.a.path.join(' > '), alTag(r.a.k), r.why || '', r.add.map(p => p.name).join(' | '), r.pick.filter(p => !r.add.includes(p)).map(p => p.name).join(' | ')].map(q).join(',')));
     const a = h('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv' })); a.download = 'PDF자동연결_미리보기.csv'; document.body.append(a); a.click(); a.remove();
+  }), btn('📋 PDF 목록 CSV', 'bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-2.5 rounded-xl font-bold', async () => { // 규칙 점검용: PDF 자료실 전체 이름과 읽은 분류
+    const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const lines = [['PDF 이름', '과목', '학년', '출판사', '읽은 분류'].map(q).join(',')].concat(pdfs.map(x => [x.p.name, x.p.subj, x.p.grade, x.p.publisher, alTag(x.k)].map(q).join(',')));
+    const a = h('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv' })); a.download = 'PDF목록_분류.csv'; document.body.append(a); a.click(); a.remove();
   }), btn('저장 (체크한 것)', 'bg-rose-600 hover:bg-rose-700 text-white text-sm px-5 py-2.5 rounded-xl font-bold', async () => {
     const todo = rows.filter(r => r.on && r.add.length); if (!todo.length) return alert('체크된 앱이 없습니다.');
     if (!confirm('앱 ' + todo.length + '개에 PDF를 연결합니다. (이미 이어 둔 PDF는 그대로)\n나중에 앱 옆 "📄 PDF"에서 하나씩 풀 수 있습니다.')) return;
