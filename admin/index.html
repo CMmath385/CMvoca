@@ -171,7 +171,8 @@ const STAFF_MENUS = [['stu', '학생 정보·연락처'], ['att', '출결'], ['c
 // 학습 기록의 과목: 폴더(B 영어·C 수학·D 국어) 우선, 없으면 제목의 낱말
 const FOLDER_SUBJ = { B: '영어', C: '수학', D: '국어' };
 // CMVOCA 학습 자료실의 큰 폴더 (학원관리 F·PDF 자료 제외). kind: branch=지점 전용, shared=공유 선택, all=전체 공개
-const ROOTS = [['A', 'A · 우리 지점 전용', 'branch'], ['B', 'B · 영어', 'shared'], ['C', 'C · 수학', 'shared'], ['D', 'D · 국어', 'shared'], ['E', 'E · 전과목 통합', 'all']];
+// 기본값. 실제 큰 폴더 이름·종류는 CMVOCA 본원 설정(config/main.folders)에서 불러옴 (로그인 때)
+let ROOTS = [['A', 'A · 우리 지점 전용', 'branch'], ['B', 'B · 영어', 'shared'], ['C', 'C · 수학', 'shared'], ['D', 'D · 국어', 'shared'], ['E', 'E · 전과목 통합', 'all']];
 const NONE = '_none';
 const KEEP = 30 * 24 * 3600 * 1000; // 출결 기록 보관 30일 (CMVOCA와 같음)
 // 행정 담당자: 운영 화면 탭 → 필요한 권한
@@ -298,7 +299,15 @@ if (configured) {
         A.me.academyName = b.data().academyName || ''; A.me.logoUrl = b.data().logoUrl || ''; A.me.logoBlank = b.data().logoBlank === true;
       }
     }
-    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { A.hqName = c.data().academyName || ''; A.hqLogo = c.data().logoUrl || ''; } } catch (_) {}
+    try {
+      const c = await db.collection('config').doc('main').get();
+      if (c.exists) {
+        A.hqName = c.data().academyName || ''; A.hqLogo = c.data().logoUrl || '';
+        // CMVOCA 왼쪽 큰 폴더와 똑같이 (학원관리·PDF 자료 폴더 제외)
+        const fl = (c.data().folders || []).filter(f => f && f.id && f.name && ['branch', 'shared', 'all'].includes(f.kind) && f.id !== 'PDFLIB');
+        if (fl.length) ROOTS = fl.map(f => [String(f.id), String(f.name), f.kind]);
+      }
+    } catch (_) {}
     if (p.role === 'super') {
       const bs = await db.collection('branches').get();
       A.branches = [{ id: 'main', academyName: '본원' }].concat(bs.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -507,7 +516,7 @@ async function vTHw(main) {
   main.innerHTML = '';
   main.append(head('숙제 · 알림장', '맡은 학생에게 숙제를 냅니다. 학생은 CMVOCA의 "숙제·알림장"에서 봅니다.'));
   const inS = 'min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:12px;background:#fff;width:100%';
-  const files = []; units.forEach(u => { const byId = new Map(u.items.map(i => [i.id, i])); u.items.filter(i => i.type !== 'folder').forEach(i => { const par = i.parentId && byId.get(i.parentId); files.push({ it: i, label: u.rname.split(' · ')[1] + ' › ' + (par ? par.name + ' › ' : '') + (i.name || '') }); }); });
+  const files = []; units.forEach(u => { const byId = new Map(u.items.map(i => [i.id, i])); u.items.filter(i => i.type !== 'folder').forEach(i => { const par = i.parentId && byId.get(i.parentId); files.push({ it: i, label: u.rname + ' › ' + (par ? par.name + ' › ' : '') + (i.name || '') }); }); });
   const c = h('section', { class: 'am-card' }, h('h2', null, '새 숙제'));
   const kind = h('select', { style: inS }, h('option', { value: 'hw' }, '숙제 (학습 자료 풀기)'), h('option', { value: 'notice' }, '알림장 (안내만)'));
   const item = h('select', { style: inS }, h('option', { value: '' }, files.length ? '학습 자료 고르기' : '고를 수 있는 학습 자료가 없습니다'), files.map((f, i) => h('option', { value: String(i) }, f.label)));
@@ -587,14 +596,15 @@ async function vReport(main) {
   const c3 = h('section', { class: 'am-card' }, h('h2', null, '3. 진도 체크'), h('p', { class: 'am-note', style: 'margin:0 0 10px' }, '왼쪽 칸 = 오늘 한 것 · 가운데 칸 = 다음 수업 예정 (원장님이 고른 학습 폴더)'));
   if (!units.length) c3.append(h('div', { class: 'am-empty' }, '진도로 고를 학습 폴더가 없습니다. 원장님께 학습 폴더 지정을 요청하거나 아래 칸에 직접 적으세요.'));
   units.forEach(u => {
-    const kids = new Map(); u.items.forEach(i => { const k = i.parentId || null; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(i); });
+    const ids = new Set(u.items.map(i => i.id)), kids = new Map(), seen = new Set(); u.items.forEach(i => { const k = i.parentId && ids.has(i.parentId) ? i.parentId : null; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(i); });
     kids.forEach(l => l.sort((a, b) => (a.order || 0) - (b.order || 0) || byName(a, b)));
     const box = h('div', { class: 'kids' }, h('div', { class: 'am-tt am-note', style: 'min-height:28px' }, h('span', { style: 'text-align:center' }, '오늘'), h('span', { style: 'text-align:center' }, '다음'), h('span', null, '')));
     const walk = (pid, depth) => (kids.get(pid) || []).forEach(i => {
+      if (seen.has(i.id) || depth > 12) return; seen.add(i.id);
       const a = h('input', { type: 'checkbox', checked: R.done.has(i.id) || null, 'aria-label': i.name + ' 오늘' }), b2 = h('input', { type: 'checkbox', checked: R.next.has(i.id) || null, 'aria-label': i.name + ' 다음' });
       a.onchange = () => a.checked ? R.done.add(i.id) : R.done.delete(i.id); b2.onchange = () => b2.checked ? R.next.add(i.id) : R.next.delete(i.id);
-      box.append(h('div', { class: 'am-tt' }, a, b2, h('span', { style: 'padding-left:' + depth * 18 + 'px;' + (i.type === 'folder' ? 'font-weight:700' : '') }, i.name || '(이름 없음)')));
-      if (depth < 4) walk(i.id, depth + 1);
+      box.append(h('div', { class: 'am-tt' }, a, b2, h('span', { style: 'padding-left:' + Math.min(depth, 6) * 18 + 'px;' + (i.type === 'folder' ? 'font-weight:700' : '') }, i.name || '(이름 없음)')));
+      walk(i.id, depth + 1);
     });
     walk(null, 0);
     c3.append(h('details', { class: 'am-tree', open: [...R.done, ...R.next].some(id => u.items.some(i => i.id === id)) || units.length === 1 ? true : null }, h('summary', null, u.rname, h('span', { class: 'am-note', style: 'margin-left:auto;font-weight:400' }, u.items.length + '개 ▾')), box));
@@ -735,7 +745,7 @@ function folderSummary(t) {
 async function loadRootItems(root, kind) {
   let q = db.collection('items').where('folder', '==', root);
   if (kind === 'branch') q = q.where('branchId', '==', A.bid).where('visible', '==', true);
-  else if (kind === 'shared') q = q.where('shared', 'array-contains', A.bid);
+  else if (kind === 'shared' && !(A.role === 'super' && A.bid === 'main')) q = q.where('shared', 'array-contains', A.bid);
   return (await q.get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.deleted && i.type === 'folder');
 }
 async function editFolders(t) {
@@ -747,15 +757,17 @@ async function editFolders(t) {
   const boxes = [];
   ROOTS.forEach(([rid, rname], ri) => {
     const items = data[ri], kids = new Map();
-    items.forEach(i => { const k = i.parentId || null; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(i); });
+    const ids = new Set(items.map(i => i.id)); // 위 폴더가 공유되지 않은 폴더는 맨 위 단계에 보여 줌
+    items.forEach(i => { const k = i.parentId && ids.has(i.parentId) ? i.parentId : null; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(i); });
     kids.forEach(l => l.sort((a, b) => (a.order || 0) - (b.order || 0) || byName(a, b)));
     const whole = h('input', { type: 'checkbox', checked: allow.has(rid) || null, 'aria-label': rname + ' 전체' });
     const det = h('details', { class: 'am-tree' }, h('summary', null, whole, rname + ' 전체', h('span', { class: 'am-note', style: 'margin-left:auto;font-weight:400' }, items.length ? '폴더 ' + items.length + '개 ▾' : '폴더 없음')));
     const kd = h('div', { class: 'kids' });
+    const seen = new Set();
     const walk = (pid, depth) => (kids.get(pid) || []).forEach(i => {
-      if (depth > 3) return;
+      if (seen.has(i.id) || depth > 12) return; seen.add(i.id);
       const c = h('input', { type: 'checkbox', value: i.id, checked: allow.has(i.id) || null });
-      kd.append(h('label', { style: 'padding-left:' + depth * 22 + 'px' }, c, i.name || '(이름 없음)'));
+      kd.append(h('label', { style: 'padding-left:' + Math.min(depth, 6) * 22 + 'px' }, c, i.name || '(이름 없음)'));
       boxes.push({ rid, c }); walk(i.id, depth + 1);
     });
     walk(null, 0);
