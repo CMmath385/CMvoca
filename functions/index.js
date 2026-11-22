@@ -50,7 +50,8 @@ exports.wbListWords = call(async (_d, me) => { needPlayer(me); return await load
 const roomRef = id => db.doc('wb_rooms/' + id), secRef = id => db.doc('wb_secrets/' + id);
 function writeRoom(tx, id, room, secret) {
   tx.set(roomRef(id), F.publicView(room));
-  tx.set(secRef(id), secret ? { room, secret } : { room }, { merge: true });
+  // 합쳐 저장(merge)하면 지도(map) 안에 지난 문제의 "답했음" 기록이 남는다 → 새로 만들 때는 통째로, 이후에는 room 필드를 통째로 바꾼다
+  if (secret) tx.set(secRef(id), { room, secret }); else tx.update(secRef(id), { room });
 }
 /** 방 하나를 트랜잭션으로 읽어 fn 으로 바꾸고 저장한다. fn → {room?, changed, ret?} 또는 {error} */
 async function mutate(roomId, fn) {
