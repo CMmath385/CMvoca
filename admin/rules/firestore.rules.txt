@@ -1,0 +1,239 @@
+rules_version = '2';
+// CMVOCA 전체 규칙 (학원관리 /admin/ 추가분 포함, 2026-11-22). 추가된 곳은 [학원관리] 표시.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ───────── 공통 함수 ─────────
+    function signedin()   { return request.auth != null; }
+    // 본원 관리자. (선택) 더 안전하게: 아래 줄 대신 다음 줄을 쓰고 ADMIN_UID 를 실제 UID 로 바꾸기
+    //   return signedin() && request.auth.uid == 'ADMIN_UID' && request.auth.token.email == 'admin@cmacademy.com';
+    function isSuper()    { return signedin() && request.auth.token.email == 'admin@cmacademy.com'; }
+    // users 문서가 있는 사람만 (직접 가입한 외부인 차단)
+    function registered() { return signedin() && exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function me()         { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isSub()      { return registered() && !isSuper() && me().role == 'sub'; }
+    // 지점 관리자이고, b 가 자기 지점일 때
+    function myBranch(b)  { return isSub() && b == request.auth.uid; }
+    // [학원관리 /admin/] 같은 지점의 강사(teacher)·행정 담당자(staff)
+    function isTeacher()  { return registered() && !isSuper() && me().role == 'teacher'; }
+    function isStaff()    { return registered() && !isSuper() && me().role == 'staff'; }
+    function teacherOf(b) { return isTeacher() && me().branchId == b; }
+    function staffOf(b)   { return isStaff() && me().branchId == b; }
+    function workerOf(b)  { return teacherOf(b) || staffOf(b); }
+    // 지점 원장이 만들 수 있는 계정 역할
+    function subRole(r)   { return r in ['student', 'teacher', 'staff']; }
+    // 강사가 읽을 수 있는 학원관리(mg) 종류: 회비(fee)·급여(pay)·수입지출(ledger)·자유기록(etc)은 제외
+    function tRead(k)     { return k in ['stu', 'att', 'progress', 'counsel', 'klass', 'plan', 'school', 'cfg', 'tclk', 'gradenote',
+                                         'am_cfg', 'am_perm', 'am_assign', 'am_report', 'am_fb', 'am_units', 'am_msum']; }
+    // 강사가 쓸 수 있는 종류: 출결·진도·출퇴근·수업 보고서·피드백
+    function tWrite(k)    { return k in ['att', 'progress', 'tclk', 'am_report', 'am_fb']; }
+
+    // ───────── 계정 ─────────
+    match /users/{uid} {
+      allow read: if isSuper()
+        || (signedin() && request.auth.uid == uid)
+        || (isSub() && resource.data.branchId == request.auth.uid)
+        || (workerOf(resource.data.branchId));
+      // 지점은 자기 지점 "학생" 계정만 만들 수 있음 (+ 학원관리: 강사·행정 담당자 계정)
+      allow create: if isSuper()
+        || (isSub() && subRole(request.resource.data.role) && request.resource.data.branchId == request.auth.uid);
+      // 지점은 원래도 자기 지점 학생인 문서만 수정 (다른 지점 계정 가져가기·바꾸기 차단)
+      // 원장 본인 문서는 역할·지점을 바꾸지 않는 수정만 허용
+      allow update: if isSuper()
+        || (isSub() && subRole(resource.data.role) && resource.data.branchId == request.auth.uid
+            && request.resource.data.role == resource.data.role && request.resource.data.branchId == request.auth.uid)
+        || (isSub() && request.auth.uid == uid
+            && request.resource.data.role == resource.data.role && request.resource.data.branchId == resource.data.branchId);
+      allow delete: if isSuper()
+        || (isSub() && subRole(resource.data.role) && resource.data.branchId == request.auth.uid);
+    }
+
+    // ───────── 지점 정보 ─────────
+    match /branches/{id} {
+      // 전체 목록은 본원만, 학생·지점은 자기 지점 문서만
+      allow read: if isSuper() || (registered() && id == me().branchId);
+      allow create, delete: if isSuper();
+      // 지점은 자기 지점 정보만, 사용기간(endDate)은 못 바꿈
+      allow update: if isSuper()
+        || (isSub() && id == request.auth.uid
+            && request.resource.data.get('endDate', '') == resource.data.get('endDate', ''));
+    }
+
+    // ───────── 본원 설정 ─────────
+    match /config/{id} {
+      allow read: if isSuper() || registered();
+      allow write: if isSuper();
+    }
+
+    // ───────── 한 아이디 = 한 곳 로그인 ─────────
+    match /sessions/{uid} {
+      allow read, write: if signedin() && request.auth.uid == uid;
+    }
+
+    // ───────── 학습 자료 ─────────
+    match /items/{id} {
+      allow read: if isSuper()
+        || (registered() && resource.data.folder == 'E')
+        || (registered() && me().branchId in resource.data.shared)
+        || (registered() && resource.data.branchId == me().branchId
+            && (me().role == 'sub' || me().role == 'staff' || (resource.data.visible == true && resource.data.folder != 'F')));
+      // 지점: 자기 지점 자료만, 공유 설정(shared) 불가, 'E'(전 지점에 보이는 폴더) 불가
+      allow create: if isSuper()
+        || (isSub() && request.resource.data.branchId == request.auth.uid
+            && !('shared' in request.resource.data)
+            && request.resource.data.get('folder', '') != 'E');
+      allow update: if isSuper()
+        || (isSub() && resource.data.branchId == request.auth.uid
+            && request.resource.data.branchId == request.auth.uid
+            && !('shared' in request.resource.data)
+            && request.resource.data.get('folder', '') != 'E');
+      allow delete: if isSuper() || (isSub() && resource.data.branchId == request.auth.uid);
+    }
+
+    // ───────── 학습 HTML ─────────
+    match /pages/{id} {
+      allow get: if isSuper() || registered();
+      allow list: if isSuper();
+      allow create: if isSuper() || myBranch(request.resource.data.branchId);
+      // 지점은 원래도 자기 지점 것만 수정 (본원·다른 지점 HTML 바꿔치기 차단)
+      allow update: if isSuper() || (myBranch(resource.data.branchId) && myBranch(request.resource.data.branchId));
+      allow delete: if isSuper() || myBranch(resource.data.branchId);
+    }
+
+    // ───────── 학습 기록·점수 ─────────
+    match /history/{id} {
+      // 학생은 "자기 이름"으로만 기록 생성
+      allow create: if isSuper()
+        || myBranch(request.resource.data.branchId)
+        || (registered() && request.resource.data.branchId == me().branchId
+            && request.resource.data.studentUid == request.auth.uid);
+      allow read, delete: if isSuper() || myBranch(resource.data.branchId);
+      allow read: if workerOf(resource.data.branchId);
+      // 학생은 자기 기록에서 "학습 완료·점수·오답" 항목만 수정 (학생·지점·제목 등 변경 불가)
+      allow update: if isSuper()
+        || myBranch(resource.data.branchId)
+        || (signedin() && resource.data.studentUid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['endTs', 'durationSec', 'score', 'status', 'wrong', 'wrongCount', 'total', 'correct']));
+    }
+
+    // ───────── 숙제·알림장 ─────────
+    match /hw/{id} {
+      allow read: if isSuper() || (registered() && resource.data.branchId == me().branchId);
+      allow create: if isSuper() || myBranch(request.resource.data.branchId)
+        || (workerOf(request.resource.data.branchId) && request.resource.data.by == request.auth.uid);
+      allow update: if isSuper() || (myBranch(resource.data.branchId) && myBranch(request.resource.data.branchId))
+        || (workerOf(resource.data.branchId) && resource.data.by == request.auth.uid
+            && request.resource.data.branchId == resource.data.branchId && request.resource.data.by == request.auth.uid);
+      allow delete: if isSuper() || myBranch(resource.data.branchId)
+        || (workerOf(resource.data.branchId) && resource.data.by == request.auth.uid);
+    }
+
+    // ───────── 숙제 완료 표시 (문서 번호: 숙제ID_학생ID) ─────────
+    match /hwdone/{id} {
+      allow read: if isSuper()
+        || myBranch(resource.data.branchId)
+        || workerOf(resource.data.branchId)
+        || (signedin() && resource.data.studentUid == request.auth.uid);
+      // 새로 만들 때: 문서 번호 끝이 "_내ID" 여야 함
+      allow create: if registered()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.branchId == me().branchId
+        && id.matches('^.+_' + request.auth.uid + '$');
+      // 수정: 원래도 내 문서일 때만 (다른 학생 기록 덮어쓰기 차단)
+      allow update: if registered()
+        && resource.data.studentUid == request.auth.uid
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.branchId == me().branchId;
+      allow delete: if isSuper() || myBranch(resource.data.branchId);
+    }
+
+    // ───────── 학원관리 (학부모 연락처·상담·회비·급여·출결) ─────────
+    match /mg/{id} {
+      allow read, delete: if isSuper() || myBranch(resource.data.branchId);
+      allow create: if isSuper() || myBranch(request.resource.data.branchId);
+      // 원래도 자기 지점 문서만 수정 (다른 지점 문서 가져가기 차단)
+      allow update: if isSuper() || (myBranch(resource.data.branchId) && myBranch(request.resource.data.branchId));
+      // [학원관리] 행정 담당자: 자기 지점 전체 (메뉴별 제한은 화면에서)
+      allow read, delete: if staffOf(resource.data.branchId);
+      allow create: if staffOf(request.resource.data.branchId);
+      allow update: if staffOf(resource.data.branchId) && staffOf(request.resource.data.branchId);
+      // [학원관리] 강사: 정해진 종류만 읽기, 출결·진도·출퇴근·보고서·피드백만 쓰기 (삭제 불가)
+      allow read: if teacherOf(resource.data.branchId) && tRead(resource.data.kind);
+      allow create: if teacherOf(request.resource.data.branchId) && tWrite(request.resource.data.kind);
+      allow update: if teacherOf(resource.data.branchId) && tWrite(resource.data.kind)
+        && request.resource.data.branchId == resource.data.branchId && request.resource.data.kind == resource.data.kind;
+    }
+
+    // ───────── WORD BATTLE: 공통 ─────────
+    // 같은 지점 선생님(sub)인지 (지점 문서 번호 = 지점 선생님 uid)
+    function wbBranchStaff(d) { return isSub() && d.branchId == request.auth.uid; }
+
+    // 경기방: 다른 지점 학생끼리도 한 방에서 한다.
+    //   읽기: 그 방의 참가자 · 참가 학생이 속한 지점의 선생님(branchIds 에 자기 uid) · 본원
+    //   방 코드로 들어오기·방 만들기는 서버 함수가 처리한다 (지점 제한 없음).
+    match /wb_rooms/{roomId} {
+      allow read: if isSuper()
+        || (isSub() && request.auth.uid in resource.data.branchIds)
+        || (signedin() && request.auth.uid in resource.data.playerUids);
+      allow write: if false;
+      // 참가자 점수·캐릭터는 방 문서 안(players)에 들어 있어 따로 규칙이 필요 없다. 정답은 wb_secrets(규칙 없음=차단)에만 있다.
+    }
+
+    // 누적 성적(랭킹용): 지점이 달라도 모든 등록 사용자가 읽는다.
+    //   그래서 이 문서에는 닉네임·캐릭터·점수·승수만 넣고 실명·연락처는 절대 넣지 않는다.
+    //   (지점 선생님이 자기 학생의 실명 기록을 볼 때는 users 문서와 서버 함수를 쓴다)
+    match /wb_stats/{statId} {  // 문서 번호 = 방번호_uid
+      allow read: if isSuper() || registered();
+      allow write: if false;
+    }
+
+    // 교환 가능 포인트: 본인·같은 지점 선생님·본원
+    match /wb_points/{uid} {
+      allow read: if isSuper()
+        || (signedin() && request.auth.uid == uid)
+        || wbBranchStaff(resource.data);
+      allow write: if false;
+    }
+
+    // 상품 목록·게임 설정: 로그인한 등록 사용자는 읽기, 본원만 수정 (기존 config 와 같은 방식)
+    match /wb_products/{id} {
+      allow read: if isSuper() || registered();
+      allow write: if false;  // 상품은 관리 화면 → 서버 함수가 저장
+    }
+    match /wb_settings/{id} {
+      allow read: if isSuper() || registered();
+      allow write: if false;
+    }
+
+    // 상품 교환 신청·미션권: 본인·같은 지점 선생님·본원은 읽기, 신청·승인은 서버 함수만
+    match /wb_redeems/{id} {
+      allow read: if isSuper()
+        || wbBranchStaff(resource.data)
+        || (signedin() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+    match /wb_missions/{id} {
+      allow read: if isSuper()
+        || wbBranchStaff(resource.data)
+        || (signedin() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // 지점별 월 상품 지급 예산·지급 현황: 해당 지점 선생님과 본원만 읽기 (문서 번호 = 지점 uid + 월, 예: {지점uid}_2026-11)
+    match /wb_budgets/{id} {
+      allow read: if isSuper() || wbBranchStaff(resource.data);
+      allow write: if false;
+    }
+
+    // 부정 이용 기록: 지점 선생님·본원만
+    match /wb_flags/{id} {
+      allow read: if isSuper() || wbBranchStaff(resource.data);
+      allow write: if false;
+    }
+
+    // wb_secrets(정답·채점)·wb_answers(제출 원본)는 규칙을 만들지 않는다 → 화면에서 읽기·쓰기 불가
+
+    // 위에 적지 않은 컬렉션은 모두 차단 (Firestore 기본값)
+  }
+}
