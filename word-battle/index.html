@@ -130,7 +130,11 @@ function join(){const c=($('jc').value||'').trim();if(c.length<6){S.err='방 코
 function setChar(c){run(()=>api('wbSetCharacter',{roomId:S.roomId,character:c}))}
 function ready(v){run(()=>api('wbReady',{roomId:S.roomId,ready:v}))}
 function start(){run(()=>api('wbStart',{roomId:S.roomId}))}
-function quit(){if(!confirm('게임을 종료할까요?\n지금 경기에서 나가게 되고, 2명이 하던 경기라면 경기가 끝나요.'))return;leave()}
+const exitBtn=r=>r.hostUid===S.uid
+  ?'<button class="btn ghost" style="margin-top:18px;min-height:40px;font-size:14px;border-color:var(--red);color:var(--red)" onclick="endAll()">🛑 게임 종료 (모두 종료)</button>'
+  :'<button class="btn ghost" style="margin-top:18px;min-height:40px;font-size:14px" onclick="quit()">🚪 나가기</button>';
+function endAll(){if(!confirm('게임을 종료할까요?\n참가한 모든 학생의 게임이 지금 바로 끝나요. 점수와 포인트는 기록되지 않아요.'))return;run(()=>api('wbEnd',{roomId:S.roomId}))}
+function quit(){if(!confirm('경기에서 나갈까요?\n2명이 하던 경기라면 경기가 끝나요.'))return;leave()}
 function leave(){run(async()=>{try{await api('wbLeave',{roomId:S.roomId})}catch(_){}leaveLocal()})}
 function waiting(r){
   const me=r.players[S.uid],host=r.hostUid===S.uid,others=r.playerUids.filter(u=>u!==r.hostUid);
@@ -139,6 +143,7 @@ function waiting(r){
   <div class="card">${r.playerUids.map(u=>{const p=r.players[u];return `<div class="pl"><img src="${img(p.character)}" alt=""><span class="n">${p.character}${u===S.uid?' (나)':''}</span>${u===r.hostUid?'<span class="tag host">방장</span>':`<span class="tag ${p.ready?'go':''}">${p.ready?'준비 완료':'대기'}</span>`}</div>`}).join('')}</div>
   <div class="card"><div class="muted" style="margin-bottom:8px">캐릭터 바꾸기</div>${charPick(r)}</div>${errBox()}
   ${host?`<div class="muted" style="text-align:center">${r.playerUids.length<2?'친구가 2명 이상 들어와야 시작할 수 있어요':(others.every(u=>r.players[u].ready)?'모두 준비됐어요!':'모두 준비를 누르면 시작할 수 있어요')}</div><button class="btn" ${r.playerUids.length>=2&&others.every(u=>r.players[u].ready)?'':'disabled'} onclick="start()">게임 시작</button>`:`<button class="btn" onclick="ready(${!me.ready})">${me.ready?'준비 취소':'준비 완료'}</button>`}
+  ${host?'<button class="btn ghost" style="border-color:var(--red);color:var(--red)" onclick="endAll()">🛑 방 닫기 (모두 내보내기)</button>':''}
   <button class="btn ghost" onclick="leave()">나가기</button>`;
 }
 function scoreBar(r){
@@ -160,13 +165,13 @@ function battle(r){
   else if(done&&S.myRes==='wrong')banner='<div class="banner no">오답 −5 · 다른 친구의 답을 기다려요</div>';else if(done)banner='<div class="banner">제출 완료 · 결과를 기다려요</div>';
   const total=r.timing.limitMs[r.round-1],left=closed?0:Math.max(0,Q.deadlineAt-now());
   return `<div class="top"><span>${RN[r.round-1]}</span><span>${q.no} / ${r.perRound[r.round-1]||r.perRound}</span><span id="tl">${Math.ceil(left/1000)}초</span></div>
-  <div class="bar"><i id="tb" style="width:${closed?0:left/total*100}%"></i></div>${scoreBar(r)}${body}<div id="bn">${banner}</div>${errBox()}<button class="btn ghost" style="margin-top:18px;min-height:40px;font-size:14px" onclick="quit()">🚪 게임 종료</button>`;
+  <div class="bar"><i id="tb" style="width:${closed?0:left/total*100}%"></i></div>${scoreBar(r)}${body}<div id="bn">${banner}</div>${errBox()}${exitBtn(r)}`;
 }
 function sendChoice(i){if(S.myAns!==null)return;S.myAns=i;render();api('wbSubmit',{roomId:S.roomId,qid:S.room.cur.id,answer:i}).then(r=>{if(r&&r.accepted&&!r.correct){S.myRes='wrong';render()}}).catch(e=>{S.err=say(e);render()})}
 function sendSpell(){const v=($('sp').value||'').trim();if(!v||S.myAns!==null)return;S.myAns=v;render();api('wbSubmit',{roomId:S.roomId,qid:S.room.cur.id,answer:v}).then(r=>{if(r&&r.accepted&&!r.correct){S.myRes='wrong';render()}}).catch(e=>{S.err=say(e);render()})}
 function roundResult(r){
   const rk=r.playerUids.map(u=>({u,p:r.players[u]})).sort((a,b)=>b.p.score-a.p.score);
-  return `<h1 style="text-align:center">라운드 ${r.round} 끝!</h1><div class="sub" style="text-align:center">지금까지 누적 점수</div><div class="card">${rk.map((x,i)=>`<div class="rk ${x.u===S.uid?'me':''}"><div class="no">${i+1}</div><img src="${img(x.p.character)}" alt=""><div class="grow"><b>${x.p.character}${x.u===S.uid?' (나)':''}</b></div><b style="font-size:20px">${x.p.score}</b></div>`).join('')}</div><div class="muted" style="text-align:center">잠시 후 다음 단계로 넘어가요…</div><button class="btn ghost" style="margin-top:18px;min-height:40px;font-size:14px" onclick="quit()">🚪 게임 종료</button>`;
+  return `<h1 style="text-align:center">라운드 ${r.round} 끝!</h1><div class="sub" style="text-align:center">지금까지 누적 점수</div><div class="card">${rk.map((x,i)=>`<div class="rk ${x.u===S.uid?'me':''}"><div class="no">${i+1}</div><img src="${img(x.p.character)}" alt=""><div class="grow"><b>${x.p.character}${x.u===S.uid?' (나)':''}</b></div><b style="font-size:20px">${x.p.score}</b></div>`).join('')}</div><div class="muted" style="text-align:center">잠시 후 다음 단계로 넘어가요…</div>${exitBtn(r)}`;
 }
 function swapView(r){
   const w=r.swap,hold=w&&w.holderUid===S.uid;
@@ -182,7 +187,7 @@ function final(r){
   return `<h1 style="text-align:center">🏁 최종 결과</h1><div class="card">${r.result.map(x=>`<div class="rk ${x.uid===S.uid?'me':''}"><div class="no">${x.rank}</div><img src="${img(x.character)}" alt=""><div class="grow"><b>${x.character}${x.uid===S.uid?' (나)':''}</b><div class="muted">정답 ${x.correct} · 오답 ${x.wrong} · 무응답 ${x.noAnswer}</div></div><div style="text-align:right"><b style="font-size:20px">${x.score}</b><div class="muted">+${x.points}P</div></div></div>`).join('')}</div>
   ${mine?`<div class="card" style="text-align:center">내 포인트 <b style="color:var(--gold);font-size:22px">+${mine.points}P</b><div class="muted">쿠폰 교환은 곧 열려요</div></div>`:''}<button class="btn" onclick="leaveLocal();render()">처음으로</button>`;
 }
-function cancelled(){return `<h1 style="text-align:center">방이 닫혔어요</h1><div class="sub" style="text-align:center">사람이 부족하거나 시간이 지났어요.</div><button class="btn" onclick="leaveLocal();render()">처음으로</button>`}
+function cancelled(r){return `<h1 style="text-align:center">방이 닫혔어요</h1><div class="sub" style="text-align:center">${r&&r.endedBy==='host'?'방장이 게임을 종료했어요.':'사람이 부족하거나 시간이 지났어요.'}</div><button class="btn" onclick="leaveLocal();render()">처음으로</button>`}
 
 /* ----- 시간 구동: 화면이 시간이 되면 서버에 한 단계 진행을 요청 (여러 명이 불러도 한 번만 반영) ----- */
 let raf=null;

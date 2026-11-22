@@ -84,6 +84,15 @@ function leaveRoom(room, uid, now) {
   return { ok: true, room: r, changed: true };
 }
 
+/** 방장이 경기를 모두 끝낸다 (대기 중이든 진행 중이든). 점수·포인트는 기록하지 않고 방을 닫는다 */
+function endRoom(room, uid, now) {
+  if (['COMPLETED', 'CANCELLED'].includes(room.status)) return no(room, 'ENDED');
+  if (uid !== room.hostUid) return no(room, 'NOT_HOST');
+  const r = clone(room);
+  r.status = 'CANCELLED'; r.cur = null; r.reveal = null; r.nextAt = null; r.swap = null; r.endedBy = 'host'; r.endedAt = now;
+  return { ok: true, room: r, changed: true };
+}
+
 /** 문제 하나 열기 (다음 번호) */
 function openNext(room, secret, now) {
   const idx = room.qIndex + 1, pub = secret.questions[idx];
@@ -205,4 +214,4 @@ function publicView(room) {
   return r;
 }
 
-module.exports = { CHARACTERS, ROOM_MAX, ROOM_MIN, DEFAULT_TIMING, makeCode, createRoom, joinRoom, chooseCharacter, setReady, leaveRoom, startGame, submit, tick, useSwap, finalizeEffects, publicView };
+module.exports = { CHARACTERS, ROOM_MAX, ROOM_MIN, DEFAULT_TIMING, makeCode, createRoom, joinRoom, chooseCharacter, setReady, leaveRoom, endRoom, startGame, submit, tick, useSwap, finalizeEffects, publicView };
