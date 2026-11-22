@@ -993,8 +993,8 @@ async function pickPdfLinks(it) {
 const AL_TYPE = /(앱학습|강의영상|본책|워크북|테스트|정답지|정답|해설|학습지|개념|영상|앱)/g;
 const alNorm = n => String(n || '').normalize('NFC').toLowerCase().replace(/\.(pdf|pptx?|html?)$/i, '');
 const AL_SUBJ = ['국어', '수학', '영어', '과학', '사회', '한국사'];
-// 학습 종류: 앱 이름·PDF 이름에서 찾음 (위에서부터 먼저 맞는 것). "문법 개념"은 개념, "구문워크북"은 구문
-const AL_KIND = [['개념', /개념|본책|concept/], ['구문', /구문/], ['문법', /문법|어법|grammar/], ['단어', /단어|어휘|voca|word/], ['본문', /본문|분석지|지문|해석|passage|reading/], ['내신', /내신|동형|모의고사|시험지|기출|예상문제/]];
+// 학습 종류: 앱 이름·PDF 이름에서 찾음 (위에서부터 먼저 맞는 것). "본문개념"은 본문, "문법 개념"은 개념, "구문워크북"은 구문
+const AL_KIND = [['본문', /본문\s?개념/], ['개념', /개념|본책|concept/], ['구문', /구문/], ['문법', /문법|어법|grammar/], ['단어', /단어|어휘|voca|word/], ['본문', /본문|분석지|지문|해석|passage|reading/], ['내신', /내신|동형|모의고사|시험지|기출|예상문제/]];
 const alTag = k => [k.subj, k.lv, k.book, k.pub || k.code, k.unit != null ? k.unit + '과·단원' : '', k.kind].filter(Boolean).join(' · ') || '분류 정보 없음';
 const alKind = n => { n = alNorm(n).replace(/_/g, ' ').replace(/\bcm\s?[가-힣a-z]+/g, ' '); return (AL_KIND.find(([, re]) => re.test(n)) || [''])[0]; }; // 교재 이름(CM구문 등)은 종류에서 뺌
 function alKeys(name, path, meta) { // meta: PDF 자료실 파일의 과목·학년·출판사 (subj·grade·publisher)
@@ -1003,22 +1003,39 @@ function alKeys(name, path, meta) { // meta: PDF 자료실 파일의 과목·학
   const pub = (meta && meta.publisher && meta.publisher !== '기타' ? canon(meta.publisher) : '') || (PUBLISHERS.find(x => full.includes(x.toLowerCase())) || '');
   const subj = (meta && AL_SUBJ.includes(meta.subj) ? meta.subj : '') || (AL_SUBJ.find(x => full.includes(x)) || '');
   const code = (/\bcm\s?[가-힣a-z]+/.exec(n.replace(/_/g, ' ')) || /\bcm\s?[가-힣a-z]+/.exec(full.replace(/_/g, ' ')) || [''])[0].replace(/\s/g, '');
-  const unitOf = t => (/(?:^|[^a-z])u\s?0*(\d{1,3})(?![0-9])/.exec(t) || /0*(\d{1,3})\s*(?:단원|과|강|회)/.exec(t) || /day\s?0*(\d{1,3})/.exec(t) || /lesson\s?0*(\d{1,3})/.exec(t) || [])[1];
+  const dot = t => { const m = /(?:^|[^0-9.])(\d{1,2}(?:\.\d{1,2}){1,2})(?![0-9.])/.exec(t); return m ? m[1].split('.').map(Number).join('.') : null; }; // 수학 "2.1.1"·"2.4"
+  const unitOf = t => dot(t) || (/(?:^|[^a-z])u\s?0*(\d{1,3})(?![0-9])/.exec(t) || /0*(\d{1,3})\s*(?:단원|과|강|회)/.exec(t) || /day\s?0*(\d{1,3})/.exec(t) || /lesson\s?0*(\d{1,3})/.exec(t) || [])[1];
   let unit = unitOf(n);
   if (unit == null && !meta) for (const seg of (path || []).slice().reverse()) { const u = unitOf(alNorm(seg)); if (u != null) { unit = u; break; } } // 앱 이름에 없으면 가까운 폴더 이름에서 (예: … › 능률민 › 1과 › 단어)
   const LVW = /(?:level|lv\.?|레벨)\s?0*(\d{1,2})(?![0-9])/; // "Level 1"·"LV1"·"레벨 1" (이름 또는 폴더)
   let lv = (/(?:^|[^a-z])l\s?0*(\d{1,2})(?![0-9])/.exec(n) || LVW.exec(n) || LVW.exec(full) || (code ? /(?:^|[^a-z])l\s?0*(\d{1,2})(?![0-9])/.exec(full) : null) || [])[1];
   if (lv != null && unit == null && !code) { unit = lv; lv = null; } // 교재 표시 없이 "L3"만 있으면 레벨이 아니라 Lesson 3
+  // Step(단계): "Step 2"(폴더·이름) · CM 교재 이름의 "S2" (CM문법_S2_U04, CM워크북_문법편S2_U01) → S2 (L 레벨과 따로)
+  const STW = /step\s?0*(\d{1,2})(?![0-9])/, STS = /(?:^|[^a-z])s\s?0*(\d{1,2})(?![0-9])/;
+  const st = (STW.exec(n) || (code ? STS.exec(n.replace(/_/g, ' ')) : null) || STW.exec(full) || [])[1];
   const sch = (/(초|중|고)\s?([1-6])/.exec(n) || /(초|중|고)\s?([1-6])/.exec(full) || []);
   const words = new Set(full.replace(AL_TYPE, ' ').split(/[^0-9a-z가-힣]+/).filter(w => w.length >= 2 && !/^\d+$/.test(w)));
   const g = meta && /^(초|중|고)[1-6]$/.test(meta.grade || '') ? meta.grade : '';
   // 단원 제목(예: "학교 생활" ↔ "학교생활"): 교재·레벨·단원 번호·종류 말을 빼고 띄어쓰기 없이
-  const title = n.replace(/_/g, ' ').replace(/\bcm\s?[가-힣a-z]+/g, ' ').replace(/(?:^|[^a-z])(?:u|l|level|lv)\s?\d+/g, ' ').replace(/\d+\s*(?:단원|과|강|회)/g, ' ').replace(AL_TYPE, ' ').replace(/강의|정답|테스트|워크북|본책/g, ' ').replace(/[^가-힣a-z]/g, '');
-  const bm = /공통\s?(국어|영어|수학)\s?([12])/.exec(full), book = bm ? '공통' + bm[1] + bm[2] : ''; // 공통영어1 ≠ 공통영어2
-  return { book, code, lv: lv != null ? 'L' + (+lv) : (g || (sch[1] ? sch[1] + sch[2] : '')), unit: unit != null ? +unit : null, pub, subj, kind: alKind(name), title: title.length >= 2 ? title : '', words };
+  const title = n.replace(/_/g, ' ').replace(/\bcm\s?[가-힣a-z]+/g, ' ').replace(/(?:^|[^a-z])(?:u|l|s|level|lv|lesson|day|step)\s?\d+/g, ' ').replace(/\d+\s*(?:단원|과|강|회)/g, ' ').replace(AL_TYPE, ' ').replace(/강의|정답|테스트|워크북|본책/g, ' ').replace(/[^가-힣a-z]/g, '');
+  const bm = /공통\s?(국어|영어|수학)\s?([12])/.exec(full), pm = /(문법|구문|독해|어휘|듣기|쓰기)편/.exec(full), book = bm ? '공통' + bm[1] + bm[2] : pm ? pm[1] + '편' : ''; // 공통영어1 ≠ 공통영어2, CM워크북 문법편 ≠ 구문편
+  // 단원 주제(예: 한글맞춤법·부등식의해와성질): 학년·과목·출판사·책·종류·형식 말을 모두 뺀 것. 4글자 이상일 때만 비교에 씀
+  const topic = title.replace(/(초|중|고)(?=[가-힣]|$)/g, '').replace(new RegExp('(' + AL_SUBJ.concat(PUBLISHERS.map(x => x.toLowerCase())).join('|') + ')', 'g'), '').replace(/공통(국어|영어|수학)|영어i+/g, '')
+    .replace(/개념|본책|구문|문법|어법|단어|어휘|voca|word|본문|분석지|분석|지문|해석|내신|동형|모의고사|시험지|기출|예상문제|워크북|테스트|정답|해설|문제지|문제풀이|문제|풀이|학습지|학습|강의|영상|앱|단계|대비|회|편|주관식|객관식|교과서|쌍둥이|수정본/g, '');
+  return { topic: topic.length >= 4 ? topic : '', book, code, unit0: unit, lv: st != null ? 'S' + (+st) : lv != null ? 'L' + (+lv) : (g || (sch[1] ? sch[1] + sch[2] : '')), unit: unit != null ? (String(unit).includes('.') ? String(unit) : String(+unit)) : null, pub, subj, kind: alKind(name), title: title.length >= 2 ? title : '', words };
+}
+// 단원 제목이 비슷한가: 한쪽이 다른 쪽을 품거나, 4글자 이상 같은 부분이 있음 (학교 생활 ↔ 학교생활, 부등식의 해와 성질 문제풀이 ↔ 부등식의 해와 성질)
+function alTitleSim(x, y) {
+  if (!x || !y) return false; if (x.includes(y) || y.includes(x)) return true;
+  if (x.length < 4 || y.length < 4) return false;
+  for (let i = 0; i + 4 <= x.length; i++) if (y.includes(x.slice(i, i + 4))) return true;
+  return false;
 }
 function alMatch(a, p) {
-  if (a.unit == null || p.unit == null || a.unit !== p.unit) return null;
+  const th0 = !!(a.title && p.title && (p.title.includes(a.title) || a.title.includes(p.title)));
+  if (a.unit != null && p.unit != null) { if (a.unit !== p.unit) return null; } else if (!th0) return null; // 단원 번호가 없으면 단원 제목이 같아야
+  if (a.code && !p.code && p.pub && !a.pub) return null; // 출판사가 없는 CM 교재 앱(CM초등 등)에 출판사별 내신 PDF는 안 이음
+  if (a.topic && p.title && !alTitleSim(a.topic, p.title)) return null; // 앱의 단원 주제가 PDF 이름에 없으면 안 이음 (한글 맞춤법 ≠ 춘향전, 학교 생활 ≠ 의학과 건강)
   if (a.code && p.code && a.code !== p.code) return null;
   if (a.lv && p.lv && a.lv !== p.lv) return null;
   if (a.book && p.book && a.book !== p.book) return null;
@@ -1031,6 +1048,7 @@ function alMatch(a, p) {
   const th = !!(a.title && p.title && (p.title.includes(a.title) || a.title.includes(p.title))); // 단원 제목이 같음
   if (a.code && p.code && (!p.lv || a.lv === p.lv || (!a.lv && th)) && kindOk) return { sure: true, sc: 10 + common + (th ? 5 : 0), th }; // PDF에 레벨이 있는데 앱 레벨을 모르면, 단원 제목까지 같아야 '확실'
   if (a.lv && p.lv && a.pub && p.pub && kindOk) return { sure: true, sc: 8 + common + (th ? 5 : 0), th }; // 내신: 학년·출판사·과·종류가 같고 과목이 서로 다르지 않음
+  if (a.topic && a.unit != null && a.unit === p.unit && a.book && a.book === p.book && kindOk) return { sure: true, sc: 9 + common, th: true }; // 같은 책·같은 단원·같은 주제 (예: 공통국어2 U01 제망매가)
   if (common >= 2 || th) return { sure: false, sc: common + (th ? 5 : 0), th };
   return null;
 }
@@ -1108,17 +1126,19 @@ async function pdfAutoLink(scope, opts) {
   }
   const onlyP = scope && scope.pdfIds ? new Set(scope.pdfIds) : null;
   const pAll = (await db.collection('items').where('folder', '==', 'PDFLIB').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.deleted && i.type !== 'folder' && i.pdfUrl && (!onlyP || onlyP.has(i.id)));
-  const pdfs = pAll.map(p => ({ p, k: alKeys(p.name, [p.subj, p.grade, p.publisher], p) })).filter(x => x.k.unit != null);
-  const byUnit = new Map(); pdfs.forEach(x => { if (!byUnit.has(x.k.unit)) byUnit.set(x.k.unit, []); byUnit.get(x.k.unit).push(x); });
+  const pdfs = pAll.map(p => ({ p, k: alKeys(p.name, [p.subj, p.grade, p.publisher], p) }));
+  const byUnit = new Map(); pdfs.forEach(x => { if (x.k.unit == null) return; if (!byUnit.has(x.k.unit)) byUnit.set(x.k.unit, []); byUnit.get(x.k.unit).push(x); });
+  const withTitle = pdfs.filter(x => x.k.title); // 단원 번호가 없는 앱은 단원 제목으로
   const rows = apps.map(a => {
-    let cand = (a.k.unit == null ? [] : (byUnit.get(a.k.unit) || [])).map(x => ({ x, m: alMatch(a.k, x.k) })).filter(c => c.m);
+    let cand = (a.k.unit != null ? (byUnit.get(a.k.unit) || []).concat(withTitle.filter(x => x.k.unit == null)) : a.k.title ? withTitle : []).map(x => ({ x, m: alMatch(a.k, x.k) })).filter(c => c.m);
     if (!a.k.lv && cand.some(c => c.m.th)) cand = cand.filter(c => c.m.th); // 앱 레벨을 모르면 단원 제목이 같은 PDF만
     const sure = cand.filter(c => c.m.sure), pick = (sure.length ? sure : cand).sort((u, v) => v.m.sc - u.m.sc).slice(0, 8);
     const old = a.it.pdfLinks || [], add = pick.map(c => c.x.p).filter(p => !old.includes(p.id));
     let why = '';
     if (!pick.length) { // 왜 못 찾았나: 같은 과·단원 PDF 중 가장 비슷한 것과 다른 점
-      if (a.k.unit == null) why = '앱 이름에서 과·단원 번호를 못 읽음';
-      else { const near = (byUnit.get(a.k.unit) || []).map(x => ({ x, sc: [...a.k.words].filter(w => x.k.words.has(w)).length })).sort((u, v) => v.sc - u.sc)[0];
+      if (a.k.unit == null) why = '과·단원 번호가 없어 단원 제목(' + (a.k.title || '-') + ')으로 찾았지만 같은 제목 PDF 없음';
+      else { const agree = k => ['subj', 'lv', 'book', 'pub', 'code', 'kind'].filter(f => a.k[f] && k[f] && a.k[f] === k[f]).length * 10 - ['subj', 'lv', 'book', 'pub', 'kind'].filter(f => a.k[f] && k[f] && a.k[f] !== k[f]).length * 10; // 맞는 항목이 많은 PDF가 '가장 가까운 PDF'
+        const near = (byUnit.get(a.k.unit) || []).map(x => ({ x, sc: agree(x.k) + [...a.k.words].filter(w => x.k.words.has(w)).length })).sort((u, v) => v.sc - u.sc)[0];
         if (!near) why = '같은 과·단원(' + a.k.unit + ') PDF가 없음';
         else { const k = near.x.k, d = []; if (a.k.subj && k.subj && a.k.subj !== k.subj) d.push('과목 ' + a.k.subj + '≠' + k.subj); if (a.k.lv && k.lv && a.k.lv !== k.lv) d.push('학년·레벨 ' + a.k.lv + '≠' + k.lv); if (a.k.code && k.code && a.k.code !== k.code) d.push('교재 ' + a.k.code + '≠' + k.code); if (!(a.k.code && k.code) && a.k.pub && k.pub && a.k.pub !== k.pub) d.push('출판사 ' + a.k.pub + '≠' + k.pub); if (a.k.kind && k.kind && a.k.kind !== k.kind) d.push('종류 ' + a.k.kind + '≠' + k.kind); if (!d.length) d.push('이름이 비슷하지 않음');
           why = '가장 가까운 PDF: ' + near.x.p.name + ' (' + alTag(k) + ') — 다른 점: ' + d.join(', '); } }
@@ -1161,10 +1181,14 @@ async function pdfAutoLink(scope, opts) {
   const shL = h('label', 'flex items-center gap-2 text-xs font-bold text-slate-700 pt-3'), shC = h('input'); shC.type = 'checkbox'; shC.checked = true;
   shL.append(shC, document.createTextNode('연결한 PDF를 그 앱이 공유된 지점에도 공유 (지점 원장·강사가 열 수 있게. PDF 자료실의 다른 공유는 그대로)')); bx.append(shL);
   const row = h('div', 'flex flex-wrap items-center gap-2 pt-3');
-  row.append(info, h('span', 'flex-grow'), btn('💾 CSV로 받기', 'bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-2.5 rounded-xl font-bold', async () => {
+  row.append(info, h('span', 'flex-grow'), btn('💾 앱 목록 CSV', 'bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-2.5 rounded-xl font-bold', async () => {
     const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
     const lines = [['결과', '앱', '앱 위치', '읽은 분류', '못 찾은 까닭', '연결할 PDF', '이미 연결된 PDF'].map(q).join(',')].concat(rows.map(r => [{ sure: '확실', check: '검토 필요', none: '못 찾음' }[r.cls], r.a.it.name, r.a.path.join(' > '), alTag(r.a.k), r.why || '', r.add.map(p => p.name).join(' | '), r.pick.filter(p => !r.add.includes(p)).map(p => p.name).join(' | ')].map(q).join(',')));
     const a = h('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv' })); a.download = 'PDF자동연결_미리보기.csv'; document.body.append(a); a.click(); a.remove();
+  }), btn('📋 PDF 목록 CSV', 'bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-2.5 rounded-xl font-bold', async () => { // 규칙 점검용: PDF 자료실 전체 이름과 읽은 분류
+    const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const lines = [['PDF 이름', '과목', '학년', '출판사', '읽은 분류'].map(q).join(',')].concat(pdfs.map(x => [x.p.name, x.p.subj, x.p.grade, x.p.publisher, alTag(x.k)].map(q).join(',')));
+    const a = h('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv' })); a.download = 'PDF목록_분류.csv'; document.body.append(a); a.click(); a.remove();
   }), btn('저장 (체크한 것)', 'bg-rose-600 hover:bg-rose-700 text-white text-sm px-5 py-2.5 rounded-xl font-bold', async () => {
     const todo = rows.filter(r => r.on && r.add.length); if (!todo.length) return alert('체크된 앱이 없습니다.');
     if (!confirm('앱 ' + todo.length + '개에 PDF를 연결합니다. (이미 이어 둔 PDF는 그대로)\n나중에 앱 옆 "📄 PDF"에서 하나씩 풀 수 있습니다.')) return;
