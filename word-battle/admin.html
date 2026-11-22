@@ -74,9 +74,10 @@ async function loadHistory(){
     S.hist=rows.map(r=>({...r,studentName:names[r.uid]||'(이름 없음)'}));
   }catch(e){S.hist=[];S.err='배틀 이력을 불러오지 못했어요: '+e.message}
 }
-async function load(){try{S.data=await api('wbAdminData');await loadHistory();if(S.role==='super'){S.products=(await api('wbProducts')).products;S.branches=await loadBranches()}}catch(e){S.err=e.message}render()}
+async function load(){try{S.data=await api('wbAdminData');try{S.ctl=(await db.doc('wb_settings/control').get()).data()||{}}catch(e){S.ctl={}}await loadHistory();if(S.role==='super'){S.products=(await api('wbProducts')).products;S.branches=await loadBranches()}}catch(e){S.err=e.message}render()}
 async function loadBranches(){try{const s=await db.collection('branches').get();return s.docs.map(d=>({id:d.id,name:d.data().academyName||d.data().name||d.id}))}catch(e){return []}}
 async function act(fn){if(S.busy)return;S.busy=true;S.err='';try{await fn();await load()}catch(e){S.err=e.message;render()}S.busy=false}
+const setOpen=(scope,branchId,open)=>act(()=>api('wbSetOpen',{scope,branchId,open}));
 const redeem=(id,action)=>act(()=>api('wbRedeemDecide',{id,action}));
 const mission=(id,action,text)=>act(()=>api('wbMissionDecide',{id,action,text}));
 function render(){
@@ -90,6 +91,12 @@ function render(){
     ${r.status==='REQUESTED'?`<button class="mini g" onclick="redeem('${r.id}','approve')">승인</button><button class="mini x" onclick="redeem('${r.id}','reject')">거절</button>`:''}
     ${r.status==='APPROVED'?`<button class="mini g" onclick="redeem('${r.id}','paid')">지급 완료</button><button class="mini x" onclick="redeem('${r.id}','reject')">취소</button>`:''}</div>`).join(''):'<div class="muted">교환 신청이 없어요</div>'}</div>
     <div class="card"><div class="muted">이번 달(${d.month}) 지급 예산</div>${d.budgets.map(b=>`<div class="pl"><span class="n">${esc(b.branchId?(S.branches||[]).find(x=>x.id===b.branchId)?.name||b.branchId:'우리 지점')}</span><span>${won(b.used)} / ${b.limit==null?'제한 없음':won(b.limit)}</span></div>`).join('')||'<div class="muted">설정 없음 (제한 없음)</div>'}</div>`;
+  if(S.tab==='ctl'){
+    const c=S.ctl||{},allOpen=c.all!==false,bs=(c.branches||{});
+    const row=(title,open,onclick,note)=>`<div class="pl"><span class="n">${esc(title)}<small>${note}</small></span><span class="tag ${open?'go':''}">${open?'학생에게 보임':'숨김'}</span><button class="mini ${open?'x':'g'}" onclick="${onclick}">${open?'숨기기':'다시 보이기'}</button></div>`;
+    body=`<div class="card"><b>학생 화면의 ⚔️ WORD BATTLE 탭</b><div class="muted" style="margin:4px 0 8px">숨기면 학생 화면에서 탭이 사라지고, 주소로 들어와도 방을 만들거나 들어갈 수 없어요. 이미 시작한 경기는 끝까지 해요. 학생이 다음에 앱을 열 때부터 적용돼요.</div>
+    ${sup?row('전체 지점',allOpen,"setOpen('all',null,"+!allOpen+")",allOpen?'모든 지점 학생':'모든 지점 학생에게 숨김 (지점 설정보다 우선)')+(S.branches||[]).map(b=>row(b.name,bs[b.id]!==false,"setOpen('branch','"+b.id+"',"+(bs[b.id]===false)+")",'이 지점 학생')).join(''):row('우리 지점',bs[auth.currentUser.uid]!==false,"setOpen('branch',null,"+(bs[auth.currentUser.uid]===false)+")",allOpen?'우리 지점 학생':'본원이 전체를 숨겨 둔 상태예요 (본원이 다시 보여야 학생에게 보여요)')}</div>`;
+  }
   if(S.tab==='his'){
     const H=S.hist||[],by={};
     H.forEach(r=>{const a=by[r.uid]||(by[r.uid]={name:r.studentName,plays:0,wins:0,score:0,correct:0,answered:0,last:0});a.plays++;if(r.won)a.wins++;a.score+=r.score||0;a.correct+=r.correct||0;a.answered+=(r.correct||0)+(r.wrong||0)+(r.noAnswer||0);a.last=Math.max(a.last,r.finishedAt||0)});
@@ -105,7 +112,7 @@ function render(){
     <input class="t" id="pn" placeholder="상품 이름 (예: GS 5,000원권)"><div class="row"><input class="t" id="pp" type="number" placeholder="교환 포인트"><input class="t" id="pw" type="number" placeholder="금액(원)"></div><input type="hidden" id="pid"><button class="btn" onclick="saveProduct()">상품 저장</button></div>
     <div class="card"><b>지점 월 예산 (${d.month})</b>${(S.branches||[]).map(b=>{const x=d.budgets.find(y=>y.branchId===b.id)||{};return `<div class="pl"><span class="n">${esc(b.name)}<small>사용 ${won(x.used)}</small></span><input class="t" style="width:120px" id="bg-${b.id}" type="number" placeholder="제한 없음" value="${x.limit==null?'':x.limit}"><button class="mini" onclick="saveBudget('${b.id}')">저장</button></div>`}).join('')}</div>
     <div class="card"><b>꼴찌 미션 목록 (한 줄에 하나)</b><textarea class="t" id="ml">${esc(d.missionList.join('\n'))}</textarea><button class="btn" onclick="saveMissions()">미션 목록 저장</button></div>`;
-  A.innerHTML=`<h1>WORD <b>BATTLE</b> 관리</h1><div class="sub">${sup?'본원':'우리 지점'}</div><div class="row">${tab('red','🎁 교환 신청')}${tab('his','📊 배틀 이력')}${tab('mis','📝 미션')}${sup?tab('set','⚙️ 설정'):''}</div><div class="err">${esc(S.err)}</div>${body}<a class="btn ghost" style="text-align:center;line-height:48px;text-decoration:none" href="../">CMVOCA로 돌아가기</a>`;
+  A.innerHTML=`<h1>WORD <b>BATTLE</b> 관리</h1><div class="sub">${sup?'본원':'우리 지점'}</div><div class="row">${tab('red','🎁 교환 신청')}${tab('ctl','🔒 배틀 열기·닫기')}${tab('his','📊 배틀 이력')}${tab('mis','📝 미션')}${sup?tab('set','⚙️ 설정'):''}</div><div class="err">${esc(S.err)}</div>${body}<a class="btn ghost" style="text-align:center;line-height:48px;text-decoration:none" href="../">CMVOCA로 돌아가기</a>`;
 }
 function editProduct(id){const p=S.products.find(x=>x.id===id);$('pid').value=id;$('pn').value=p.name;$('pp').value=p.points;$('pw').value=p.won||0;$('pn').focus()}
 const saveProduct=()=>act(()=>api('wbSaveProduct',{id:$('pid').value||undefined,name:$('pn').value,points:$('pp').value,won:$('pw').value}));
