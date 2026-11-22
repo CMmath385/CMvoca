@@ -308,6 +308,7 @@ if (configured) {
     $('am-me').textContent = (p.name || '') + ' · ' + (ROLE_NAME[p.role] || p.role); brand();
     $('am-old').classList.toggle('hidden', A.role === 'staff'); // 행정 담당자는 CMVOCA 앱을 쓰지 않음
     $('am-login').classList.add('hidden'); $('am-app').classList.remove('hidden');
+    if (A.role === 'teacher') A.tperm = effPerm(await loadPermData(), u.uid);
     go(A.role === 'teacher' ? 'tatt' : 'home');
   }));
 } else {
@@ -356,7 +357,7 @@ async function vSettings(main) {
 
 /* ===== 메뉴 ===== */
 function menus() {
-  if (A.role === 'teacher') return [['tatt', '오늘 출결'], ['report', '수업 보고서'], ['mystu', '내 학생']];
+  if (A.role === 'teacher') return [['tatt', '오늘 출결'], ['report', '수업 보고서'], ['mystu', '내 학생']].concat(A.tperm && A.tperm.hw ? [['thw', '숙제·알림장']] : []);
   const m = [['home', '오늘 할 일']];
   if (isBoss() || (A.role === 'staff' && Object.values(TAB_PERM).some(k => staffCan(k)))) m.push(['ops', '학원 운영']);
   if (isBoss() || staffCan('stu')) m.push(['reports', '수업 보고서']);
@@ -372,7 +373,7 @@ function go(v) {
   const nav = $('am-nav'); nav.innerHTML = '';
   ms.forEach(([k, t]) => nav.append(h('button', { type: 'button', 'aria-current': k === v ? 'page' : null, onclick: () => go(k) }, t)));
   const main = $('am-main'); main.innerHTML = ''; main.append(h('div', { class: 'am-empty' }, '불러오는 중…'));
-  safe(() => ({ home: vHome, ops: vOps, reports: vReports, people: vPeople, assign: vAssign, perm: vPerm, branches: vBranches, settings: vSettings, mystu: vMyStu, tatt: vTAtt, report: vReport })[v](main));
+  safe(() => ({ home: vHome, ops: vOps, reports: vReports, people: vPeople, assign: vAssign, perm: vPerm, branches: vBranches, settings: vSettings, mystu: vMyStu, tatt: vTAtt, report: vReport, thw: vTHw })[v](main));
 }
 const head = (t, s) => h('div', null, h('h1', { class: 'am-h1' }, t), s ? h('p', { class: 'am-sub' }, s) : null);
 function modal(title, body, onOk, okText) {
@@ -494,6 +495,50 @@ async function vTAtt(main) {
     });
   };
   draw();
+}
+
+/* ===== 강사: 숙제·알림장 (원장이 '숙제 내기'를 공개했을 때) — CMVOCA 학생 화면의 숙제·알림장으로 감 ===== */
+async function vTHw(main) {
+  const [{ list }, units, hwq] = await Promise.all([myStudents(), myUnits(), db.collection('hw').where('branchId', '==', A.bid).get()]);
+  const mine = hwq.docs.map(d => ({ id: d.id, ...d.data() })).filter(w => w.by === A.me.uid && (w.kind === 'hw' || w.kind === 'notice')).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  main.innerHTML = '';
+  main.append(head('숙제 · 알림장', '맡은 학생에게 숙제를 냅니다. 학생은 CMVOCA의 "숙제·알림장"에서 봅니다.'));
+  const inS = 'min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:12px;background:#fff;width:100%';
+  const files = []; units.forEach(u => { const byId = new Map(u.items.map(i => [i.id, i])); u.items.filter(i => i.type !== 'folder').forEach(i => { const par = i.parentId && byId.get(i.parentId); files.push({ it: i, label: u.rname.split(' · ')[1] + ' › ' + (par ? par.name + ' › ' : '') + (i.name || '') }); }); });
+  const c = h('section', { class: 'am-card' }, h('h2', null, '새 숙제'));
+  const kind = h('select', { style: inS }, h('option', { value: 'hw' }, '숙제 (학습 자료 풀기)'), h('option', { value: 'notice' }, '알림장 (안내만)'));
+  const item = h('select', { style: inS }, h('option', { value: '' }, files.length ? '학습 자료 고르기' : '고를 수 있는 학습 자료가 없습니다'), files.map((f, i) => h('option', { value: String(i) }, f.label)));
+  const title = h('input', { type: 'text', placeholder: '제목 (예: 지수 앱학습 끝까지 풀기)', style: inS });
+  const memo = h('input', { type: 'text', placeholder: '안내 (선택)', style: inS });
+  const due = h('input', { type: 'date', value: addDays(today(), 3), style: inS });
+  item.onchange = () => { const f = files[Number(item.value)]; if (f && !title.value) title.value = f.it.name || ''; };
+  const iWrap = field('학습 자료', item), dWrap = field('마감일', due);
+  kind.onchange = () => { iWrap.classList.toggle('hidden', kind.value !== 'hw'); dWrap.classList.toggle('hidden', kind.value !== 'hw'); };
+  const picked = new Set(list.map(x => x.id));
+  const stu = h('div', { class: 'am-chk' }, list.map(x => { const i = h('input', { type: 'checkbox', checked: true }); i.onchange = () => i.checked ? picked.add(x.id) : picked.delete(x.id); return h('label', null, i, x.name); }));
+  c.append(h('div', { class: 'am-grid' }, field('종류', kind), dWrap), iWrap, field('제목', title), field('안내', memo), h('div', { class: 'am-f' }, h('span', { class: 'am-lbl' }, '받을 학생 (맡은 학생만)'), list.length ? stu : h('span', { class: 'am-note' }, '맡은 학생이 없습니다.')));
+  const go2 = btn('숙제 내기', '', () => safe(async () => {
+    const f = files[Number(item.value)], k = kind.value;
+    if (!title.value.trim()) return alert('제목을 입력하세요.');
+    if (k === 'hw' && !f) return alert('학습 자료를 고르세요.');
+    const who = list.filter(x => picked.has(x.id) && x.acct);
+    if (!who.length) return alert('받을 학생을 고르세요. (학습 계정이 있는 학생만 받을 수 있습니다)');
+    go2.disabled = true; toast('내는 중…');
+    for (const x of who) await db.collection('hw').add({ branchId: A.bid, kind: k, title: title.value.trim(), memo: memo.value.trim(), ...(k === 'hw' ? { itemId: f.it.id, itemName: f.it.name || '', folder: f.it.folder || '', due: due.value || '' } : {}), target: { type: 'student', uid: x.id, name: x.name }, createdAt: Date.now(), by: A.me.uid, byName: A.me.name || '' });
+    toast(who.length + '명에게 냈습니다.', 2500); go('thw');
+  }));
+  c.append(go2); main.append(c);
+  // 낸 숙제와 완료 현황
+  const box = h('section', { class: 'am-card' }, h('h2', null, '내가 낸 숙제 (최근 20개)'));
+  if (!mine.length) box.append(h('div', { class: 'am-empty' }, '아직 낸 숙제가 없습니다.'));
+  for (const w of mine.slice(0, 20)) {
+    let st = '';
+    if (w.kind === 'hw' && w.target && w.target.uid) { try { const d = await db.collection('hwdone').doc(w.id + '_' + w.target.uid).get(); st = d.exists ? (d.data().done ? '완료' : d.data().opened ? '열어 봄' : '안 함') : '안 함'; } catch (_) { st = '-'; } }
+    const late = w.due && w.due < today() && st !== '완료';
+    box.append(h('div', { class: 'am-item', style: 'margin-bottom:8px' }, h('span', { class: 'am-pill' }, w.kind === 'hw' ? '숙제' : '알림'), h('span', { class: 'grow' }, (w.target && w.target.name ? w.target.name + ' · ' : '') + w.title), w.due ? h('span', { class: 'am-note' }, '~' + w.due.slice(5)) : null, st ? h('span', { class: 'am-pill ' + (st === '완료' ? 'blue' : late ? 'red' : 'org') }, late ? '기한 지남' : st) : null,
+      btn('삭제', 'danger sm', () => confirm('이 숙제를 삭제할까요?') && safe(async () => { await db.collection('hw').doc(w.id).delete(); go('thw'); }))));
+  }
+  main.append(box);
 }
 
 /* ===== 강사: 수업 보고서 쓰기 ===== */
@@ -814,7 +859,7 @@ async function vPerm(main) {
         h('b', null, on ? '공개' : '비공개'), sw(on, l, () => save({ ...over, [k]: !on }))));
     });
   }
-  c.append(h('div', { class: 'am-note', style: 'margin-top:12px;padding:12px;border-radius:12px;background:var(--bg)' }, '항상 가능: ' + ALWAYS + ' · 학생의 연락처 등 개인정보는 강사 화면에 나오지 않습니다. · 숙제·주간평가·월말평가 내기 화면은 다음 단계에서 강사 화면에 들어갑니다.'));
+  c.append(h('div', { class: 'am-note', style: 'margin-top:12px;padding:12px;border-radius:12px;background:var(--bg)' }, '항상 가능: ' + ALWAYS + ' · 학생의 연락처 등 개인정보는 강사 화면에 나오지 않습니다. · 숙제 내기를 공개하면 강사 화면에 "숙제·알림장" 메뉴가 생깁니다. 주간·월말평가 내기는 다음 단계에서 들어갑니다.'));
   body.append(c);
 }
 
