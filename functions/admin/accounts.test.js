@@ -1,0 +1,10 @@
+'use strict';
+const assert = require('assert');
+const { _canFree: f } = require('./accounts');
+const E = id => id + '@cmacademy.com';
+assert.deepStrictEqual(f({ loginId: 'nowon', email: E('nowon'), profileExists: false }), { ok: true });
+assert.strictEqual(f({ loginId: 'nowon', email: E('nowon'), profileExists: true }).why, 'IN_USE');
+assert.strictEqual(f({ loginId: 'admin', email: E('admin'), profileExists: false }).why, 'PROTECTED');
+assert.strictEqual(f({ loginId: 'A B', email: E('A B'), profileExists: false }).why, 'BAD_ID');
+assert.strictEqual(f({ loginId: '', email: E(''), profileExists: false }).why, 'BAD_ID');
+console.log('accounts: 5개 통과');

@@ -22,6 +22,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
@@ -348,9 +349,11 @@ async function createAuth(id, pw) {
   try { uid = (await auth2.createUserWithEmailAndPassword(email, pw)).user.uid; }
   catch (e) {
     if (e.code !== 'auth/email-already-in-use') throw e;
-    // 삭제된 계정(프로필 없음)은 같은 비밀번호로 재등록 가능
-    try { uid = (await auth2.signInWithEmailAndPassword(email, pw)).user.uid; if ((await db.collection('users').doc(uid).get()).exists) uid = null; } catch (_) { uid = null; }
-    if (!uid) { await auth2.signOut().catch(() => {}); throw new Error('이미 사용 중인 아이디입니다.'); }
+    // 삭제된 계정(프로필 없음)은 같은 비밀번호로 다시 등록: 보조 로그인(본인)으로 자기 프로필이 있는지 확인 (지점 원장은 없는 문서를 읽을 수 없어서)
+    try { uid = (await auth2.signInWithEmailAndPassword(email, pw)).user.uid; if ((await firebase.app('sec').firestore().collection('users').doc(uid).get()).exists) uid = null; } catch (_) { uid = null; }
+    // 비밀번호가 다르면: 서버에서 지운 계정의 로그인 기록만 지우고 새로 만든다 (서버 함수 amFreeLoginId)
+    if (!uid) { await auth2.signOut().catch(() => {}); try { const r = await firebase.app().functions('asia-northeast3').httpsCallable('amFreeLoginId')({ loginId: id }); if (r.data && r.data.freed) uid = (await auth2.createUserWithEmailAndPassword(email, pw)).user.uid; } catch (_) {} }
+    if (!uid) { await auth2.signOut().catch(() => {}); throw new Error('이미 사용 중인 아이디입니다.\n(예전에 지운 아이디라면: 예전 비밀번호를 그대로 넣으면 다시 쓸 수 있습니다)'); }
   }
   await auth2.signOut();
   return uid;

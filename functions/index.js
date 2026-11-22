@@ -296,3 +296,6 @@ exports.wbSetOpen = call(async (d, me) => {
   await db.doc('wb_settings/control').set({ branches: { [bid]: open }, updatedAt: FV.serverTimestamp(), updatedBy: me.uid }, { merge: true });
   return { ok: true };
 });
+
+/* ----- 학원관리: 지운 계정의 아이디 다시 쓰기 (functions/admin/accounts.js) ----- */
+exports.amFreeLoginId = require('./admin/accounts').amFreeLoginId;
