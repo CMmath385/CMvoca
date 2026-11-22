@@ -169,7 +169,6 @@ const ALWAYS = '출결 입력 · 오늘 진도 체크 · 다음 진도 예정 �
 // 행정 담당자 메뉴 권한 체크리스트
 const STAFF_MENUS = [['stu', '학생 정보·연락처'], ['att', '출결'], ['counsel', '상담'], ['fee', '회비·수납'], ['ledger', '수입·지출'], ['tpay', '강사 출퇴근·급여'], ['plan', '일정'], ['notice', '공지'], ['exam', '숙제·평가 출제'], ['stats', '통계'], ['assign', '강사 학생 지정·공개 설정']];
 // 학습 기록의 과목: 폴더(B 영어·C 수학·D 국어) 우선, 없으면 제목의 낱말
-const FOLDER_SUBJ = { B: '영어', C: '수학', D: '국어' };
 // CMVOCA 학습 자료실의 큰 폴더 (학원관리 F·PDF 자료 제외). kind: branch=지점 전용, shared=공유 선택, all=전체 공개
 // 기본값. 실제 큰 폴더 이름·종류는 CMVOCA 본원 설정(config/main.folders)에서 불러옴 (로그인 때)
 let ROOTS = [['A', 'A · 우리 지점 전용', 'branch'], ['B', 'B · 영어', 'shared'], ['C', 'C · 수학', 'shared'], ['D', 'D · 국어', 'shared'], ['E', 'E · 전과목 통합', 'all']];
@@ -250,7 +249,10 @@ function assignedMap(assigns, roster) {
   });
   return m;
 }
-const histSubj = r => FOLDER_SUBJ[r.folder] || (Object.entries(SUBJ_WORDS).find(([, ws]) => ws.some(w => String(r.title || '').toUpperCase().includes(w.toUpperCase()))) || [''])[0];
+// 학습 기록의 과목: 그 기록이 든 큰 폴더의 이름(CMVOCA 설정, 예: "D.국어")에서 먼저 찾고, 없으면 학습 제목의 낱말로
+const wordSubj = t => { t = String(t || '').toUpperCase(); return (Object.entries(SUBJ_WORDS).find(([, ws]) => ws.some(w => t.includes(w.toUpperCase()))) || [''])[0]; };
+const folderSubj = id => { const r = ROOTS.find(x => x[0] === id); return r ? wordSubj(r[1]) : ''; };
+const histSubj = r => folderSubj(r.folder) || wordSubj(r.title);
 
 /* ===== 로그인 ===== */
 async function createAuth(id, pw) {
