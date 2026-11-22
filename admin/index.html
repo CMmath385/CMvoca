@@ -171,7 +171,8 @@ const STAFF_MENUS = [['stu', '학생 정보·연락처'], ['att', '출결'], ['c
 // 학습 기록의 과목: 폴더(B 영어·C 수학·D 국어) 우선, 없으면 제목의 낱말
 const FOLDER_SUBJ = { B: '영어', C: '수학', D: '국어' };
 // CMVOCA 학습 자료실의 큰 폴더 (학원관리 F·PDF 자료 제외). kind: branch=지점 전용, shared=공유 선택, all=전체 공개
-const ROOTS = [['A', 'A · 우리 지점 전용', 'branch'], ['B', 'B · 영어', 'shared'], ['C', 'C · 수학', 'shared'], ['D', 'D · 국어', 'shared'], ['E', 'E · 전과목 통합', 'all']];
+// 기본값. 실제 큰 폴더 이름·종류는 CMVOCA 본원 설정(config/main.folders)에서 불러옴 (로그인 때)
+let ROOTS = [['A', 'A · 우리 지점 전용', 'branch'], ['B', 'B · 영어', 'shared'], ['C', 'C · 수학', 'shared'], ['D', 'D · 국어', 'shared'], ['E', 'E · 전과목 통합', 'all']];
 const NONE = '_none';
 const KEEP = 30 * 24 * 3600 * 1000; // 출결 기록 보관 30일 (CMVOCA와 같음)
 // 행정 담당자: 운영 화면 탭 → 필요한 권한
@@ -298,7 +299,15 @@ if (configured) {
         A.me.academyName = b.data().academyName || ''; A.me.logoUrl = b.data().logoUrl || ''; A.me.logoBlank = b.data().logoBlank === true;
       }
     }
-    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { A.hqName = c.data().academyName || ''; A.hqLogo = c.data().logoUrl || ''; } } catch (_) {}
+    try {
+      const c = await db.collection('config').doc('main').get();
+      if (c.exists) {
+        A.hqName = c.data().academyName || ''; A.hqLogo = c.data().logoUrl || '';
+        // CMVOCA 왼쪽 큰 폴더와 똑같이 (학원관리·PDF 자료 폴더 제외)
+        const fl = (c.data().folders || []).filter(f => f && f.id && f.name && ['branch', 'shared', 'all'].includes(f.kind) && f.id !== 'PDFLIB');
+        if (fl.length) ROOTS = fl.map(f => [String(f.id), String(f.name), f.kind]);
+      }
+    } catch (_) {}
     if (p.role === 'super') {
       const bs = await db.collection('branches').get();
       A.branches = [{ id: 'main', academyName: '본원' }].concat(bs.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -507,7 +516,7 @@ async function vTHw(main) {
   main.innerHTML = '';
   main.append(head('숙제 · 알림장', '맡은 학생에게 숙제를 냅니다. 학생은 CMVOCA의 "숙제·알림장"에서 봅니다.'));
   const inS = 'min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:12px;background:#fff;width:100%';
-  const files = []; units.forEach(u => { const byId = new Map(u.items.map(i => [i.id, i])); u.items.filter(i => i.type !== 'folder').forEach(i => { const par = i.parentId && byId.get(i.parentId); files.push({ it: i, label: u.rname.split(' · ')[1] + ' › ' + (par ? par.name + ' › ' : '') + (i.name || '') }); }); });
+  const files = []; units.forEach(u => { const byId = new Map(u.items.map(i => [i.id, i])); u.items.filter(i => i.type !== 'folder').forEach(i => { const par = i.parentId && byId.get(i.parentId); files.push({ it: i, label: u.rname + ' › ' + (par ? par.name + ' › ' : '') + (i.name || '') }); }); });
   const c = h('section', { class: 'am-card' }, h('h2', null, '새 숙제'));
   const kind = h('select', { style: inS }, h('option', { value: 'hw' }, '숙제 (학습 자료 풀기)'), h('option', { value: 'notice' }, '알림장 (안내만)'));
   const item = h('select', { style: inS }, h('option', { value: '' }, files.length ? '학습 자료 고르기' : '고를 수 있는 학습 자료가 없습니다'), files.map((f, i) => h('option', { value: String(i) }, f.label)));
