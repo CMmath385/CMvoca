@@ -169,7 +169,6 @@ const ALWAYS = '출결 입력 · 오늘 진도 체크 · 다음 진도 예정 �
 // 행정 담당자 메뉴 권한 체크리스트
 const STAFF_MENUS = [['stu', '학생 정보·연락처'], ['att', '출결'], ['counsel', '상담'], ['fee', '회비·수납'], ['ledger', '수입·지출'], ['tpay', '강사 출퇴근·급여'], ['plan', '일정'], ['notice', '공지'], ['exam', '숙제·평가 출제'], ['stats', '통계'], ['assign', '강사 학생 지정·공개 설정']];
 // 학습 기록의 과목: 폴더(B 영어·C 수학·D 국어) 우선, 없으면 제목의 낱말
-const FOLDER_SUBJ = { B: '영어', C: '수학', D: '국어' };
 // CMVOCA 학습 자료실의 큰 폴더 (학원관리 F·PDF 자료 제외). kind: branch=지점 전용, shared=공유 선택, all=전체 공개
 // 기본값. 실제 큰 폴더 이름·종류는 CMVOCA 본원 설정(config/main.folders)에서 불러옴 (로그인 때)
 let ROOTS = [['A', 'A · 우리 지점 전용', 'branch'], ['B', 'B · 영어', 'shared'], ['C', 'C · 수학', 'shared'], ['D', 'D · 국어', 'shared'], ['E', 'E · 전과목 통합', 'all']];
@@ -240,7 +239,7 @@ async function loadPermData() {
   const defaults = { ...PDEF, ...((cfg[0] && cfg[0].defaults) || {}) };
   return { defaults, per };
 }
-const effPerm = (pd, tuid) => { const o = (pd.per.find(p => p.tuid === tuid) || {}).over || {}; const r = {}; PERMS.forEach(([k]) => { r[k] = k in o ? !!o[k] : !!pd.defaults[k]; }); return r; };
+const effPerm = (pd, tuid) => { const o = (pd.per.find(p => p.tuid === tuid) || {}).over || {}; const r = {}; permList().forEach(([k]) => { r[k] = k in o ? !!o[k] : !!pd.defaults[k]; }); return r; };
 // 강사가 맡은 학생 → { 학생id: [과목…] }
 function assignedMap(assigns, roster) {
   const m = {};
@@ -250,7 +249,13 @@ function assignedMap(assigns, roster) {
   });
   return m;
 }
-const histSubj = r => FOLDER_SUBJ[r.folder] || (Object.entries(SUBJ_WORDS).find(([, ws]) => ws.some(w => String(r.title || '').toUpperCase().includes(w.toUpperCase()))) || [''])[0];
+// 학습 기록의 과목: 그 기록이 든 큰 폴더의 이름(CMVOCA 설정, 예: "D.국어")에서 먼저 찾고, 없으면 학습 제목의 낱말로
+const wordSubj = t => { t = String(t || '').toUpperCase(); return (Object.entries(SUBJ_WORDS).find(([, ws]) => ws.some(w => t.includes(w.toUpperCase()))) || [''])[0]; };
+const folderSubj = id => { const r = ROOTS.find(x => x[0] === id); return r ? wordSubj(r[1]) : ''; };
+const histSubj = r => folderSubj(r.folder) || wordSubj(r.title);
+// 이름에 과목이 없는 큰 폴더(예: 논술/독서)는 과목과 따로, 폴더마다 공개·비공개로 정함 ("전과목" 폴더·지점 전용 폴더는 제목으로 과목을 판단하므로 제외)
+const folderPerms = () => ROOTS.filter(r => r[2] !== 'branch' && !wordSubj(r[1]) && !/전과목/.test(r[1])).map(r => ['f_' + r[0], r[1] + ' 학습 기록 보기 (맡은 학생)']);
+const permList = () => PERMS.concat(folderPerms());
 
 /* ===== 로그인 ===== */
 async function createAuth(id, pw) {
@@ -861,11 +866,11 @@ async function vPerm(main) {
   const c = h('section', { class: 'am-card' });
   if (A.sel === '_def') {
     c.append(h('h2', null, '지점 기본값'));
-    PERMS.forEach(([k, l]) => { const on = !!pd.defaults[k]; c.append(h('div', { class: 'am-perm' }, h('div', { class: 't' }, h('b', null, l), h('small', null, '모든 강사에게 적용 (강사별로 바꾼 것은 제외)')), h('b', null, on ? '공개' : '비공개'), sw(on, l, () => safe(async () => { await mgSet('am_cfg_' + A.bid, { kind: 'am_cfg', defaults: { ...pd.defaults, [k]: !on } }); go('perm'); })))); });
+    permList().forEach(([k, l]) => { const on = !!pd.defaults[k]; c.append(h('div', { class: 'am-perm' }, h('div', { class: 't' }, h('b', null, l), h('small', null, '모든 강사에게 적용 (강사별로 바꾼 것은 제외)')), h('b', null, on ? '공개' : '비공개'), sw(on, l, () => safe(async () => { await mgSet('am_cfg_' + A.bid, { kind: 'am_cfg', defaults: { ...pd.defaults, [k]: !on } }); go('perm'); })))); });
   } else {
     const t = teachers.find(x => x.id === A.sel), rec = pd.per.find(p => p.tuid === t.id), over = (rec && rec.over) || {}, eff = effPerm(pd, t.id);
     c.append(h('h2', null, t.name + ' 선생님'));
-    PERMS.forEach(([k, l]) => {
+    permList().forEach(([k, l]) => {
       const own = k in over, on = eff[k];
       const save = o => safe(async () => { await db.collection('mg').doc('am_perm_' + A.bid + '_' + t.id).set({ kind: 'am_perm', tuid: t.id, over: o, branchId: A.bid }); go('perm'); });
       c.append(h('div', { class: 'am-perm' },
@@ -919,13 +924,13 @@ async function vMyStu(main) {
       const cs = counsel.filter(c => c.pid === s.id).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 3);
       card.append(h('div', { class: 'am-hist' }, cs.length ? cs.map(c => h('div', null, (c.date || '') + ' · 상담(' + (c.who || '') + ') · ' + (c.content || ''))) : h('div', null, '상담 기록 없음')));
     }
-    if (perm.learn) {
+    if (perm.learn || folderPerms().some(([k]) => perm[k])) {
       const out = h('div', { class: 'am-hist' });
       const b = btn('학습 상태 보기', 'ghost sm', () => safe(async () => {
         b.disabled = true; out.innerHTML = '';
         if (!s.acct) { out.append(h('div', null, '학습 계정이 없는 학생이라 앱 학습 기록이 없습니다.')); return; }
         const q = await db.collection('history').where('branchId', '==', A.bid).where('studentUid', '==', s.id).get();
-        const rows = q.docs.map(d => d.data()).filter(r => subjects.includes(histSubj(r))).sort((x, y) => (y.ts || 0) - (x.ts || 0));
+        const rows = q.docs.map(d => d.data()).filter(r => (perm.learn && subjects.includes(histSubj(r))) || (!folderSubj(r.folder) && perm['f_' + r.folder])).sort((x, y) => (y.ts || 0) - (x.ts || 0));
         const sc = rows.filter(r => r.score != null);
         out.append(h('div', { style: 'font-weight:700;background:var(--bluebg);color:var(--blue2);border:0' }, '최근 30일 ' + rows.length + '건 · 평균 ' + (sc.length ? Math.round(sc.reduce((a, r) => a + r.score, 0) / sc.length) + '점' : '-')));
         rows.slice(0, 8).forEach(r => out.append(h('div', null, (r.day || dayOf(r.ts)) + ' · ' + (r.title || '') + ' · ' + (r.score != null ? r.score + '점' : (r.status === 'done' ? '완료' : '학습 중')))));
