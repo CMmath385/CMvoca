@@ -1009,13 +1009,16 @@ function alKeys(name, path, meta) { // meta: PDF 자료실 파일의 과목·학
   const LVW = /(?:level|lv\.?|레벨)\s?0*(\d{1,2})(?![0-9])/; // "Level 1"·"LV1"·"레벨 1" (이름 또는 폴더)
   let lv = (/(?:^|[^a-z])l\s?0*(\d{1,2})(?![0-9])/.exec(n) || LVW.exec(n) || LVW.exec(full) || (code ? /(?:^|[^a-z])l\s?0*(\d{1,2})(?![0-9])/.exec(full) : null) || [])[1];
   if (lv != null && unit == null && !code) { unit = lv; lv = null; } // 교재 표시 없이 "L3"만 있으면 레벨이 아니라 Lesson 3
+  // Step(단계): "Step 2"(폴더·이름) · CM 교재 이름의 "S2" (CM문법_S2_U04, CM워크북_문법편S2_U01) → S2 (L 레벨과 따로)
+  const STW = /step\s?0*(\d{1,2})(?![0-9])/, STS = /(?:^|[^a-z])s\s?0*(\d{1,2})(?![0-9])/;
+  const st = (STW.exec(n) || (code ? STS.exec(n.replace(/_/g, ' ')) : null) || STW.exec(full) || [])[1];
   const sch = (/(초|중|고)\s?([1-6])/.exec(n) || /(초|중|고)\s?([1-6])/.exec(full) || []);
   const words = new Set(full.replace(AL_TYPE, ' ').split(/[^0-9a-z가-힣]+/).filter(w => w.length >= 2 && !/^\d+$/.test(w)));
   const g = meta && /^(초|중|고)[1-6]$/.test(meta.grade || '') ? meta.grade : '';
   // 단원 제목(예: "학교 생활" ↔ "학교생활"): 교재·레벨·단원 번호·종류 말을 빼고 띄어쓰기 없이
   const title = n.replace(/_/g, ' ').replace(/\bcm\s?[가-힣a-z]+/g, ' ').replace(/(?:^|[^a-z])(?:u|l|level|lv)\s?\d+/g, ' ').replace(/\d+\s*(?:단원|과|강|회)/g, ' ').replace(AL_TYPE, ' ').replace(/강의|정답|테스트|워크북|본책/g, ' ').replace(/[^가-힣a-z]/g, '');
-  const bm = /공통\s?(국어|영어|수학)\s?([12])/.exec(full), book = bm ? '공통' + bm[1] + bm[2] : ''; // 공통영어1 ≠ 공통영어2
-  return { book, code, lv: lv != null ? 'L' + (+lv) : (g || (sch[1] ? sch[1] + sch[2] : '')), unit: unit != null ? +unit : null, pub, subj, kind: alKind(name), title: title.length >= 2 ? title : '', words };
+  const bm = /공통\s?(국어|영어|수학)\s?([12])/.exec(full), pm = /(문법|구문|독해|어휘|듣기|쓰기)편/.exec(full), book = bm ? '공통' + bm[1] + bm[2] : pm ? pm[1] + '편' : ''; // 공통영어1 ≠ 공통영어2, CM워크북 문법편 ≠ 구문편
+  return { book, code, lv: st != null ? 'S' + (+st) : lv != null ? 'L' + (+lv) : (g || (sch[1] ? sch[1] + sch[2] : '')), unit: unit != null ? +unit : null, pub, subj, kind: alKind(name), title: title.length >= 2 ? title : '', words };
 }
 function alMatch(a, p) {
   if (a.unit == null || p.unit == null || a.unit !== p.unit) return null;
