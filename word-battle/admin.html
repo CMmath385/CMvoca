@@ -63,7 +63,18 @@ const api=(n,d)=>fns.httpsCallable(n)(d||{}).then(r=>r.data);
 const S={role:null,data:null,products:null,err:'',tab:'red',busy:false};
 const ST={REQUESTED:'승인 대기',APPROVED:'승인됨',PAID:'지급 완료',REJECTED:'거절'},MS={PROPOSED:'제안됨',ISSUED:'발행됨',DONE:'완료',REJECTED:'거절'};
 const won=n=>(n||0).toLocaleString()+'원';
-async function load(){try{S.data=await api('wbAdminData');if(S.role==='super'){S.products=(await api('wbProducts')).products;S.branches=await loadBranches()}}catch(e){S.err=e.message}render()}
+async function loadHistory(){
+  try{
+    const col=db.collection('wb_stats');
+    const q=S.role==='sub'?col.where('branchId','==',auth.currentUser.uid):col.where('finishedAt','>=',Date.now()-90*86400000);
+    const sn=await q.limit(1500).get();
+    const rows=sn.docs.map(d=>d.data()).sort((a,b)=>(b.finishedAt||0)-(a.finishedAt||0));
+    const names={};
+    await Promise.all([...new Set(rows.map(r=>r.uid))].map(async u=>{try{const d=await db.doc('users/'+u).get();names[u]=(d.data()||{}).name||''}catch(e){names[u]=''}}));
+    S.hist=rows.map(r=>({...r,studentName:names[r.uid]||'(이름 없음)'}));
+  }catch(e){S.hist=[];S.err='배틀 이력을 불러오지 못했어요: '+e.message}
+}
+async function load(){try{S.data=await api('wbAdminData');await loadHistory();if(S.role==='super'){S.products=(await api('wbProducts')).products;S.branches=await loadBranches()}}catch(e){S.err=e.message}render()}
 async function loadBranches(){try{const s=await db.collection('branches').get();return s.docs.map(d=>({id:d.id,name:d.data().academyName||d.data().name||d.id}))}catch(e){return []}}
 async function act(fn){if(S.busy)return;S.busy=true;S.err='';try{await fn();await load()}catch(e){S.err=e.message;render()}S.busy=false}
 const redeem=(id,action)=>act(()=>api('wbRedeemDecide',{id,action}));
@@ -79,13 +90,22 @@ function render(){
     ${r.status==='REQUESTED'?`<button class="mini g" onclick="redeem('${r.id}','approve')">승인</button><button class="mini x" onclick="redeem('${r.id}','reject')">거절</button>`:''}
     ${r.status==='APPROVED'?`<button class="mini g" onclick="redeem('${r.id}','paid')">지급 완료</button><button class="mini x" onclick="redeem('${r.id}','reject')">취소</button>`:''}</div>`).join(''):'<div class="muted">교환 신청이 없어요</div>'}</div>
     <div class="card"><div class="muted">이번 달(${d.month}) 지급 예산</div>${d.budgets.map(b=>`<div class="pl"><span class="n">${esc(b.branchId?(S.branches||[]).find(x=>x.id===b.branchId)?.name||b.branchId:'우리 지점')}</span><span>${won(b.used)} / ${b.limit==null?'제한 없음':won(b.limit)}</span></div>`).join('')||'<div class="muted">설정 없음 (제한 없음)</div>'}</div>`;
+  if(S.tab==='his'){
+    const H=S.hist||[],by={};
+    H.forEach(r=>{const a=by[r.uid]||(by[r.uid]={name:r.studentName,plays:0,wins:0,score:0,correct:0,answered:0,last:0});a.plays++;if(r.won)a.wins++;a.score+=r.score||0;a.correct+=r.correct||0;a.answered+=(r.correct||0)+(r.wrong||0)+(r.noAnswer||0);a.last=Math.max(a.last,r.finishedAt||0)});
+    const sum=Object.values(by).sort((x,y)=>y.plays-x.plays||y.score-x.score);
+    const dt=t=>t?new Date(t).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    body=`<div class="card"><b>학생별 요약 (${sup?'최근 90일':'전체'})</b>${sum.length?sum.map(a=>`<div class="pl"><span class="n">${esc(a.name)}<small>${a.plays}판 · ${a.wins}승 · 총점 ${a.score} · 정답률 ${a.answered?Math.round(a.correct/a.answered*100):0}% · 마지막 ${dt(a.last)}</small></span></div>`).join(''):'<div class="muted">아직 배틀 기록이 없어요</div>'}</div>
+    <div class="card"><b>최근 경기 (${Math.min(H.length,100)}건)</b>${H.slice(0,100).map(r=>`<div class="pl"><span class="n">${esc(r.studentName)}<small>${dt(r.finishedAt)} · ${r.rank}위 · ${r.score}점 · 정답 ${r.correct||0} 오답 ${r.wrong||0} 무응답 ${r.noAnswer||0}</small></span><span class="tag ${r.won?'go':''}">${r.won?'우승':'+'+(r.points||0)+'P'}</span></div>`).join('')||'<div class="muted">기록 없음</div>'}</div>
+    <div class="muted">우리 지점 학생의 기록만 이름이 보여요. 다른 지점 학생과 같이 한 경기도 내 학생 기록은 그대로 남아요.</div>`;
+  }
   if(S.tab==='mis')body=`<div class="card">${d.missions.length?d.missions.map(m=>`<div class="pl"><span class="n">${esc(m.studentName)||'학생'}<small><input class="t" id="mt-${m.id}" value="${esc(m.text)}" ${m.status==='PROPOSED'?'':'disabled'}></small></span><span class="tag">${MS[m.status]||m.status}</span>
     ${m.status==='PROPOSED'?`<button class="mini g" onclick="mission('${m.id}','approve',document.getElementById('mt-${m.id}').value)">발행</button><button class="mini x" onclick="mission('${m.id}','reject')">취소</button>`:''}${m.status==='ISSUED'?`<button class="mini g" onclick="mission('${m.id}','done')">완료</button>`:''}</div>`).join(''):'<div class="muted">꼴찌 미션 제안이 아직 없어요</div>'}</div><div class="muted">미션은 선생님이 발행해야 학생에게 보여요. 같은 미션은 연속으로 제안되지 않아요.</div>`;
   if(S.tab==='set'&&sup)body=`<div class="card"><b>상품 (포인트 · 원 금액)</b>${(S.products||[]).map(p=>`<div class="pl"><span class="n">${esc(p.name)}<small>${p.points}P · ${won(p.won)}${p.active===false?' · 숨김':''}</small></span><button class="mini x" onclick="editProduct('${p.id}')">수정</button></div>`).join('')}
     <input class="t" id="pn" placeholder="상품 이름 (예: GS 5,000원권)"><div class="row"><input class="t" id="pp" type="number" placeholder="교환 포인트"><input class="t" id="pw" type="number" placeholder="금액(원)"></div><input type="hidden" id="pid"><button class="btn" onclick="saveProduct()">상품 저장</button></div>
     <div class="card"><b>지점 월 예산 (${d.month})</b>${(S.branches||[]).map(b=>{const x=d.budgets.find(y=>y.branchId===b.id)||{};return `<div class="pl"><span class="n">${esc(b.name)}<small>사용 ${won(x.used)}</small></span><input class="t" style="width:120px" id="bg-${b.id}" type="number" placeholder="제한 없음" value="${x.limit==null?'':x.limit}"><button class="mini" onclick="saveBudget('${b.id}')">저장</button></div>`}).join('')}</div>
     <div class="card"><b>꼴찌 미션 목록 (한 줄에 하나)</b><textarea class="t" id="ml">${esc(d.missionList.join('\n'))}</textarea><button class="btn" onclick="saveMissions()">미션 목록 저장</button></div>`;
-  A.innerHTML=`<h1>WORD <b>BATTLE</b> 관리</h1><div class="sub">${sup?'본원':'우리 지점'}</div><div class="row">${tab('red','🎁 교환 신청')}${tab('mis','📝 미션')}${sup?tab('set','⚙️ 설정'):''}</div><div class="err">${esc(S.err)}</div>${body}<a class="btn ghost" style="text-align:center;line-height:48px;text-decoration:none" href="../">CMVOCA로 돌아가기</a>`;
+  A.innerHTML=`<h1>WORD <b>BATTLE</b> 관리</h1><div class="sub">${sup?'본원':'우리 지점'}</div><div class="row">${tab('red','🎁 교환 신청')}${tab('his','📊 배틀 이력')}${tab('mis','📝 미션')}${sup?tab('set','⚙️ 설정'):''}</div><div class="err">${esc(S.err)}</div>${body}<a class="btn ghost" style="text-align:center;line-height:48px;text-decoration:none" href="../">CMVOCA로 돌아가기</a>`;
 }
 function editProduct(id){const p=S.products.find(x=>x.id===id);$('pid').value=id;$('pn').value=p.name;$('pp').value=p.points;$('pw').value=p.won||0;$('pn').focus()}
 const saveProduct=()=>act(()=>api('wbSaveProduct',{id:$('pid').value||undefined,name:$('pn').value,points:$('pp').value,won:$('pw').value}));
