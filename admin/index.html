@@ -332,7 +332,7 @@ function brand() {
 }
 // 학원 이름 바꾸기: CMVOCA 앱의 "학원명 변경"과 같은 곳에 저장 (지점 문서·지점 원장 계정 / 본원은 config)
 async function saveAcadName(n) {
-  if (A.role === 'sub') { const b = db.batch(); b.update(db.collection('branches').doc(A.me.uid), { academyName: n, nameSet: true }); b.update(db.collection('users').doc(A.me.uid), { academyName: n, name: n }); await b.commit(); A.me.academyName = n; A.me.name = n; }
+  if (A.role === 'sub') { const b = db.batch(); b.update(db.collection('branches').doc(A.me.uid), { academyName: n, nameSet: true }); b.update(db.collection('users').doc(A.me.uid), { academyName: n, name: n }); await b.commit(); A.me.academyName = n; A.me.name = n; $('am-me').textContent = n + ' · ' + ROLE_NAME.sub; }
   else if (A.bid === 'main') { await db.collection('config').doc('main').set({ academyName: n }, { merge: true }); A.hqName = n; }
   else { const b = db.batch(); b.update(db.collection('branches').doc(A.bid), { academyName: n, nameSet: true }); b.update(db.collection('users').doc(A.bid), { academyName: n, name: n }); await b.commit(); const br = A.branches.find(x => x.id === A.bid); if (br) br.academyName = n; const o = [...$('am-br').options].find(x => x.value === A.bid); if (o) o.textContent = n; }
   brand();
@@ -345,7 +345,7 @@ async function vSettings(main) {
     const n = inp.value.trim(); if (!n) return alert('학원 이름을 입력하세요.'); if (n.length > 40) return alert('학원 이름은 40자 이내로 입력하세요.');
     save.disabled = true; await saveAcadName(n); save.disabled = false; toast('학원 이름을 바꿨습니다.', 2000);
   }));
-  const prev = h('div', { class: 'am-item', style: 'margin-top:12px' }, h('div', { class: 'am-logo' }, 'CM'), h('b', { style: 'font-size:17px' }, h('span', { id: 'am-prev' }, (acadOf(A.bid) || 'CM') + ' 학원관리')));
+  const lg = logoOf(A.bid), prev = h('div', { class: 'am-item', style: 'margin-top:12px' }, h('div', { class: 'am-logo' }, lg ? h('img', { src: lg, alt: '' }) : 'CM'), h('b', { style: 'font-size:17px' }, h('span', { id: 'am-prev' }, (acadOf(A.bid) || 'CM') + ' 학원관리')));
   inp.oninput = () => { $('am-prev').textContent = (inp.value.trim() || 'CM') + ' 학원관리'; };
   main.append(h('section', { class: 'am-card' }, h('h2', null, '학원 이름'),
     h('p', { class: 'am-note', style: 'margin:0 0 12px' }, '학원관리 머리글, 강사·행정 담당자 화면, CMVOCA 학습 앱의 학원 이름이 함께 바뀝니다.'),
