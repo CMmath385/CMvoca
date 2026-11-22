@@ -23,7 +23,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 a{color:var(--red)}
 .am-hd{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
 .am-hd-in{max-width:1280px;margin:0 auto;padding:12px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
-.am-logo{width:36px;height:36px;border-radius:10px;background:var(--red);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.am-logo img{width:100%;height:100%;object-fit:contain;background:#fff;border-radius:10px;display:block}
+.am-logo{overflow:hidden;flex:none;width:36px;height:36px;border-radius:10px;background:var(--red);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
 .am-brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
 .am-nav{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 auto}
 .am-nav button{border:0;background:none;font-weight:700;font-size:15px;padding:9px 14px;border-radius:999px;min-height:40px;cursor:pointer}
@@ -130,7 +131,7 @@ a{color:var(--red)}
 
 <div id="am-app" class="hidden">
   <header class="am-hd"><div class="am-hd-in">
-    <div class="am-brand"><div class="am-logo">CM</div><span id="am-acad">CM 학원관리</span></div>
+    <div class="am-brand"><div class="am-logo" id="am-logo">CM</div><span id="am-acad">CM 학원관리</span></div>
     <nav id="am-nav" class="am-nav" aria-label="주 메뉴"></nav>
     <div class="am-who">
       <label id="am-br-wrap" class="hidden" style="display:flex;align-items:center;gap:6px">지점 <select id="am-br" style="min-height:40px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:#fff"></select></label>
@@ -145,7 +146,7 @@ a{color:var(--red)}
 <script>
 'use strict';
 /* 운영 화면(ops.js)이 함께 쓰는 연결점 */
-window.AM = { toast: m => toast(m), me: () => A.me, branches: () => A.branches.filter(b => b.id !== 'main'), bid: () => A.bid };
+window.AM = { toast: m => toast(m), me: () => A.me, branches: () => A.branches.filter(b => b.id !== 'main'), bid: () => A.bid, brand: () => brand(), hq: () => A.hqName || '', setHq: v => { A.hqName = v; brand(); } };
 /* ===== 설정 (CMVOCA index.html 과 같은 Firebase 프로젝트·로그인) ===== */
 const FB = {
   apiKey: 'AIzaSyDtXLBEPEa89bst8lJWJ8ayCUJgyaf7PS4',
@@ -290,25 +291,66 @@ if (configured) {
       if (b && b.exists) {
         const ed = b.data().endDate || '';
         if (ed && ed < today()) { await auth.signOut(); $('am-login-err').textContent = '사용기간이 만료되었습니다. (' + ed + ') 본원에 문의해 주세요.'; return; }
-        $('am-acad').textContent = (b.data().academyName || 'CM') + ' 학원관리'; A.me.academyName = b.data().academyName || ''; A.me.logoUrl = b.data().logoUrl || '';
+        A.me.academyName = b.data().academyName || ''; A.me.logoUrl = b.data().logoUrl || ''; A.me.logoBlank = b.data().logoBlank === true;
       }
     }
+    try { const c = await db.collection('config').doc('main').get(); if (c.exists) { A.hqName = c.data().academyName || ''; A.hqLogo = c.data().logoUrl || ''; } } catch (_) {}
     if (p.role === 'super') {
       const bs = await db.collection('branches').get();
       A.branches = [{ id: 'main', academyName: '본원' }].concat(bs.docs.map(d => ({ id: d.id, ...d.data() })));
       const sel = $('am-br'); sel.innerHTML = '';
       A.branches.forEach(b => sel.append(h('option', { value: b.id }, b.academyName || b.id)));
-      sel.value = A.bid; sel.onchange = () => { A.bid = sel.value; A.sel = null; go(A.view); };
+      sel.value = A.bid; sel.onchange = () => { A.bid = sel.value; A.sel = null; brand(); go(A.view); };
       $('am-br-wrap').classList.remove('hidden');
     }
     if (p.role === 'staff') A.staffPerm = (await mgGet('am_staff')).find(r => r.uid === u.uid) || { all: false, menus: {} };
-    $('am-me').textContent = (p.name || '') + ' · ' + (ROLE_NAME[p.role] || p.role);
+    $('am-me').textContent = (p.name || '') + ' · ' + (ROLE_NAME[p.role] || p.role); brand();
     $('am-old').classList.toggle('hidden', A.role === 'staff'); // 행정 담당자는 CMVOCA 앱을 쓰지 않음
     $('am-login').classList.add('hidden'); $('am-app').classList.remove('hidden');
     go(A.role === 'teacher' ? 'tatt' : 'home');
   }));
 } else {
   $('am-login').classList.remove('hidden'); $('am-login-err').textContent = 'Firebase를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.';
+}
+
+/* ===== 학원 이름 (머리글) ===== */
+function acadOf(bid) {
+  if (A.role !== 'super') return A.me.academyName || '';
+  if (bid === 'main') return A.hqName || '본원';
+  return (A.branches.find(b => b.id === bid) || {}).academyName || '';
+}
+// 학원 로고: CMVOCA 앱에서 올린 지점 로고(branches.logoUrl), 없으면 본원 로고(config.logoUrl) — CMVOCA 앱과 같은 규칙
+function logoOf(bid) {
+  if (A.role !== 'super') return A.me.logoUrl || (A.me.logoBlank ? '' : A.hqLogo || '');
+  if (bid === 'main') return A.hqLogo || '';
+  const b = A.branches.find(x => x.id === bid) || {}; return b.logoUrl || (b.logoBlank ? '' : A.hqLogo || '');
+}
+function brand() {
+  const n = acadOf(A.bid), lg = logoOf(A.bid), box = $('am-logo');
+  $('am-acad').textContent = (n || 'CM') + ' 학원관리'; document.title = (n ? n + ' ' : '') + '학원관리';
+  box.innerHTML = ''; if (lg) { const im = h('img', { src: lg, alt: (n || '학원') + ' 로고' }); im.onerror = () => { box.textContent = 'CM'; }; box.append(im); } else box.textContent = 'CM';
+}
+// 학원 이름 바꾸기: CMVOCA 앱의 "학원명 변경"과 같은 곳에 저장 (지점 문서·지점 원장 계정 / 본원은 config)
+async function saveAcadName(n) {
+  if (A.role === 'sub') { const b = db.batch(); b.update(db.collection('branches').doc(A.me.uid), { academyName: n, nameSet: true }); b.update(db.collection('users').doc(A.me.uid), { academyName: n, name: n }); await b.commit(); A.me.academyName = n; A.me.name = n; }
+  else if (A.bid === 'main') { await db.collection('config').doc('main').set({ academyName: n }, { merge: true }); A.hqName = n; }
+  else { const b = db.batch(); b.update(db.collection('branches').doc(A.bid), { academyName: n, nameSet: true }); b.update(db.collection('users').doc(A.bid), { academyName: n, name: n }); await b.commit(); const br = A.branches.find(x => x.id === A.bid); if (br) br.academyName = n; const o = [...$('am-br').options].find(x => x.value === A.bid); if (o) o.textContent = n; }
+  brand();
+}
+async function vSettings(main) {
+  main.innerHTML = '';
+  main.append(head('학원 설정', A.role === 'super' ? '지금 고른 지점(' + (acadOf(A.bid) || A.bid) + ')의 설정입니다.' : '우리 학원의 설정입니다.'));
+  const inp = h('input', { type: 'text', value: acadOf(A.bid), maxlength: '40', style: 'min-height:48px;padding:0 14px;border:1px solid var(--line);border-radius:12px;font-size:17px;flex:1 1 260px;min-width:0' });
+  const save = btn('저장', '', () => safe(async () => {
+    const n = inp.value.trim(); if (!n) return alert('학원 이름을 입력하세요.'); if (n.length > 40) return alert('학원 이름은 40자 이내로 입력하세요.');
+    save.disabled = true; await saveAcadName(n); save.disabled = false; toast('학원 이름을 바꿨습니다.', 2000);
+  }));
+  const prev = h('div', { class: 'am-item', style: 'margin-top:12px' }, h('div', { class: 'am-logo' }, 'CM'), h('b', { style: 'font-size:17px' }, h('span', { id: 'am-prev' }, (acadOf(A.bid) || 'CM') + ' 학원관리')));
+  inp.oninput = () => { $('am-prev').textContent = (inp.value.trim() || 'CM') + ' 학원관리'; };
+  main.append(h('section', { class: 'am-card' }, h('h2', null, '학원 이름'),
+    h('p', { class: 'am-note', style: 'margin:0 0 12px' }, '학원관리 머리글, 강사·행정 담당자 화면, CMVOCA 학습 앱의 학원 이름이 함께 바뀝니다.'),
+    h('div', { style: 'display:flex;flex-wrap:wrap;gap:8px' }, inp, save), h('div', { class: 'am-note', style: 'margin-top:12px' }, '미리 보기'), prev,
+    h('p', { class: 'am-note', style: 'margin:12px 0 0' }, '학원 로고는 CMVOCA 앱의 학원 설정에서 올리면 여기에도 같이 나옵니다.')));
 }
 
 /* ===== 메뉴 ===== */
@@ -319,6 +361,7 @@ function menus() {
   if (isBoss() || staffCan('stu')) m.push(['reports', '수업 보고서']);
   if (isBoss()) m.push(['people', '강사·행정']);
   if (isBoss() || staffCan('assign')) m.push(['assign', '학생 지정'], ['perm', '공개 설정']);
+  if (isBoss()) m.push(['settings', '학원 설정']);
   if (A.role === 'super') m.push(['branches', '지점']);
   return m;
 }
@@ -328,7 +371,7 @@ function go(v) {
   const nav = $('am-nav'); nav.innerHTML = '';
   ms.forEach(([k, t]) => nav.append(h('button', { type: 'button', 'aria-current': k === v ? 'page' : null, onclick: () => go(k) }, t)));
   const main = $('am-main'); main.innerHTML = ''; main.append(h('div', { class: 'am-empty' }, '불러오는 중…'));
-  safe(() => ({ home: vHome, ops: vOps, reports: vReports, people: vPeople, assign: vAssign, perm: vPerm, branches: vBranches, mystu: vMyStu, tatt: vTAtt, report: vReport })[v](main));
+  safe(() => ({ home: vHome, ops: vOps, reports: vReports, people: vPeople, assign: vAssign, perm: vPerm, branches: vBranches, settings: vSettings, mystu: vMyStu, tatt: vTAtt, report: vReport })[v](main));
 }
 const head = (t, s) => h('div', null, h('h1', { class: 'am-h1' }, t), s ? h('p', { class: 'am-sub' }, s) : null);
 function modal(title, body, onOk, okText) {
@@ -783,7 +826,7 @@ async function vBranches(main) {
     let tn = '-';
     try { tn = (await db.collection('users').where('branchId', '==', b.id).where('role', '==', 'teacher').get()).size + '명'; } catch (_) {}
     l.append(h('div', { class: 'am-item' }, h('span', { class: 'grow' }, b.academyName || b.id), h('span', { class: 'am-note' }, '강사 ' + tn), b.endDate ? h('span', { class: 'am-pill' + (b.endDate < today() ? ' red' : '') }, '사용기간 ' + b.endDate) : null,
-      btn(A.bid === b.id ? '보는 중' : '이 지점 관리', A.bid === b.id ? 'ghost sm' : 'sm', () => { A.bid = b.id; $('am-br').value = b.id; A.sel = null; go('people'); }, { disabled: A.bid === b.id || null })));
+      btn(A.bid === b.id ? '보는 중' : '이 지점 관리', A.bid === b.id ? 'ghost sm' : 'sm', () => { A.bid = b.id; $('am-br').value = b.id; A.sel = null; brand(); go('people'); }, { disabled: A.bid === b.id || null })));
   }
   c.append(l); main.append(c);
 }

@@ -16,10 +16,10 @@ const dayOf = ts => { const d = new Date(ts); return d.getFullYear() + '-' + Str
 const fmtD = s => Math.floor(s / 60) + '분 ' + (s % 60) + '초';
 const db = firebase.firestore();
 // CMVOCA 앱의 상태(S) 대신 학원관리 화면의 상태를 씀
-const S = { get me() { return window.AM.me(); }, get branches() { return window.AM.branches(); }, get viewBranch() { return window.AM.bid(); }, set viewBranch(v) {}, hqLogo: '', hqName: '', fFiles: false, folderId: null };
+const S = { get me() { return window.AM.me(); }, get branches() { return window.AM.branches(); }, get viewBranch() { return window.AM.bid(); }, set viewBranch(v) {}, hqLogo: '', get hqName() { return window.AM.hq ? window.AM.hq() : ''; }, set hqName(v) { if (window.AM.setHq) window.AM.setHq(v); }, fFiles: false, folderId: null };
 const curBranch = () => window.AM.bid();
 const branchName = id => id === 'main' ? '본원' : ((S.branches.find(b => b.id === id) || {}).academyName || id);
-const nameBlank = () => false, meLogo = () => (S.me && S.me.logoUrl) || '', blankLogo = () => false, applyBrand = () => {};
+const nameBlank = () => false, meLogo = () => (S.me && S.me.logoUrl) || '', blankLogo = () => false, applyBrand = () => window.AM.brand();
 const setLogo = async () => { throw new Error('학원 로고는 CMVOCA 앱의 학원 설정에서 바꿔 주세요.'); };
 const setView = () => window.open('/', '_blank');
 // 출퇴근 화면: 예전 강사 명단 + 학원관리 계정 강사(같은 이름이 없을 때). 계정 강사는 수업 보고서로 출퇴근이 기록됨
