@@ -134,6 +134,8 @@ exports.wbJoinRoom = call(async (d, me) => {
 exports.wbSetCharacter = call(async (d, me) => mutate(d.roomId, room => { inRoom(room, me.uid); return lift(F.chooseCharacter(room, me.uid, d.character)); }));
 exports.wbReady = call(async (d, me) => mutate(d.roomId, room => { inRoom(room, me.uid); return lift({ ok: true, room: F.setReady(room, me.uid, !!d.ready).room }); }));
 exports.wbLeave = call(async (d, me) => mutate(d.roomId, room => { if (!room.players[me.uid]) return { changed: false }; return lift(F.leaveRoom(room, me.uid, Date.now())); }));
+/** 방장이 모든 참가자의 경기를 한꺼번에 끝낸다 */
+exports.wbEnd = call(async (d, me) => mutate(d.roomId, room => { inRoom(room, me.uid); return lift(F.endRoom(room, me.uid, Date.now())); }));
 exports.wbStart = call(async (d, me) => mutate(d.roomId, (room, secret) => lift(F.startGame(room, secret, me.uid, Date.now()))));
 
 /* ----- 경기 중 ----- */

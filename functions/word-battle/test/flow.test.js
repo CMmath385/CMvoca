@@ -138,4 +138,13 @@ t('경기가 끝나면 성적·포인트 기록 목록은 한 번만 만들어�
   assert.strictEqual(F.finalizeEffects({ ...end, finalized: true }), null); assert.strictEqual(F.finalizeEffects({ ...end, status: 'IN_PROGRESS' }), null);
 });
 
+t('방장 전체 종료: 방장만, 대기·진행 중 모두, 종료 후 제출·tick 불가, 포인트 기록 없음', () => {
+  const { room, secret } = newRoom(3);
+  assert.strictEqual(F.endRoom(room, 'P1', T0 + 5).reason, 'NOT_HOST');
+  const w = F.endRoom(room, 'P0', T0 + 5); assert(w.ok && w.room.status === 'CANCELLED' && w.room.endedBy === 'host');
+  let r = F.startGame(room, secret, 'P0', T0 + 100).room; r = F.submit(r, secret, 'P1', r.cur.id, answerFor(secret, 0, true), T0 + 200).room;
+  const e = F.endRoom(r, 'P0', T0 + 300); assert(e.ok && e.room.status === 'CANCELLED' && e.room.cur === null);
+  assert.strictEqual(F.submit(e.room, secret, 'P2', 'r1-1', 0, T0 + 400).reason, 'NOT_IN_PROGRESS'); assert.strictEqual(F.tick(e.room, secret, T0 + 99999).reason, 'ENDED');
+  assert.strictEqual(F.finalizeEffects(e.room), null); assert.strictEqual(F.endRoom(e.room, 'P0', T0 + 500).reason, 'ENDED');
+});
 console.log(`\n통과 ${pass}개`);

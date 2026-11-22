@@ -60,5 +60,13 @@ put('pages/w1', { html: '<script>const DATA = ' + JSON.stringify({ title: '테�
     assert.strictEqual(pub().status, 'COMPLETED'); assert.strictEqual(pub().result.length, 2);
     assert(store.get('wb_stats/' + roomId + '_A') && store.get('wb_stats/' + roomId + '_B'), '성적 기록');
   });
+  await t('방장 전체 종료: 참가자 화면(방)이 모두 종료 상태가 되고, 방장이 아니면 거부', async () => {
+    const c = await run('wbCreateRoom', 'A', { itemIds: ['w1'], character: '검은이' }); const j = await run('wbJoinRoom', 'B', { code: c.code, character: '말티즈' });
+    await run('wbReady', 'B', { roomId: c.roomId, ready: true }); await run('wbStart', 'A', { roomId: c.roomId });
+    await assert.rejects(() => run('wbEnd', 'B', { roomId: c.roomId }), /NOT_HOST/);
+    const e = await run('wbEnd', 'A', { roomId: c.roomId }); assert.strictEqual(e.room.status, 'CANCELLED');
+    assert.strictEqual(store.get('wb_rooms/' + c.roomId).status, 'CANCELLED'); assert.strictEqual(store.get('wb_rooms/' + c.roomId).endedBy, 'host');
+    assert(!store.get('wb_stats/' + c.roomId + '_A'), '종료한 경기는 성적을 기록하지 않음');
+  });
   console.log(`\n통과 ${pass}개`);
 })().catch(e => { console.error('\n실패:', e.message); process.exit(1); });
